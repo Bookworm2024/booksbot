@@ -64,9 +64,16 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Public logs / invite link (/get_link, 24h single-use, 1/day)
 - ✅ Safe in-house captcha (CAPTCHA_ENABLED) replacing 3rd-party verification
 - ✅ Payments — UPI manual flow (UTR + screenshot → admin approve → credit BGM)
-- ⬜ Payments — crypto (Oxapay) auto deposits → needs OXAPAY_MERCHANT key
-- ⬜ AI recommendations (needs LLM API key)
-- ⬜ Admin dashboard Mini App (optional polish)
+- ✅ Payments — crypto (Oxapay) invoice + HMAC-verified webhook → auto-credit BGM
+  (activates when OXAPAY_MERCHANT set)
+- ✅ AI recommendations — Claude-backed, 100 titles/20-batch, refund on invalid
+  genre (activates when ANTHROPIC_API_KEY set)
+- ⬜ Admin dashboard Mini App (optional future polish)
+
+## Status: feature-complete
+All TBC features rebuilt + modernized. Credential-gated features (AI, crypto)
+activate automatically once their keys are set in the host env. Remaining work
+is operational: deploy to Koyeb, run the Telethon backfill, go live.
 
 ## Cross-cutting (applied throughout)
 - Coloured keyboards everywhere · Mini Apps where they beat chat UI

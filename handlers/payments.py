@@ -21,12 +21,15 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
+from aiohttp import web
+
 from config import (
-    ADMIN_IDS, BGM_PRICE_INR, BGM_PRICE_USD, MIN_BGM_PURCHASE, OXAPAY_MERCHANT,
-    PAYMENT_QR_URL, UPI_ID,
+    ADMIN_IDS, BGM_PRICE_INR, BGM_PRICE_USD, BOT_PUBLIC_URL, MIN_BGM_PURCHASE,
+    OXAPAY_MERCHANT, PAYMENT_QR_URL, UPI_ID,
 )
 from database.connection import MongoManager
 from utils.keyboards import btn, kb, url_btn
+from utils.oxapay import create_invoice, is_paid, verify_hmac
 from utils.wallet import add_bgm
 
 logger = logging.getLogger(__name__)
@@ -220,17 +223,85 @@ async def cb_decline(call: CallbackQuery) -> None:
         pass
 
 
-# ── crypto (gated on Oxapay key) ────────────────────────────────────────────────
+# ── crypto (Oxapay) ─────────────────────────────────────────────────────────
+_PACKS = [10, 25, 50, 100]
+
+
 @router.callback_query(F.data == "pay_crypto")
 async def cb_crypto(call: CallbackQuery) -> None:
     await call.answer()
-    if not OXAPAY_MERCHANT:
+    if not OXAPAY_MERCHANT or not BOT_PUBLIC_URL:
         await call.message.edit_text(
             "🌐 <b>Crypto payments</b> aren't enabled yet.\n"
-            "<i>Admin: set OXAPAY_MERCHANT to activate automatic crypto deposits.</i>",
+            "<i>Admin: set OXAPAY_MERCHANT and BOT_PUBLIC_URL to activate.</i>",
             reply_markup=kb([btn("🔙 Back", "acc_buy", style="danger")]))
         return
-    # Oxapay static-address generation goes here once the key is configured.
+    rows = [[btn(f"💰 {p} BGM (${p * BGM_PRICE_USD:.2f})", f"pay_cpack:{p}", style="success")]
+            for p in _PACKS]
+    rows.append([btn("🔙 Back", "acc_buy", style="danger")])
     await call.message.edit_text(
-        "🌐 <b>Crypto</b> — coming online. (Oxapay integration pending final wiring.)",
-        reply_markup=kb([btn("🔙 Back", "acc_buy", style="danger")]))
+        "🌐 <b>Crypto Payment</b>\n━━━━━━━━━━━━━━━━━━\n"
+        f"${BGM_PRICE_USD:g}/BGM · pay any supported coin (BTC, USDT, etc.)\n\n"
+        "Pick a pack — you'll get a secure pay link. BGM is credited "
+        "automatically once the blockchain confirms.",
+        reply_markup=kb(*rows))
+
+
+@router.callback_query(F.data.startswith("pay_cpack:"))
+async def cb_cpack(call: CallbackQuery) -> None:
+    bgm = int(call.data.split(":", 1)[1])
+    amount_usd = round(bgm * BGM_PRICE_USD, 2)
+    await call.answer("Generating pay link…")
+    order_id = _pid()
+    db = await MongoManager.get()
+    callback_url = f"{BOT_PUBLIC_URL}/api/oxapay/callback"
+    inv = await create_invoice(amount_usd, order_id, callback_url)
+    if not inv or not inv.get("pay_link"):
+        await call.message.edit_text(
+            "❌ Couldn't reach the payment gateway. Try again shortly.",
+            reply_markup=kb([btn("🔙 Back", "acc_buy", style="danger")]))
+        return
+    await db.safe_insert("crypto_orders", {
+        "order_id": order_id, "user_id": call.from_user.id, "bgm": bgm,
+        "amount_usd": amount_usd, "track_id": inv.get("track_id"),
+        "status": "pending", "created_at": _now(),
+    })
+    await call.message.edit_text(
+        f"🌐 <b>Pay ${amount_usd:.2f}</b> for <b>{bgm} BGM</b>\n\n"
+        "Tap below to pay (link valid ~30 min). BGM lands automatically after "
+        "confirmation.",
+        reply_markup=kb([url_btn("💳 Pay Now", inv["pay_link"], style="success")],
+                        [btn("🔙 Back", "acc_buy", style="danger")]))
+
+
+# ── Oxapay webhook (registered in bot.py at /api/oxapay/callback) ───────────────
+async def api_oxapay_callback(request: web.Request) -> web.Response:
+    raw = await request.read()
+    if not verify_hmac(raw, request.headers.get("HMAC", "")):
+        logger.warning("Oxapay callback failed HMAC check")
+        return web.Response(status=403, text="bad signature")
+    try:
+        data = await request.json()
+    except Exception:  # noqa: BLE001
+        return web.Response(status=400, text="bad json")
+
+    order_id = str(data.get("orderId") or "")
+    if not (is_paid(data.get("status", "")) and order_id):
+        return web.Response(text="ignored")
+
+    db = await MongoManager.get()
+    order = await db.find_one_global("crypto_orders", {"order_id": order_id})
+    if not order or order.get("status") == "paid":
+        return web.Response(text="ok")  # unknown or already credited (idempotent)
+
+    await db.safe_update("crypto_orders", {"order_id": order_id},
+                         {"$set": {"status": "paid", "paid_at": _now()}}, upsert=False)
+    await add_bgm(order["user_id"], float(order["bgm"]))
+    bot = request.app["bot"]
+    try:
+        await bot.send_message(order["user_id"],
+                               f"🎉 <b>Crypto payment confirmed!</b>\n"
+                               f"💎 +{order['bgm']} BGM added to your wallet.")
+    except Exception:  # noqa: BLE001
+        pass
+    return web.Response(text="ok")

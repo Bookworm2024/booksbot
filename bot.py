@@ -29,9 +29,10 @@ from config import (
 from database.connection import MongoManager
 from handlers import (
     admin, broadcast, captcha, economy, favorites, games, indexer, invite,
-    payments, qadmin, rate, referral, request, requests_manual, start, stats,
-    support, track,
+    payments, qadmin, rate, recommend, referral, request, requests_manual, start,
+    stats, support, track,
 )
+from handlers.payments import api_oxapay_callback
 from handlers.games_api import api_game_new, api_game_submit
 from handlers.reader_api import (
     api_file, api_reader_state_get, api_reader_state_set,
@@ -72,6 +73,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(track.router)
     dp.include_router(economy.router)
     dp.include_router(payments.router)
+    dp.include_router(recommend.router)
     dp.include_router(favorites.router)
     dp.include_router(games.router)
     dp.include_router(referral.router)
@@ -104,6 +106,8 @@ async def _start_web(bot: Bot) -> web.AppRunner:
     app.router.add_get("/api/file", api_file)
     app.router.add_get("/api/reader/state", api_reader_state_get)
     app.router.add_post("/api/reader/state", api_reader_state_set)
+    # Oxapay crypto payment webhook
+    app.router.add_post("/api/oxapay/callback", api_oxapay_callback)
     if os.path.isdir(WEB_APP_DIR):
         app.router.add_static("/app/", WEB_APP_DIR, show_index=False)
     runner = web.AppRunner(app)

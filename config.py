@@ -136,6 +136,11 @@ MIN_BGM_PURCHASE: int  = _int("MIN_BGM_PURCHASE", 10)
 OXAPAY_MERCHANT: str   = os.getenv("OXAPAY_MERCHANT", "")  # crypto (Oxapay)
 
 
+# ── AI recommendations (Claude) ──────────────────────────────────────────────
+ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL: str   = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+
+
 # ── anti-bot captcha ─────────────────────────────────────────────────────────
 # Safe in-house emoji-tap captcha (replaces the old token-leaking 3rd-party
 # verification). Off by default; enable if you want a bot gate on /start.
