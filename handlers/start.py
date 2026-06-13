@@ -183,14 +183,12 @@ async def cb_tools(call: CallbackQuery) -> None:
 
 
 # ── phase-2 stubs (never dead-end) ─────────────────────────────────────────────
+# Actions still pending a phase. Implemented actions (menu_request, acc_balance,
+# acc_redeem, lib_favorites, …) are handled by their own routers and removed here.
 _COMING = {
-    "menu_request": "📚 The request system (bot search + admin request) is being rebuilt for this new bot — coming in the next phase.",
     "menu_games":   "🎮 Games (Quiz, True/False & new Mini-App games) are coming in a later phase.",
     "lib_recommend": "🤖 AI recommendations are coming soon.",
-    "lib_favorites": "⭐ Favorites are coming soon.",
-    "acc_balance":  "💼 Wallet & balance view is coming in the economy phase.",
     "acc_buy":      "💎 BGM purchase (UPI + crypto) is coming in the payments phase.",
-    "acc_redeem":   "🎟 Redeem codes are coming soon.",
     "acc_refer":    "🎁 Referrals are coming soon.",
     "acc_track":    "🚨 Request tracking is coming soon.",
     "tool_stats":   "📊 Live stats are coming soon.",

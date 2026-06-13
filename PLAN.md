@@ -19,19 +19,22 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Telethon backfill scaffold (generate_session + backfill)
 - ✅ Dockerfile / Koyeb-ready / README
 
-## Phase 2 — File index & search 🔜
-- 🔜 Run backfill; index 30k files (name, ext, kind, channel msg_id)
-- 🔜 Live indexer: new channel posts → `files` (bot-side, real-time)
-- 🔜 Fast search (Mongo text + prefix), paginated coloured results
-- 🔜 Delivery via `bot.copy_message` from the file channel (valid bot file_ids)
-- 🔜 Watchlist: notify users when a missing title is later added
-- 🔜 Token cost per download (BCN/BGM) + refund on delivery failure
+## Phase 2 — File index & search ✅
+- ✅ Live indexer: new channel posts → `files` (real-time, bot-side)
+- ✅ Telethon backfill scaffold for the 30k history (tools/backfill.py)
+- ✅ All-words search, paginated coloured results
+- ✅ Delivery via `bot.copy_message` from the file channel
+- ✅ Watchlist: notify users when a missing title is later added
+- ✅ Token cost per download (BCN-first) + refund on delivery failure
+- ✅ Favorites: add / list / view (free re-deliver) / remove
+- 🔜 (operational) run backfill once creds + FILE_CHANNEL_ID are set
 
-## Phase 3 — Economy & wallet ⬜
-- ⬜ BGM (permanent) / BCN (daily, expiring) wallet on Mongo
-- ⬜ /claim daily, /balance, BCN→BGM convert
+## Phase 3 — Economy & wallet 🔜
+- ✅ BGM (permanent) / BCN (daily, expiring) wallet on Mongo
+- ✅ /claim daily (random 3–5 BCN), /balance
+- ✅ Redeem codes: /create (admin) + /redeem (per-user one-time, limited supply)
+- 🔜 BCN→BGM convert
 - ⬜ Payments: UPI (manual verify) + crypto (Oxapay) → BGM
-- ⬜ Redeem codes (create/claim, per-user one-time)
 
 ## Phase 4 — Requests ⬜
 - ⬜ Auto request (search archive) + manual request (admin fulfilment)

@@ -1,0 +1,180 @@
+"""
+handlers/economy.py — wallet, daily claim, redeem codes.
+
+  /claim   — free daily BCN (random 3–5), expires in 24h
+  /balance — wallet view (also the "Balance" dashboard button)
+  /redeem  — enter a code → credit BGM (one claim per user, limited supply)
+  /create  — (admin) mint a redeem code: /create <max_claims> <total_bgm>
+"""
+import logging
+import random
+import string
+from datetime import datetime, timezone
+
+from aiogram import F, Router
+from aiogram.filters import Command, CommandObject
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import CallbackQuery, Message
+
+from config import ADMIN_IDS, BCN_EXPIRY_SECONDS
+from database.connection import MongoManager
+from utils.keyboards import btn, kb
+from utils.wallet import add_bgm, get_balances, seconds_until_claim, set_daily_bcn
+
+logger = logging.getLogger(__name__)
+router = Router()
+
+
+class RedeemFSM(StatesGroup):
+    awaiting_code = State()
+
+
+def _fmt_dur(seconds: int) -> str:
+    h, m = seconds // 3600, (seconds % 3600) // 60
+    return f"{h}h {m}m" if h else f"{m}m {seconds % 60}s"
+
+
+# ── /balance ─────────────────────────────────────────────────────────────────
+async def _balance_view(uid: int):
+    bgm, bcn = await get_balances(uid)
+    left = await seconds_until_claim(uid)
+    claim_line = ("🎁 <b>Daily Bonus:</b> READY — /claim now"
+                  if left == 0 else f"🎁 <b>Daily Bonus:</b> in {_fmt_dur(left)}")
+    text = (
+        "<b>💼 Your Wallet</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"💎 <b>BGM:</b> <code>{bgm:.3f}</code>  <i>(permanent)</i>\n"
+        f"🪙 <b>BCN:</b> <code>{bcn:.3f}</code>  <i>(expires 24h)</i>\n"
+        f"⚖️ <b>Total:</b> <code>{bgm + bcn:.3f}</code>\n\n"
+        f"{claim_line}"
+    )
+    rows = []
+    if left == 0:
+        rows.append([btn("⚡ Claim Daily BCN", "do_claim", style="success")])
+    rows.append([btn("💎 Buy BGM", "acc_buy", style="success"),
+                 btn("🎟 Redeem", "acc_redeem", style="primary")])
+    rows.append([btn("🔙 Back", "menu_account", style="danger")])
+    return text, kb(*rows)
+
+
+@router.message(Command("balance"))
+async def cmd_balance(message: Message) -> None:
+    text, markup = await _balance_view(message.chat.id)
+    await message.answer(text, reply_markup=markup)
+
+
+@router.callback_query(F.data == "acc_balance")
+async def cb_balance(call: CallbackQuery) -> None:
+    await call.answer()
+    text, markup = await _balance_view(call.from_user.id)
+    await call.message.edit_text(text, reply_markup=markup)
+
+
+# ── /claim ───────────────────────────────────────────────────────────────────
+async def _do_claim(uid: int) -> tuple[str, object]:
+    left = await seconds_until_claim(uid)
+    if left > 0:
+        return (f"⏳ <b>Claim on cooldown.</b>\nNext claim in <b>{_fmt_dur(left)}</b>.",
+                kb([btn("💎 Buy BGM (skip wait)", "acc_buy", style="success")],
+                   [btn("🔙 Back", "menu_account", style="danger")]))
+    bonus = round(random.uniform(3.0, 5.0), 2)
+    await set_daily_bcn(uid, bonus)
+    return (f"✨ <b>Claim Successful!</b>\n\n💰 <b>+{bonus:.2f} BCN</b>\n"
+            "📅 Valid for 24 hours.",
+            kb([btn("💼 View Balance", "acc_balance", style="primary")],
+               [btn("🔙 Back", "menu_account", style="danger")]))
+
+
+@router.message(Command("claim"))
+async def cmd_claim(message: Message) -> None:
+    text, markup = await _do_claim(message.chat.id)
+    await message.answer(text, reply_markup=markup)
+
+
+@router.callback_query(F.data == "do_claim")
+async def cb_claim(call: CallbackQuery) -> None:
+    await call.answer()
+    text, markup = await _do_claim(call.from_user.id)
+    await call.message.edit_text(text, reply_markup=markup)
+
+
+# ── /redeem ──────────────────────────────────────────────────────────────────
+@router.message(Command("redeem"))
+async def cmd_redeem(message: Message, state: FSMContext) -> None:
+    await _prompt_redeem(message, state)
+
+
+@router.callback_query(F.data == "acc_redeem")
+async def cb_redeem(call: CallbackQuery, state: FSMContext) -> None:
+    await call.answer()
+    await _prompt_redeem(call.message, state)
+
+
+async def _prompt_redeem(message: Message, state: FSMContext) -> None:
+    await state.set_state(RedeemFSM.awaiting_code)
+    await message.answer(
+        "🎟 <b>Redeem a Code</b>\n\nType or paste your code below.\n"
+        "<i>Codes are case-sensitive and usually one-use per account.</i>",
+        reply_markup=kb([btn("❌ Cancel", "menu_account", style="danger")]),
+    )
+
+
+@router.message(RedeemFSM.awaiting_code, F.text)
+async def on_code(message: Message, state: FSMContext) -> None:
+    code = (message.text or "").strip()
+    if code.startswith("/"):
+        await state.clear()
+        return
+    await state.clear()
+    uid = message.chat.id
+    db = await MongoManager.get()
+
+    doc = await db.find_one_global("codes", {"code": code})
+    if not doc:
+        await message.answer("❌ <b>Invalid code.</b> Check for typos and try again.")
+        return
+    if await db.find_one_global("code_claims", {"code": code, "user_id": uid}):
+        await message.answer("⚠️ You have already redeemed this code.")
+        return
+    if int(doc.get("remaining", 0)) <= 0:
+        await message.answer("❌ <b>Code exhausted.</b> All claims used up.")
+        return
+
+    amount = float(doc.get("amount_per_claim", 0))
+    await add_bgm(uid, amount)
+    await db.safe_insert("code_claims", {"code": code, "user_id": uid,
+                                         "at": datetime.now(timezone.utc)})
+    await db.safe_update("codes", {"code": code}, {"$inc": {"remaining": -1}})
+    await message.answer(
+        f"✨ <b>Redeemed!</b>\n\n🎁 <b>+{amount} BGM</b> added to your wallet.",
+        reply_markup=kb([btn("💼 Check Balance", "acc_balance", style="primary")]),
+    )
+
+
+# ── /create (admin) ────────────────────────────────────────────────────────────
+@router.message(Command("create"))
+async def cmd_create(message: Message, command: CommandObject) -> None:
+    if message.chat.id not in ADMIN_IDS:
+        await message.answer("🚫 Access denied.")
+        return
+    parts = (command.args or "").split()
+    if len(parts) != 2 or not all(p.replace(".", "").isdigit() for p in parts):
+        await message.answer("❌ Usage: <code>/create &lt;max_claims&gt; &lt;total_bgm&gt;</code>\n"
+                             "Example: <code>/create 20 50</code> → 2.5 BGM each.")
+        return
+    max_claims, total = int(parts[0]), float(parts[1])
+    if max_claims <= 0:
+        await message.answer("❌ Max claims must be > 0.")
+        return
+    per = round(total / max_claims, 3)
+    code = "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    db = await MongoManager.get()
+    await db.safe_insert("codes", {
+        "code": code, "amount_per_claim": per, "remaining": max_claims,
+        "created_by": message.chat.id, "created_at": datetime.now(timezone.utc),
+    })
+    await message.answer(
+        "✅ <b>Redeem Code Created</b>\n\n"
+        f"🎟️ <code>{code}</code>\n🧮 Claims: {max_claims}\n"
+        f"💸 Per user: {per} BGM\n💰 Total: {total} BGM")
