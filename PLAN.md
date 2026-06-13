@@ -29,17 +29,18 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Favorites: add / list / view (free re-deliver) / remove
 - 🔜 (operational) run backfill once creds + FILE_CHANNEL_ID are set
 
-## Phase 3 — Economy & wallet 🔜
+## Phase 3 — Economy & wallet ✅
 - ✅ BGM (permanent) / BCN (daily, expiring) wallet on Mongo
-- ✅ /claim daily (random 3–5 BCN), /balance
+- ✅ /claim daily (random 3–5 BCN), /balance (with request counts)
 - ✅ Redeem codes: /create (admin) + /redeem (per-user one-time, limited supply)
-- 🔜 BCN→BGM convert
-- ⬜ Payments: UPI (manual verify) + crypto (Oxapay) → BGM
+- ✅ BCN→BGM convert (≥50 BGM, 10×/month, 25% tax)
+- ⬜ Payments: UPI (manual verify) + crypto (Oxapay) → BGM  → Phase 6
 
-## Phase 4 — Requests ⬜
-- ⬜ Auto request (search archive) + manual request (admin fulfilment)
-- ⬜ Admin request queue, mark-completed, send-file, cancel-with-reason
-- ⬜ Request tracking + history, favorites
+## Phase 4 — Requests ✅
+- ✅ Auto request (search archive — Phase 2) + manual request (ebook/audiobook flow)
+- ✅ Admin queue (/requests + panel), send-file (+archive enrich), mark-completed, cancel+reason+refund
+- ✅ Refund: BCN→25%, BGM→75%, always paid in BGM
+- ✅ Request tracking (/track, own-only) + history; admin /track_request
 
 ## Phase 5 — Mini Apps ⬜
 - ⬜ eBook reader Mini App (PDF/EPUB, pagination, bookmarks, page memory)

@@ -125,7 +125,8 @@ async def do_unban(message: Message, state: FSMContext) -> None:
 
 
 # ── stubs for later phases ──────────────────────────────────────────────────────
-@router.callback_query(F.data.in_({"admin_requests", "admin_broadcast", "admin_addbgm",
+# admin_requests is handled by handlers/requests_manual.py.
+@router.callback_query(F.data.in_({"admin_broadcast", "admin_addbgm",
                                     "admin_create", "admin_list", "admin_manage"}))
 async def cb_admin_stub(call: CallbackQuery) -> None:
     await call.answer("Coming in a later phase.", show_alert=True)

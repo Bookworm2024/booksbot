@@ -39,6 +39,12 @@ def _fmt_dur(seconds: int) -> str:
 async def _balance_view(uid: int):
     bgm, bcn = await get_balances(uid)
     left = await seconds_until_claim(uid)
+    db = await MongoManager.get()
+    u = await db.find_one_global("users", {"user_id": uid},
+                                 {"ebook_requests": 1, "audiobook_requests": 1,
+                                  "downloads": 1}) or {}
+    eb = int(u.get("ebook_requests") or 0)
+    ab = int(u.get("audiobook_requests") or 0)
     claim_line = ("🎁 <b>Daily Bonus:</b> READY — /claim now"
                   if left == 0 else f"🎁 <b>Daily Bonus:</b> in {_fmt_dur(left)}")
     text = (
@@ -47,6 +53,8 @@ async def _balance_view(uid: int):
         f"💎 <b>BGM:</b> <code>{bgm:.3f}</code>  <i>(permanent)</i>\n"
         f"🪙 <b>BCN:</b> <code>{bcn:.3f}</code>  <i>(expires 24h)</i>\n"
         f"⚖️ <b>Total:</b> <code>{bgm + bcn:.3f}</code>\n\n"
+        f"📚 eBook reqs: <code>{eb}</code>  ·  🎧 Audio reqs: <code>{ab}</code>  ·  "
+        f"📈 Total: <code>{eb + ab}</code>\n\n"
         f"{claim_line}"
     )
     rows = []
@@ -54,6 +62,8 @@ async def _balance_view(uid: int):
         rows.append([btn("⚡ Claim Daily BCN", "do_claim", style="success")])
     rows.append([btn("💎 Buy BGM", "acc_buy", style="success"),
                  btn("🎟 Redeem", "acc_redeem", style="primary")])
+    if bcn > 0:
+        rows.append([btn("🔄 Convert BCN→BGM", "convert_bcn", style="primary")])
     rows.append([btn("🔙 Back", "menu_account", style="danger")])
     return text, kb(*rows)
 
@@ -150,6 +160,78 @@ async def on_code(message: Message, state: FSMContext) -> None:
         f"✨ <b>Redeemed!</b>\n\n🎁 <b>+{amount} BGM</b> added to your wallet.",
         reply_markup=kb([btn("💼 Check Balance", "acc_balance", style="primary")]),
     )
+
+
+# ── BCN → BGM converter ────────────────────────────────────────────────────────
+_CONVERT_TAX = 0.25            # 25% tax → 75% credited
+_CONVERT_MIN_BGM = 50.0        # must already hold ≥50 BGM
+_CONVERT_MONTHLY_CAP = 10      # uses per calendar month
+
+
+def _month_key() -> str:
+    n = datetime.now(timezone.utc)
+    return f"{n.year}-{n.month:02d}"
+
+
+@router.callback_query(F.data == "convert_bcn")
+async def cb_convert(call: CallbackQuery) -> None:
+    await call.answer()
+    uid = call.from_user.id
+    bgm, bcn = await get_balances(uid)
+    db = await MongoManager.get()
+    udoc = await db.find_one_global("users", {"user_id": uid},
+                                    {"convert_month": 1, "convert_count": 1}) or {}
+    used = udoc.get("convert_count", 0) if udoc.get("convert_month") == _month_key() else 0
+
+    if bcn <= 0:
+        await call.message.edit_text("You have no BCN to convert.",
+                                     reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
+        return
+    if bgm < _CONVERT_MIN_BGM:
+        await call.message.edit_text(
+            f"🔒 <b>Converter Locked</b>\n\nYou must hold at least <b>{_CONVERT_MIN_BGM:.0f} BGM</b> "
+            f"to use the converter.\nYou have {bgm:.2f} BGM.",
+            reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
+        return
+    if used >= _CONVERT_MONTHLY_CAP:
+        await call.message.edit_text(
+            f"🔒 Monthly converter limit reached ({_CONVERT_MONTHLY_CAP}×). Try next month.",
+            reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
+        return
+
+    credited = round(bcn * (1 - _CONVERT_TAX), 3)
+    await call.message.edit_text(
+        "<b>🔄 Convert BCN → BGM</b>\n"
+        f"🪙 Converting: <code>{bcn:.3f} BCN</code>\n"
+        f"🧾 Tax (25%): <code>{bcn * _CONVERT_TAX:.3f}</code>\n"
+        f"💎 You receive: <code>{credited:.3f} BGM</code>\n\n"
+        f"Uses this month: {used}/{_CONVERT_MONTHLY_CAP}",
+        reply_markup=kb([btn("✅ Confirm Convert", "convert_do", style="success")],
+                        [btn("🔙 Back", "acc_balance", style="danger")]))
+
+
+@router.callback_query(F.data == "convert_do")
+async def cb_convert_do(call: CallbackQuery) -> None:
+    uid = call.from_user.id
+    bgm, bcn = await get_balances(uid)
+    db = await MongoManager.get()
+    udoc = await db.find_one_global("users", {"user_id": uid},
+                                    {"convert_month": 1, "convert_count": 1}) or {}
+    used = udoc.get("convert_count", 0) if udoc.get("convert_month") == _month_key() else 0
+    if bcn <= 0 or bgm < _CONVERT_MIN_BGM or used >= _CONVERT_MONTHLY_CAP:
+        await call.answer("Conditions no longer met.", show_alert=True)
+        return
+    await call.answer()
+    credited = round(bcn * (1 - _CONVERT_TAX), 3)
+    # zero BCN, credit BGM, bump monthly counter
+    await db.safe_update("users", {"user_id": uid},
+                         {"$set": {"bookcoin": 0.0, "bcn_claimed_at": None,
+                                   "convert_month": _month_key(),
+                                   "convert_count": used + 1},
+                          "$inc": {"bookgem": credited}})
+    text, markup = await _balance_view(uid)
+    await call.message.edit_text(f"✅ Converted to <b>{credited:.3f} BGM</b>.\n\n" + text,
+                                 reply_markup=markup)
 
 
 # ── /create (admin) ────────────────────────────────────────────────────────────

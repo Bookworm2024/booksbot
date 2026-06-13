@@ -27,7 +27,9 @@ from config import (
     validate_runtime_config,
 )
 from database.connection import MongoManager
-from handlers import admin, economy, favorites, indexer, request, start
+from handlers import (
+    admin, economy, favorites, indexer, request, requests_manual, start, track,
+)
 from middlewares.ban import BanMiddleware
 
 logging.basicConfig(
@@ -58,6 +60,8 @@ def _build_dispatcher() -> Dispatcher:
     # start first (owns the dashboard + nav), then feature routers.
     dp.include_router(start.router)
     dp.include_router(request.router)
+    dp.include_router(requests_manual.router)
+    dp.include_router(track.router)
     dp.include_router(economy.router)
     dp.include_router(favorites.router)
     dp.include_router(admin.router)
