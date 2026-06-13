@@ -47,8 +47,11 @@ Legend: ✅ done · 🔜 next · ⬜ planned
   sent to client; sessions single-use; daily limits + HMAC initData auth)
 - ✅ Telegram initData HMAC validation (utils/webapp_auth.py)
 - ✅ Starter question bank auto-seed + game API (/api/game/new, /api/game/submit)
-- ⬜ eBook reader Mini App (PDF/EPUB, pagination, bookmarks, page memory)
-- ⬜ Audiobook player Mini App (seek, speed, resume position)
+- ✅ eBook reader Mini App (PDF via pdf.js, EPUB via epub.js, pagination,
+  bookmarks, page/CFI memory) — reader.html + /api/file + /api/reader/state
+- ✅ Audiobook player Mini App (seek, ±15s, 0.75–2× speed, resume position)
+- ✅ File-stream endpoint gated to the user's Favorites (initData-auth);
+  graceful >20MB / no-file_id fallbacks
 - ⬜ Admin question management + leaderboards
 
 ## Phase 6 — Admin & growth 🔜

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>BooksBot Player</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column; justify-content:center;
+    align-items:center; gap:18px; padding:24px; font-family: system-ui, sans-serif;
+    background: var(--tg-theme-bg-color,#0f1115); color: var(--tg-theme-text-color,#e8e8e8); }
+  h1 { font-size:1.1rem; text-align:center; margin:0; }
+  .disc { font-size:4rem; }
+  input[type=range]{ width:100%; accent-color: var(--tg-theme-button-color,#3390ec); }
+  .times { display:flex; justify-content:space-between; width:100%; font-variant-numeric:tabular-nums; font-size:.85rem; opacity:.8; }
+  .row { display:flex; gap:14px; align-items:center; }
+  button { border:0; border-radius:50%; width:64px; height:64px; font-size:1.5rem; cursor:pointer;
+    background: var(--tg-theme-button-color,#3390ec); color: var(--tg-theme-button-text-color,#fff); }
+  button.sm { width:46px; height:46px; font-size:1rem; background: var(--tg-theme-secondary-bg-color,#1c2027);
+    color: var(--tg-theme-text-color,#e8e8e8); }
+  .speeds button { width:auto; height:auto; border-radius:10px; padding:6px 10px; font-size:.85rem;
+    background: var(--tg-theme-secondary-bg-color,#1c2027); color: var(--tg-theme-text-color,#e8e8e8); }
+  .speeds button.on { background: var(--tg-theme-button-color,#3390ec); color:#fff; }
+  #wrap { width:100%; max-width:420px; display:flex; flex-direction:column; gap:16px; align-items:center; }
+  #msg { text-align:center; }
+</style>
+</head>
+<body>
+<div id="wrap"><div class="disc">🎧</div><h1 id="title">Loading…</h1><div id="msg"></div></div>
+
+<script>
+const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
+const q = new URLSearchParams(location.search);
+const FUID = q.get("fuid"); const INIT = tg?.initData || "";
+const wrap = document.getElementById("wrap");
+let audio, state = { position:0 }, lastSave=0;
+
+function fmt(s){ s=Math.floor(s||0); const m=Math.floor(s/60), r=s%60; return `${m}:${String(r).padStart(2,'0')}`; }
+function saveState(){ fetch("/api/reader/state",{method:"POST",headers:{"Content-Type":"application/json"},
+  body: JSON.stringify({init_data:INIT, fuid:FUID, position: audio.currentTime})}); }
+
+async function boot(){
+  if(!FUID){ document.getElementById("title").textContent="⚠️ No file."; return; }
+  try{ state = await (await fetch(`/api/reader/state?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`)).json(); }catch(e){}
+  const r = await fetch(`/api/file?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`);
+  if(!r.ok){
+    const j = await r.json().catch(()=>({}));
+    const m = j.error==="too_large" ? "🎧 Too large to stream — receive it in chat."
+      : j.error==="not_in_library" ? "🔒 Add it to Favorites first." : "❌ Couldn't load audio.";
+    document.getElementById("title").textContent = m;
+    return;
+  }
+  const blob = await r.blob();
+  buildUI(URL.createObjectURL(blob));
+}
+
+function buildUI(src){
+  wrap.innerHTML = `
+    <div class="disc">🎧</div>
+    <input type="range" id="seek" min="0" max="100" value="0" step="0.1">
+    <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+    <div class="row">
+      <button class="sm" id="b15">⏪15</button>
+      <button id="play">▶️</button>
+      <button class="sm" id="f15">15⏩</button>
+    </div>
+    <div class="row speeds" id="speeds"></div>`;
+  audio = new Audio(src);
+  const seek=document.getElementById("seek"), cur=document.getElementById("cur"),
+        dur=document.getElementById("dur"), play=document.getElementById("play");
+
+  audio.addEventListener("loadedmetadata", ()=>{
+    dur.textContent = fmt(audio.duration);
+    if(state.position && state.position < audio.duration) audio.currentTime = state.position;
+  });
+  audio.addEventListener("timeupdate", ()=>{
+    if(audio.duration){ seek.value = (audio.currentTime/audio.duration)*100; }
+    cur.textContent = fmt(audio.currentTime);
+    if(Date.now()-lastSave > 5000){ lastSave=Date.now(); saveState(); }
+  });
+  audio.addEventListener("ended", saveState);
+  seek.addEventListener("input", ()=>{ audio.currentTime = (seek.value/100)*(audio.duration||0); });
+  play.onclick = ()=>{ if(audio.paused){ audio.play(); play.textContent="⏸️"; } else { audio.pause(); play.textContent="▶️"; saveState(); } };
+  document.getElementById("b15").onclick=()=> audio.currentTime=Math.max(0,audio.currentTime-15);
+  document.getElementById("f15").onclick=()=> audio.currentTime=Math.min(audio.duration||0,audio.currentTime+15);
+
+  const sp=document.getElementById("speeds");
+  [0.75,1,1.25,1.5,2].forEach(r=>{ const b=document.createElement("button"); b.textContent=r+"×";
+    if(r===1) b.classList.add("on");
+    b.onclick=()=>{ audio.playbackRate=r; sp.querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); };
+    sp.appendChild(b); });
+}
+window.addEventListener("pagehide", ()=>{ if(audio) saveState(); });
+boot();
+</script>
+</body>
+</html>

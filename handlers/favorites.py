@@ -16,7 +16,9 @@ from aiogram.types import CallbackQuery
 from config import FILE_CHANNEL_ID
 from database.connection import MongoManager
 from utils.files import get_file, icon_for
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, kb, webapp_btn
+
+_AUDIO_EXT = {"mp3", "m4b", "m4a", "wav", "ogg", "flac", "aac"}
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -75,9 +77,20 @@ async def _render(call: CallbackQuery, page: int) -> None:
 
     rows = []
     for f in chunk:
-        label = f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:34]}"
-        rows.append([btn(label, f"fav_get:{f['file_unique_id']}", style="success"),
-                     btn("🗑", f"fav_del:{f['file_unique_id']}", style="danger")])
+        fuid = f["file_unique_id"]
+        ext = (f.get("ext") or "").lower()
+        name = f.get("name", "Untitled")[:32]
+        is_audio = f.get("kind") == "audio" or ext in _AUDIO_EXT
+        # title row
+        rows.append([btn(f"{icon_for(ext)} {name}", f"fav_get:{fuid}", style="primary")])
+        # action row: open in Mini App · receive in chat · remove
+        open_btn = webapp_btn(
+            "🎧 Listen" if is_audio else "📖 Read",
+            "player.html" if is_audio else "reader.html",
+            query=f"fuid={fuid}&ext={ext}", style="success", fallback_cb=f"fav_get:{fuid}")
+        rows.append([open_btn,
+                     btn("📥 Chat", f"fav_get:{fuid}", style="primary"),
+                     btn("🗑", f"fav_del:{fuid}", style="danger")])
     nav = []
     if page > 0:
         nav.append(btn("⬅️ Prev", f"fav_pg:{page-1}", style="primary"))

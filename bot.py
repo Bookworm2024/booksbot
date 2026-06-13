@@ -32,6 +32,9 @@ from handlers import (
     requests_manual, start, stats, support, track,
 )
 from handlers.games_api import api_game_new, api_game_submit
+from handlers.reader_api import (
+    api_file, api_reader_state_get, api_reader_state_set,
+)
 from middlewares.ban import BanMiddleware
 from utils.games import ensure_seed
 
@@ -83,13 +86,18 @@ async def _health(_req: web.Request) -> web.Response:
     return web.json_response({"ok": True, "service": "booksbot"})
 
 
-async def _start_web() -> web.AppRunner:
-    app = web.Application()
+async def _start_web(bot: Bot) -> web.AppRunner:
+    app = web.Application(client_max_size=30 * 1024 * 1024)
+    app["bot"] = bot  # reader_api streams files via the bot
     app.router.add_get("/health", _health)
     app.router.add_get("/", _health)
     # Mini-App game API
     app.router.add_post("/api/game/new", api_game_new)
     app.router.add_post("/api/game/submit", api_game_submit)
+    # Reader / audiobook Mini-App API
+    app.router.add_get("/api/file", api_file)
+    app.router.add_get("/api/reader/state", api_reader_state_get)
+    app.router.add_post("/api/reader/state", api_reader_state_set)
     if os.path.isdir(WEB_APP_DIR):
         app.router.add_static("/app/", WEB_APP_DIR, show_index=False)
     runner = web.AppRunner(app)
@@ -113,7 +121,7 @@ async def main() -> None:
 
     bot = _build_bot()
     dp = _build_dispatcher()
-    runner = await _start_web()
+    runner = await _start_web(bot)
 
     try:
         me = await bot.get_me()
