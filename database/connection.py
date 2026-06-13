@@ -57,6 +57,10 @@ class MongoManager:
                     maxPoolSize=40,
                     maxIdleTimeMS=60000,
                     retryWrites=True,
+                    # CRITICAL: without this, stored aware UTC datetimes read back
+                    # naive → every aware-minus-stored subtraction (balance/claim/
+                    # games/captcha/invite) raises TypeError. Keep tz-aware.
+                    tz_aware=True,
                 )
                 await client.admin.command("ping")
                 self.clients[idx] = client
@@ -87,6 +91,9 @@ class MongoManager:
                 await db.requests.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)])
                 await db.favorites.create_index([("user_id", ASCENDING), ("file_unique_id", ASCENDING)], unique=True)
                 await db.kv.create_index([("k", ASCENDING)], unique=True)
+                await db.codes.create_index([("code", ASCENDING)], unique=True)
+                await db.code_claims.create_index([("code", ASCENDING), ("user_id", ASCENDING)], unique=True)
+                await db.crypto_orders.create_index([("order_id", ASCENDING)], unique=True)
             except OperationFailure as exc:
                 # "already exists with different options" etc. are benign.
                 logger.debug("Index note on cluster %d: %s", idx, exc)
@@ -149,6 +156,20 @@ class MongoManager:
             key, direction = sort[0]
             results.sort(key=lambda d: d.get(key) or 0, reverse=(direction == DESCENDING))
         return results[:limit] if limit else results
+
+    async def find_one_and_update_global(self, coll: str, flt: Dict[str, Any],
+                                         update: Dict[str, Any], *,
+                                         return_before: bool = False) -> Optional[Dict[str, Any]]:
+        """Atomic conditional update used to make credit/decrement paths race-safe.
+        Tries each cluster; returns the matched doc (pre- or post-update) or None
+        if no cluster had a doc matching `flt`."""
+        from pymongo import ReturnDocument
+        rd = ReturnDocument.BEFORE if return_before else ReturnDocument.AFTER
+        for idx in self.healthy:
+            doc = await self.dbs[idx][coll].find_one_and_update(flt, update, return_document=rd)
+            if doc:
+                return doc
+        return None
 
     async def count_global(self, coll: str, flt: Optional[Dict[str, Any]] = None) -> int:
         total = 0

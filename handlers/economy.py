@@ -144,18 +144,27 @@ async def on_code(message: Message, state: FSMContext) -> None:
     if not doc:
         await message.answer("❌ <b>Invalid code.</b> Check for typos and try again.")
         return
-    if await db.find_one_global("code_claims", {"code": code, "user_id": uid}):
+    amount = float(doc.get("amount_per_claim", 0))
+
+    # 1) Claim the per-user slot first. The unique index on (code,user_id) makes
+    #    this the atomic guard against double-tap / concurrent re-redeem.
+    claimed = await db.safe_insert("code_claims", {"code": code, "user_id": uid,
+                                                   "at": datetime.now(timezone.utc)})
+    if not claimed:
         await message.answer("⚠️ You have already redeemed this code.")
         return
-    if int(doc.get("remaining", 0)) <= 0:
+
+    # 2) Atomically decrement remaining only if a unit is left. If none, roll
+    #    back the claim so the user can redeem a different (still-stocked) code.
+    dec = await db.find_one_and_update_global(
+        "codes", {"code": code, "remaining": {"$gt": 0}}, {"$inc": {"remaining": -1}})
+    if not dec:
+        for idx in db.healthy:
+            await db.dbs[idx]["code_claims"].delete_one({"code": code, "user_id": uid})
         await message.answer("❌ <b>Code exhausted.</b> All claims used up.")
         return
 
-    amount = float(doc.get("amount_per_claim", 0))
     await add_bgm(uid, amount)
-    await db.safe_insert("code_claims", {"code": code, "user_id": uid,
-                                         "at": datetime.now(timezone.utc)})
-    await db.safe_update("codes", {"code": code}, {"$inc": {"remaining": -1}})
     await message.answer(
         f"✨ <b>Redeemed!</b>\n\n🎁 <b>+{amount} BGM</b> added to your wallet.",
         reply_markup=kb([btn("💼 Check Balance", "acc_balance", style="primary")]),
@@ -222,13 +231,20 @@ async def cb_convert_do(call: CallbackQuery) -> None:
         await call.answer("Conditions no longer met.", show_alert=True)
         return
     await call.answer()
-    credited = round(bcn * (1 - _CONVERT_TAX), 3)
-    # zero BCN, credit BGM, bump monthly counter
-    await db.safe_update("users", {"user_id": uid},
-                         {"$set": {"bookcoin": 0.0, "bcn_claimed_at": None,
-                                   "convert_month": _month_key(),
-                                   "convert_count": used + 1},
-                          "$inc": {"bookgem": credited}})
+    # Atomic: flip bookcoin→0 only if it's still >0, returning the OLD value so
+    # the credited amount is computed from exactly what we zeroed. A concurrent
+    # second tap finds bookcoin already 0 → no match → no double credit.
+    old = await db.find_one_and_update_global(
+        "users", {"user_id": uid, "bookcoin": {"$gt": 0}},
+        {"$set": {"bookcoin": 0.0, "bcn_claimed_at": None,
+                  "convert_month": _month_key(), "convert_count": used + 1}},
+        return_before=True)
+    if not old:
+        await call.message.edit_text("Nothing to convert.",
+                                     reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
+        return
+    credited = round(float(old.get("bookcoin") or 0) * (1 - _CONVERT_TAX), 3)
+    await add_bgm(uid, credited)
     text, markup = await _balance_view(uid)
     await call.message.edit_text(f"✅ Converted to <b>{credited:.3f} BGM</b>.\n\n" + text,
                                  reply_markup=markup)

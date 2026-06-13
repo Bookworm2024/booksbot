@@ -1,5 +1,5 @@
 """
-handlers/payments.py — Buy BGM (UPI manual; crypto stub until Oxapay key).
+handlers/payments.py — Buy BGM (UPI manual + crypto via Heleket).
 
 UPI flow (no external dependency):
   💎 Buy BGM → 💳 UPI → shows UPI ID + QR + pricing → ✅ Paid →
@@ -7,8 +7,10 @@ UPI flow (no external dependency):
   admins get the proof with ✅ Approve / ❌ Decline →
   Approve → admin enters BGM amount → credited + user notified.
 
-Crypto (Oxapay) is wired as a placeholder; it activates once OXAPAY_MERCHANT
-is set (the actual address-generation call goes in here then).
+Crypto flow (Heleket gateway, same as inflowads):
+  🌐 Crypto → pick coin/network → pick a USD pack (≥$5 gateway min) →
+  Heleket invoice → pay page/address → HMAC-verified /heleket-webhook credits
+  BGM automatically. Activates when HELEKET_API_KEY + HELEKET_MERCHANT_ID are set.
 """
 import logging
 import random
@@ -24,12 +26,15 @@ from aiogram.types import CallbackQuery, Message
 from aiohttp import web
 
 from config import (
-    ADMIN_IDS, BGM_PRICE_INR, BGM_PRICE_USD, BOT_PUBLIC_URL, MIN_BGM_PURCHASE,
-    OXAPAY_MERCHANT, PAYMENT_QR_URL, UPI_ID,
+    ADMIN_IDS, BGM_PRICE_INR, BGM_PRICE_USD, BOT_PUBLIC_URL, HELEKET_API_KEY,
+    HELEKET_MERCHANT_ID, MIN_BGM_PURCHASE, PAYMENT_QR_URL, UPI_ID,
 )
 from database.connection import MongoManager
+from utils.heleket import (
+    CRYPTO_CHOICES, MIN_USD_AMOUNT, PAID_STATUSES, create_invoice, make_order_id,
+    verify_webhook,
+)
 from utils.keyboards import btn, kb, url_btn
-from utils.oxapay import create_invoice, is_paid, verify_hmac
 from utils.wallet import add_bgm
 
 logger = logging.getLogger(__name__)
@@ -106,8 +111,8 @@ async def cb_upi(call: CallbackQuery) -> None:
 async def cb_paid(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
     await state.set_state(PayFSM.awaiting_utr)
-    await call.message.answer("🧾 Send your <b>12-digit UTR / transaction ID</b> "
-                              "(/cancel to abort):")
+    await call.message.answer("🧾 Send your <b>UTR / transaction reference</b> "
+                              "(the number on your payment receipt) — /cancel to abort:")
 
 
 @router.message(PayFSM.awaiting_utr, F.text)
@@ -223,85 +228,122 @@ async def cb_decline(call: CallbackQuery) -> None:
         pass
 
 
-# ── crypto (Oxapay) ─────────────────────────────────────────────────────────
-_PACKS = [10, 25, 50, 100]
+# ── crypto (Heleket) ─────────────────────────────────────────────────────────
+# Heleket enforces a ~$5 minimum, so packs are USD-denominated (BGM shown too).
+_USD_PACKS = [5, 10, 25, 50]
+
+
+def _crypto_enabled() -> bool:
+    return bool(HELEKET_API_KEY and HELEKET_MERCHANT_ID and BOT_PUBLIC_URL)
 
 
 @router.callback_query(F.data == "pay_crypto")
 async def cb_crypto(call: CallbackQuery) -> None:
     await call.answer()
-    if not OXAPAY_MERCHANT or not BOT_PUBLIC_URL:
+    if not _crypto_enabled():
         await call.message.edit_text(
             "🌐 <b>Crypto payments</b> aren't enabled yet.\n"
-            "<i>Admin: set OXAPAY_MERCHANT and BOT_PUBLIC_URL to activate.</i>",
+            "<i>Admin: set HELEKET_API_KEY, HELEKET_MERCHANT_ID and BOT_PUBLIC_URL.</i>",
             reply_markup=kb([btn("🔙 Back", "acc_buy", style="danger")]))
         return
-    rows = [[btn(f"💰 {p} BGM (${p * BGM_PRICE_USD:.2f})", f"pay_cpack:{p}", style="success")]
-            for p in _PACKS]
+    # pick the coin/network first
+    rows = [[btn(label, f"hk_coin:{i}", style="primary")]
+            for i, (_c, _n, label) in enumerate(CRYPTO_CHOICES)]
     rows.append([btn("🔙 Back", "acc_buy", style="danger")])
     await call.message.edit_text(
         "🌐 <b>Crypto Payment</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"${BGM_PRICE_USD:g}/BGM · pay any supported coin (BTC, USDT, etc.)\n\n"
-        "Pick a pack — you'll get a secure pay link. BGM is credited "
-        "automatically once the blockchain confirms.",
+        f"${BGM_PRICE_USD:g}/BGM · gateway minimum ${MIN_USD_AMOUNT:g}.\n\n"
+        "Choose the coin/network you'll pay with:",
         reply_markup=kb(*rows))
 
 
-@router.callback_query(F.data.startswith("pay_cpack:"))
-async def cb_cpack(call: CallbackQuery) -> None:
-    bgm = int(call.data.split(":", 1)[1])
-    amount_usd = round(bgm * BGM_PRICE_USD, 2)
-    await call.answer("Generating pay link…")
-    order_id = _pid()
-    db = await MongoManager.get()
-    callback_url = f"{BOT_PUBLIC_URL}/api/oxapay/callback"
-    inv = await create_invoice(amount_usd, order_id, callback_url)
-    if not inv or not inv.get("pay_link"):
+@router.callback_query(F.data.startswith("hk_coin:"))
+async def cb_coin(call: CallbackQuery) -> None:
+    await call.answer()
+    idx = int(call.data.split(":", 1)[1])
+    if idx >= len(CRYPTO_CHOICES):
+        return
+    _c, _n, label = CRYPTO_CHOICES[idx]
+    rows = [[btn(f"💰 ${u} → {round(u / BGM_PRICE_USD):,} BGM", f"hk_buy:{idx}:{u}",
+                 style="success")] for u in _USD_PACKS]
+    rows.append([btn("🔙 Back", "pay_crypto", style="danger")])
+    await call.message.edit_text(
+        f"🌐 <b>{label}</b>\n\nPick an amount — you'll get a secure Heleket pay "
+        "page. BGM is credited automatically once the network confirms.",
+        reply_markup=kb(*rows))
+
+
+@router.callback_query(F.data.startswith("hk_buy:"))
+async def cb_hk_buy(call: CallbackQuery) -> None:
+    _, idx_s, usd_s = call.data.split(":")
+    idx, usd = int(idx_s), float(usd_s)
+    if idx >= len(CRYPTO_CHOICES) or usd < MIN_USD_AMOUNT:
+        await call.answer("Invalid selection.", show_alert=True)
+        return
+    crypto, network, label = CRYPTO_CHOICES[idx]
+    bgm = round(usd / BGM_PRICE_USD)
+    await call.answer("Generating invoice…")
+    uid = call.from_user.id
+    order_id = make_order_id(uid)
+    webhook_url = f"{BOT_PUBLIC_URL}/heleket-webhook"
+    result = await create_invoice(order_id, usd, crypto, network, webhook_url)
+    if not result or not (result.get("url") or result.get("address")):
         await call.message.edit_text(
             "❌ Couldn't reach the payment gateway. Try again shortly.",
-            reply_markup=kb([btn("🔙 Back", "acc_buy", style="danger")]))
+            reply_markup=kb([btn("🔙 Back", "pay_crypto", style="danger")]))
         return
+    db = await MongoManager.get()
     await db.safe_insert("crypto_orders", {
-        "order_id": order_id, "user_id": call.from_user.id, "bgm": bgm,
-        "amount_usd": amount_usd, "track_id": inv.get("track_id"),
-        "status": "pending", "created_at": _now(),
+        "order_id": order_id, "user_id": uid, "bgm": bgm, "amount_usd": usd,
+        "crypto": crypto, "network": network,
+        "heleket_uuid": result.get("uuid"), "status": "waiting", "created_at": _now(),
     })
-    await call.message.edit_text(
-        f"🌐 <b>Pay ${amount_usd:.2f}</b> for <b>{bgm} BGM</b>\n\n"
-        "Tap below to pay (link valid ~30 min). BGM lands automatically after "
-        "confirmation.",
-        reply_markup=kb([url_btn("💳 Pay Now", inv["pay_link"], style="success")],
-                        [btn("🔙 Back", "acc_buy", style="danger")]))
+    pay_url = result.get("url")
+    addr = result.get("address")
+    text = (f"🌐 <b>Pay ${usd:.2f}</b> in <b>{label}</b> → <b>{bgm:,} BGM</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n")
+    rows = []
+    if pay_url:
+        rows.append([url_btn("💳 Open Pay Page", pay_url, style="success")])
+        text += "Tap to pay (valid ~30 min). "
+    if addr:
+        text += f"\n📥 <b>Address:</b>\n<code>{addr}</code>\n"
+    text += "\nBGM lands automatically after confirmation."
+    rows.append([btn("🔙 Back", "acc_buy", style="danger")])
+    await call.message.edit_text(text, reply_markup=kb(*rows))
 
 
-# ── Oxapay webhook (registered in bot.py at /api/oxapay/callback) ───────────────
-async def api_oxapay_callback(request: web.Request) -> web.Response:
+# ── Heleket webhook (registered in bot.py at /heleket-webhook) ──────────────────
+async def heleket_webhook(request: web.Request) -> web.Response:
     raw = await request.read()
-    if not verify_hmac(raw, request.headers.get("HMAC", "")):
-        logger.warning("Oxapay callback failed HMAC check")
-        return web.Response(status=403, text="bad signature")
     try:
         data = await request.json()
     except Exception:  # noqa: BLE001
         return web.Response(status=400, text="bad json")
+    if not verify_webhook(raw, str(data.get("sign", ""))):
+        logger.warning("Heleket webhook failed signature check")
+        return web.Response(status=403, text="bad signature")
 
-    order_id = str(data.get("orderId") or "")
-    if not (is_paid(data.get("status", "")) and order_id):
+    order_id = str(data.get("order_id") or "")
+    status = str(data.get("status") or data.get("payment_status") or "")
+    if not order_id or status not in PAID_STATUSES:
         return web.Response(text="ignored")
 
     db = await MongoManager.get()
-    order = await db.find_one_global("crypto_orders", {"order_id": order_id})
-    if not order or order.get("status") == "paid":
-        return web.Response(text="ok")  # unknown or already credited (idempotent)
-
-    await db.safe_update("crypto_orders", {"order_id": order_id},
-                         {"$set": {"status": "paid", "paid_at": _now()}}, upsert=False)
+    # Atomic flip: only the FIRST callback that flips waiting/pending → paid
+    # credits BGM. Concurrent duplicate callbacks match nothing and skip.
+    order = await db.find_one_and_update_global(
+        "crypto_orders",
+        {"order_id": order_id, "status": {"$ne": "paid"}},
+        {"$set": {"status": "paid", "paid_at": _now()}})
+    if not order:
+        return web.Response(text="ok")  # unknown / already credited (idempotent)
     await add_bgm(order["user_id"], float(order["bgm"]))
     bot = request.app["bot"]
     try:
         await bot.send_message(order["user_id"],
                                f"🎉 <b>Crypto payment confirmed!</b>\n"
-                               f"💎 +{order['bgm']} BGM added to your wallet.")
+                               f"💎 +{order['bgm']:,} BGM added to your wallet.")
     except Exception:  # noqa: BLE001
         pass
     return web.Response(text="ok")

@@ -133,7 +133,9 @@ PAYMENT_QR_URL: str    = os.getenv("PAYMENT_QR_URL", "")  # static QR image URL
 BGM_PRICE_INR: float   = _float_env("BGM_PRICE_INR", 2.0)
 BGM_PRICE_USD: float   = _float_env("BGM_PRICE_USD", 0.023)
 MIN_BGM_PURCHASE: int  = _int("MIN_BGM_PURCHASE", 10)
-OXAPAY_MERCHANT: str   = os.getenv("OXAPAY_MERCHANT", "")  # crypto (Oxapay)
+# Crypto via Heleket (same gateway as inflowads).
+HELEKET_API_KEY: str   = os.getenv("HELEKET_API_KEY", "")
+HELEKET_MERCHANT_ID: str = os.getenv("HELEKET_MERCHANT_ID", "")
 
 
 # ── AI recommendations (Claude) ──────────────────────────────────────────────

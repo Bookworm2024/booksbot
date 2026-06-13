@@ -32,7 +32,7 @@ from handlers import (
     payments, qadmin, rate, recommend, referral, request, requests_manual, start,
     stats, support, track,
 )
-from handlers.payments import api_oxapay_callback
+from handlers.payments import heleket_webhook
 from handlers.games_api import api_game_new, api_game_submit
 from handlers.reader_api import (
     api_file, api_reader_state_get, api_reader_state_set,
@@ -106,8 +106,8 @@ async def _start_web(bot: Bot) -> web.AppRunner:
     app.router.add_get("/api/file", api_file)
     app.router.add_get("/api/reader/state", api_reader_state_get)
     app.router.add_post("/api/reader/state", api_reader_state_set)
-    # Oxapay crypto payment webhook
-    app.router.add_post("/api/oxapay/callback", api_oxapay_callback)
+    # Heleket crypto payment webhook
+    app.router.add_post("/heleket-webhook", heleket_webhook)
     if os.path.isdir(WEB_APP_DIR):
         app.router.add_static("/app/", WEB_APP_DIR, show_index=False)
     runner = web.AppRunner(app)

@@ -93,8 +93,8 @@ async def _service_watchlist(bot, new_title: str) -> None:
     norm_title = _norm(new_title)
     if not norm_title:
         return
-    watchers = await db.find_global("watchlist", {}, proj={"user_id": 1, "query": 1,
-                                                           "query_norm": 1})
+    watchers = await db.find_global("watchlist", {"matched": False},
+                                    proj={"user_id": 1, "query": 1, "query_norm": 1})
     for w in watchers:
         words = (w.get("query_norm") or "").split()
         if words and all(word in norm_title for word in words):

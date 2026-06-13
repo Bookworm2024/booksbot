@@ -218,7 +218,7 @@ async def submit(uid: int, session_id: str, client_answers: list) -> dict:
         # full clear under time → eligible for speed bonus (once/day)
         if elapsed <= cfg["speed_secs"]:
             today = _now().strftime("%Y-%m-%d")
-            u = await db.find_one_global("users", {"uid": uid} if False else {"user_id": uid},
+            u = await db.find_one_global("users", {"user_id": uid},
                                          {"speed_bonus_day": 1}) or {}
             if u.get("speed_bonus_day") != today:
                 bonus = cfg["speed_bonus"]

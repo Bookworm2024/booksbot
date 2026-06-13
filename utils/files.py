@@ -23,6 +23,7 @@ from typing import Any
 from database.connection import MongoManager
 
 _AUDIO_EXT = {"mp3", "m4b", "m4a", "wav", "ogg", "flac", "aac"}
+_MAX_SCAN = 500  # cap matches materialised per search (memory bound)
 _TAG_RE = re.compile(r"@\w+")
 _CLEAN_RE = re.compile(r"[_\-.]+")
 _NORM_RE = re.compile(r"[^a-z0-9 ]+")
@@ -74,11 +75,12 @@ async def search(query: str, *, skip: int = 0, limit: int = 10) -> tuple[list[di
     flt = {"$and": [{"name_lc": {"$regex": re.escape(w)}} for w in words]}
     db = await MongoManager.get()
     total = await db.count_global("files", flt)
-    page = await db.find_global("files", flt, sort=[("name_lc", 1)],
-                                proj={"name": 1, "ext": 1, "kind": 1, "msg_id": 1,
-                                      "file_id": 1, "file_unique_id": 1})
-    page.sort(key=lambda d: d.get("name_lc") or d.get("name", "").lower())
-    return page[skip:skip + limit], total
+    # Bound memory: only materialise up to _MAX_SCAN matches for pagination.
+    rows = await db.find_global("files", flt, limit=_MAX_SCAN,
+                                proj={"name": 1, "name_lc": 1, "ext": 1, "kind": 1,
+                                      "msg_id": 1, "file_id": 1, "file_unique_id": 1})
+    rows.sort(key=lambda d: d.get("name_lc") or d.get("name", "").lower())
+    return rows[skip:skip + limit], total
 
 
 async def get_file(file_unique_id: str) -> dict | None:

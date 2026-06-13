@@ -64,16 +64,26 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Public logs / invite link (/get_link, 24h single-use, 1/day)
 - ✅ Safe in-house captcha (CAPTCHA_ENABLED) replacing 3rd-party verification
 - ✅ Payments — UPI manual flow (UTR + screenshot → admin approve → credit BGM)
-- ✅ Payments — crypto (Oxapay) invoice + HMAC-verified webhook → auto-credit BGM
-  (activates when OXAPAY_MERCHANT set)
+- ✅ Payments — crypto (**Heleket**, same gateway as inflowads): coin/network →
+  USD pack (≥$5 min) → invoice → signed /heleket-webhook auto-credits BGM
+  (activates when HELEKET_API_KEY + HELEKET_MERCHANT_ID set)
 - ✅ AI recommendations — Claude-backed, 100 titles/20-batch, refund on invalid
   genre (activates when ANTHROPIC_API_KEY set)
 - ⬜ Admin dashboard Mini App (optional future polish)
 
-## Status: feature-complete
-All TBC features rebuilt + modernized. Credential-gated features (AI, crypto)
-activate automatically once their keys are set in the host env. Remaining work
-is operational: deploy to Koyeb, run the Telethon backfill, go live.
+## Hardening pass (post-audit)
+- ✅ Mongo client `tz_aware=True` — fixes naive/aware datetime crash across
+  balance/claim/downloads/games/captcha/invite (was the one critical bug)
+- ✅ Atomic `find_one_and_update_global` → race-safe: Heleket webhook credit,
+  redeem codes (+ unique (code,user_id) index), BCN→BGM convert
+- ✅ Search result cap + sort-key projection; watchlist `matched:False` filter
+- ✅ Unique indexes: codes.code, code_claims(code,user_id), crypto_orders.order_id
+
+## Status: feature-complete + hardened
+All TBC features rebuilt + modernized; crypto via Heleket like inflowads.
+Credential-gated features (AI, crypto) activate once their keys are set in the
+host env. Remaining work is operational: deploy to Koyeb, run the Telethon
+backfill, go live.
 
 ## Cross-cutting (applied throughout)
 - Coloured keyboards everywhere · Mini Apps where they beat chat UI
