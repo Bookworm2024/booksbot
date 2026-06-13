@@ -1,0 +1,21 @@
+# BooksBot — getfreebooksbot
+# Telegram framework. 3.25+ declares InlineKeyboardButton.style /
+# icon_custom_emoji_id (Bot API 9.x coloured buttons). The bot is designed to
+# run against a coloured-button-capable Bot API server; on the vanilla API the
+# style fields are simply ignored (see utils/keyboards.py).
+aiogram>=3.25.0,<4
+
+# Userbot client — used ONLY by tools/backfill.py to index the full history of
+# the private file channel (the Bot API cannot read past channel messages).
+telethon>=1.34.0,<2
+
+# Database (MongoDB — Atlas free tier friendly, multi-cluster waterfall ready)
+motor>=3.3.0,<4
+pymongo>=4.6.0,<5
+
+# Web server for Mini Apps (reader / player / games) + health endpoint
+aiohttp>=3.9.0,<4
+
+# Utilities
+python-dotenv>=1.0.1,<2
+pytz>=2024.1,<2027

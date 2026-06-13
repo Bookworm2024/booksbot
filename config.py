@@ -1,0 +1,132 @@
+"""
+config.py — BooksBot configuration.
+
+All settings come from environment variables (.env locally; the platform's
+env panel on Koyeb/Render/Railway/VPS). Parsing is defensive: a typo in one
+variable must never crash module import — it would mask the friendly summary
+printed by validate_runtime_config() at startup.
+"""
+import logging
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+_log = logging.getLogger(__name__)
+
+
+# ── parsing helpers ──────────────────────────────────────────────────────────
+def _csv_ints(raw: str) -> list[int]:
+    out: list[int] = []
+    for tok in (raw or "").split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        try:
+            out.append(int(tok))
+        except (ValueError, TypeError):
+            _log.warning("Ignoring non-integer entry %r", tok)
+    return out
+
+
+def _csv_strs(raw: str) -> list[str]:
+    return [t.strip() for t in (raw or "").split(",") if t.strip()]
+
+
+def _int(name: str, default: int = 0) -> int:
+    try:
+        return int(os.getenv(name) or default)
+    except (ValueError, TypeError):
+        _log.warning("Invalid %s; defaulting to %d.", name, default)
+        return default
+
+
+def _bool(name: str, default: bool = False) -> bool:
+    val = (os.getenv(name) or "").strip().lower()
+    if not val:
+        return default
+    return val in ("1", "true", "yes", "on")
+
+
+# ── core ─────────────────────────────────────────────────────────────────────
+BOT_TOKEN: str       = os.getenv("BOT_TOKEN", "")
+BOT_USERNAME: str    = os.getenv("BOT_USERNAME", "getfreebooksbot").lstrip("@")
+SUPER_ADMIN_ID: int  = _int("SUPER_ADMIN_ID", 6011680723)
+# Normal admins (super admin is always implicitly an admin too).
+ADMIN_IDS: list[int] = sorted(set(_csv_ints(os.getenv("ADMIN_IDS", "")) + [SUPER_ADMIN_ID]))
+
+# Optional custom Bot API server (a coloured-button-capable fork). Leave unset
+# to use Telegram's official api.telegram.org.
+TELEGRAM_API_BASE: str = os.getenv("TELEGRAM_API_BASE", "").strip()
+# Master switch for coloured button styling. The bot ALWAYS builds coloured
+# keyboards; on a vanilla API server set this False so the style fields are
+# stripped before send (vanilla rejects unknown fields on some methods).
+COLORED_BUTTONS: bool = _bool("COLORED_BUTTONS", True)
+
+
+# ── database ─────────────────────────────────────────────────────────────────
+# Accept either a single MONGO_URL or a comma list MONGO_URLS, plus numbered
+# MONGO_URL_1.. for a multi-cluster waterfall (free Atlas 512MB tiers).
+def _mongo_urls() -> list[str]:
+    urls = _csv_strs(os.getenv("MONGO_URLS", "")) or _csv_strs(os.getenv("MONGO_URL", ""))
+    i = 1
+    while True:
+        u = os.getenv(f"MONGO_URL_{i}")
+        if not u:
+            break
+        urls.append(u.strip())
+        i += 1
+    # de-dup, preserve order
+    seen, out = set(), []
+    for u in urls:
+        if u and u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out
+
+
+MONGO_URLS: list[str] = _mongo_urls()
+MONGO_DB_NAME: str    = os.getenv("MONGO_DB_NAME", "booksbot")
+
+
+# ── channels ─────────────────────────────────────────────────────────────────
+# Required-membership gate shown on /start (comma list of @usernames).
+REQUIRED_CHANNELS: list[str] = _csv_strs(
+    os.getenv("REQUIRED_CHANNELS", "@Bookslibraryofficial,@eternalmantra,@thesciencelabs")
+)
+# Private channel holding the ~30k files to be indexed (numeric -100... id).
+FILE_CHANNEL_ID: int = _int("FILE_CHANNEL_ID", 0)
+# Where the bot posts new-user / activity logs.
+LOG_CHANNEL_ID: int  = _int("LOG_CHANNEL_ID", 0)
+
+
+# ── Telethon backfill (tools/backfill.py only) ───────────────────────────────
+API_ID: int           = _int("API_ID", 0)
+API_HASH: str         = os.getenv("API_HASH", "")
+TELETHON_SESSION: str = os.getenv("TELETHON_SESSION", "")
+
+
+# ── web / mini apps ──────────────────────────────────────────────────────────
+PORT: int            = _int("PORT", 8080)
+# Public HTTPS base (e.g. https://booksbot.koyeb.app). Required for Mini Apps —
+# Telegram only opens web_app buttons over HTTPS.
+BOT_PUBLIC_URL: str  = os.getenv("BOT_PUBLIC_URL", "").rstrip("/")
+
+
+# ── economy ──────────────────────────────────────────────────────────────────
+BCN_EXPIRY_SECONDS: int = _int("BCN_EXPIRY_SECONDS", 86400)
+
+
+# ── startup validation ───────────────────────────────────────────────────────
+def validate_runtime_config() -> list[str]:
+    """Return a list of fatal problems (empty == good to go)."""
+    problems: list[str] = []
+    if not BOT_TOKEN:
+        problems.append("BOT_TOKEN is not set.")
+    if not MONGO_URLS:
+        problems.append("No MongoDB URL set (MONGO_URL / MONGO_URLS / MONGO_URL_1).")
+    if not BOT_PUBLIC_URL:
+        _log.warning("BOT_PUBLIC_URL not set — Mini Apps (reader/player/games) "
+                     "will fall back to in-chat callbacks.")
+    return problems
