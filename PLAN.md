@@ -63,8 +63,9 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Admin question manager (add quiz/TF, counts)
 - ✅ Public logs / invite link (/get_link, 24h single-use, 1/day)
 - ✅ Safe in-house captcha (CAPTCHA_ENABLED) replacing 3rd-party verification
+- ✅ Payments — UPI manual flow (UTR + screenshot → admin approve → credit BGM)
+- ⬜ Payments — crypto (Oxapay) auto deposits → needs OXAPAY_MERCHANT key
 - ⬜ AI recommendations (needs LLM API key)
-- ⬜ Payments: UPI (manual) + crypto (Oxapay — needs merchant key)
 - ⬜ Admin dashboard Mini App (optional polish)
 
 ## Cross-cutting (applied throughout)

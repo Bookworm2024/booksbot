@@ -42,6 +42,15 @@ def _int(name: str, default: int = 0) -> int:
         return default
 
 
+def _float_env(name: str, default: float) -> float:
+    try:
+        raw = os.getenv(name)
+        return float(raw) if raw not in (None, "") else default
+    except (ValueError, TypeError):
+        _log.warning("Invalid %s; defaulting to %s.", name, default)
+        return default
+
+
 def _bool(name: str, default: bool = False) -> bool:
     val = (os.getenv(name) or "").strip().lower()
     if not val:
@@ -116,6 +125,15 @@ BOT_PUBLIC_URL: str  = os.getenv("BOT_PUBLIC_URL", "").rstrip("/")
 
 # ── economy ──────────────────────────────────────────────────────────────────
 BCN_EXPIRY_SECONDS: int = _int("BCN_EXPIRY_SECONDS", 86400)
+
+
+# ── payments (Buy BGM) ───────────────────────────────────────────────────────
+UPI_ID: str            = os.getenv("UPI_ID", "sendrajbooks@fam")
+PAYMENT_QR_URL: str    = os.getenv("PAYMENT_QR_URL", "")  # static QR image URL
+BGM_PRICE_INR: float   = _float_env("BGM_PRICE_INR", 2.0)
+BGM_PRICE_USD: float   = _float_env("BGM_PRICE_USD", 0.023)
+MIN_BGM_PURCHASE: int  = _int("MIN_BGM_PURCHASE", 10)
+OXAPAY_MERCHANT: str   = os.getenv("OXAPAY_MERCHANT", "")  # crypto (Oxapay)
 
 
 # ── anti-bot captcha ─────────────────────────────────────────────────────────
