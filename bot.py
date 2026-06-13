@@ -28,8 +28,8 @@ from config import (
 )
 from database.connection import MongoManager
 from handlers import (
-    admin, economy, favorites, games, indexer, rate, referral, request,
-    requests_manual, start, stats, support, track,
+    admin, broadcast, captcha, economy, favorites, games, indexer, invite, qadmin,
+    rate, referral, request, requests_manual, start, stats, support, track,
 )
 from handlers.games_api import api_game_new, api_game_submit
 from handlers.reader_api import (
@@ -65,6 +65,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.callback_query.middleware(BanMiddleware())
     # start first (owns the dashboard + nav), then feature routers.
     dp.include_router(start.router)
+    dp.include_router(captcha.router)
     dp.include_router(request.router)
     dp.include_router(requests_manual.router)
     dp.include_router(track.router)
@@ -75,6 +76,9 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(support.router)
     dp.include_router(rate.router)
     dp.include_router(stats.router)
+    dp.include_router(invite.router)
+    dp.include_router(broadcast.router)
+    dp.include_router(qadmin.router)
     dp.include_router(admin.router)
     # indexer last — channel_post observer, no overlap with user handlers.
     dp.include_router(indexer.router)

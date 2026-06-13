@@ -59,10 +59,13 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Support inbox (user → admins, one-tap admin reply)
 - ✅ Ratings (/rate, 3/day, logged to admins)
 - ✅ Global /stats analytics
-- ⬜ AI recommendations (needs LLM API)
-- ⬜ Broadcast engine (audience, progress, pause/resume)
-- ⬜ Payments: UPI (manual) + crypto (Oxapay)
-- ⬜ Admin dashboard Mini App, public logs / invite link
+- ✅ Broadcast engine (audience, live progress, pause/resume/stop)
+- ✅ Admin question manager (add quiz/TF, counts)
+- ✅ Public logs / invite link (/get_link, 24h single-use, 1/day)
+- ✅ Safe in-house captcha (CAPTCHA_ENABLED) replacing 3rd-party verification
+- ⬜ AI recommendations (needs LLM API key)
+- ⬜ Payments: UPI (manual) + crypto (Oxapay — needs merchant key)
+- ⬜ Admin dashboard Mini App (optional polish)
 
 ## Cross-cutting (applied throughout)
 - Coloured keyboards everywhere · Mini Apps where they beat chat UI

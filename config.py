@@ -118,6 +118,13 @@ BOT_PUBLIC_URL: str  = os.getenv("BOT_PUBLIC_URL", "").rstrip("/")
 BCN_EXPIRY_SECONDS: int = _int("BCN_EXPIRY_SECONDS", 86400)
 
 
+# ── anti-bot captcha ─────────────────────────────────────────────────────────
+# Safe in-house emoji-tap captcha (replaces the old token-leaking 3rd-party
+# verification). Off by default; enable if you want a bot gate on /start.
+CAPTCHA_ENABLED: bool = _bool("CAPTCHA_ENABLED", False)
+CAPTCHA_TTL_SECONDS: int = _int("CAPTCHA_TTL_SECONDS", 604800)  # re-verify weekly
+
+
 # ── startup validation ───────────────────────────────────────────────────────
 def validate_runtime_config() -> list[str]:
     """Return a list of fatal problems (empty == good to go)."""

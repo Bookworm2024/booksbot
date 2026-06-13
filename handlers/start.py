@@ -117,6 +117,11 @@ async def _render_gate_or_dashboard(message: Message, *, override_user: int = 0,
             reply_markup=_join_kb(missing),
         )
         return
+    # optional anti-bot gate (config CAPTCHA_ENABLED)
+    from handlers.captcha import needs_verification, send_challenge
+    if await needs_verification(uid):
+        await send_challenge(message, uid)
+        return
     await _send_dashboard(message, name)
 
 
@@ -197,7 +202,6 @@ async def cb_tools(call: CallbackQuery) -> None:
 _COMING = {
     "lib_recommend": "🤖 AI recommendations are coming soon.",
     "acc_buy":      "💎 BGM purchase (UPI + crypto) is coming in the payments phase.",
-    "tool_logs":    "📜 Public logs are coming soon.",
 }
 
 
