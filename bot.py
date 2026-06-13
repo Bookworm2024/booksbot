@@ -28,7 +28,8 @@ from config import (
 )
 from database.connection import MongoManager
 from handlers import (
-    admin, economy, favorites, indexer, request, requests_manual, start, track,
+    admin, economy, favorites, indexer, rate, referral, request, requests_manual,
+    start, stats, support, track,
 )
 from middlewares.ban import BanMiddleware
 
@@ -64,6 +65,10 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(track.router)
     dp.include_router(economy.router)
     dp.include_router(favorites.router)
+    dp.include_router(referral.router)
+    dp.include_router(support.router)
+    dp.include_router(rate.router)
+    dp.include_router(stats.router)
     dp.include_router(admin.router)
     # indexer last — channel_post observer, no overlap with user handlers.
     dp.include_router(indexer.router)

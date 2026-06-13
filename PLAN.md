@@ -47,11 +47,15 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ⬜ Audiobook player Mini App (seek, speed, resume position)
 - ⬜ Games as Mini Apps: Quiz, True/False, + new ones (leaderboards)
 
-## Phase 6 — Admin & growth ⬜
-- ⬜ Full admin dashboard Mini App (users, broadcast, stats, config)
+## Phase 6 — Admin & growth 🔜
+- ✅ Referrals (+0.5 / +0.25 BGM, paid on join-gate clear) + leaderboard
+- ✅ Support inbox (user → admins, one-tap admin reply)
+- ✅ Ratings (/rate, 3/day, logged to admins)
+- ✅ Global /stats analytics
+- ⬜ AI recommendations (needs LLM API)
 - ⬜ Broadcast engine (audience, progress, pause/resume)
-- ⬜ AI recommendations, referrals, ratings, support inbox
-- ⬜ Analytics / stats dashboard
+- ⬜ Payments: UPI (manual) + crypto (Oxapay)
+- ⬜ Admin dashboard Mini App, public logs / invite link
 
 ## Cross-cutting (applied throughout)
 - Coloured keyboards everywhere · Mini Apps where they beat chat UI

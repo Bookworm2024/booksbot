@@ -19,11 +19,12 @@ import logging
 from datetime import datetime, timezone
 
 from aiogram import F, Router
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import CommandObject, CommandStart
 from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS, LOG_CHANNEL_ID, REQUIRED_CHANNELS
 from utils.keyboards import btn, kb, url_btn
+from utils.referral import grant_referral, remember_referrer
 from utils.users import ensure_user, is_banned
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,7 @@ def _join_kb(missing: list[str]):
 
 # ── /start ───────────────────────────────────────────────────────────────────
 @router.message(CommandStart())
-async def cmd_start(message: Message) -> None:
+async def cmd_start(message: Message, command: CommandObject) -> None:
     if message.chat.type != "private":
         await message.answer(
             "👋 <b>Hello!</b> Please talk to me in private to use my features.",
@@ -78,6 +79,10 @@ async def cmd_start(message: Message) -> None:
 
     doc = await ensure_user(uid, message.from_user.first_name or "Reader",
                             message.from_user.username or "")
+
+    # referral attribution from the deep-link payload (?start=<referrer_id>)
+    if command.args:
+        await remember_referrer(uid, command.args.strip())
 
     # new-user log
     if doc.get("is_new") and LOG_CHANNEL_ID:
@@ -116,6 +121,8 @@ async def _render_gate_or_dashboard(message: Message, *, override_user: int = 0,
 
 
 async def _send_dashboard(message: Message, name: str) -> None:
+    # pay out referral the first time the user clears the join-gate
+    await grant_referral(message.bot, message.chat.id)
     await message.answer(
         f"👋 <b>Welcome back, {name}!</b>\n\n"
         "✨ <b>Your reading companion is ready.</b>\n\n"
@@ -162,7 +169,8 @@ async def cb_account(call: CallbackQuery) -> None:
              btn("💎 Buy BGM", "acc_buy", style="success")],
             [btn("🎟 Redeem Code", "acc_redeem", style="success"),
              btn("🎁 Refer & Earn", "acc_refer", style="primary")],
-            [btn("🚨 Track Request", "acc_track", style="primary")],
+            [btn("🚨 Track Request", "acc_track", style="primary"),
+             btn("🆘 Support", "menu_support", style="primary")],
             [btn("🔙 Back", "menu_home", style="danger")],
         ),
     )
@@ -172,7 +180,8 @@ async def cb_account(call: CallbackQuery) -> None:
 async def cb_tools(call: CallbackQuery) -> None:
     await call.answer()
     rows = [
-        [btn("📊 Bot Stats", "tool_stats", style="primary")],
+        [btn("📊 Bot Stats", "tool_stats", style="primary"),
+         btn("⭐ Rate Us", "menu_rate", style="primary")],
         [btn("📜 Public Logs", "tool_logs", style="primary")],
     ]
     if call.from_user.id in ADMIN_IDS:
@@ -186,12 +195,9 @@ async def cb_tools(call: CallbackQuery) -> None:
 # Actions still pending a phase. Implemented actions (menu_request, acc_balance,
 # acc_redeem, lib_favorites, …) are handled by their own routers and removed here.
 _COMING = {
-    "menu_games":   "🎮 Games (Quiz, True/False & new Mini-App games) are coming in a later phase.",
+    "menu_games":   "🎮 Games (Quiz, True/False & new Mini-App games) are coming in the next phase.",
     "lib_recommend": "🤖 AI recommendations are coming soon.",
     "acc_buy":      "💎 BGM purchase (UPI + crypto) is coming in the payments phase.",
-    "acc_refer":    "🎁 Referrals are coming soon.",
-    "acc_track":    "🚨 Request tracking is coming soon.",
-    "tool_stats":   "📊 Live stats are coming soon.",
     "tool_logs":    "📜 Public logs are coming soon.",
 }
 
