@@ -28,10 +28,12 @@ from config import (
 )
 from database.connection import MongoManager
 from handlers import (
-    admin, economy, favorites, indexer, rate, referral, request, requests_manual,
-    start, stats, support, track,
+    admin, economy, favorites, games, indexer, rate, referral, request,
+    requests_manual, start, stats, support, track,
 )
+from handlers.games_api import api_game_new, api_game_submit
 from middlewares.ban import BanMiddleware
+from utils.games import ensure_seed
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,6 +67,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(track.router)
     dp.include_router(economy.router)
     dp.include_router(favorites.router)
+    dp.include_router(games.router)
     dp.include_router(referral.router)
     dp.include_router(support.router)
     dp.include_router(rate.router)
@@ -84,6 +87,9 @@ async def _start_web() -> web.AppRunner:
     app = web.Application()
     app.router.add_get("/health", _health)
     app.router.add_get("/", _health)
+    # Mini-App game API
+    app.router.add_post("/api/game/new", api_game_new)
+    app.router.add_post("/api/game/submit", api_game_submit)
     if os.path.isdir(WEB_APP_DIR):
         app.router.add_static("/app/", WEB_APP_DIR, show_index=False)
     runner = web.AppRunner(app)
@@ -102,6 +108,7 @@ async def main() -> None:
 
     # Connect Mongo up front so a bad URL fails fast & loud.
     await MongoManager.get()
+    await ensure_seed()  # seed the starter question bank if empty
     logger.info("MongoDB ready.")
 
     bot = _build_bot()

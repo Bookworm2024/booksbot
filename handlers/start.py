@@ -195,7 +195,6 @@ async def cb_tools(call: CallbackQuery) -> None:
 # Actions still pending a phase. Implemented actions (menu_request, acc_balance,
 # acc_redeem, lib_favorites, …) are handled by their own routers and removed here.
 _COMING = {
-    "menu_games":   "🎮 Games (Quiz, True/False & new Mini-App games) are coming in the next phase.",
     "lib_recommend": "🤖 AI recommendations are coming soon.",
     "acc_buy":      "💎 BGM purchase (UPI + crypto) is coming in the payments phase.",
     "tool_logs":    "📜 Public logs are coming soon.",

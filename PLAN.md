@@ -42,10 +42,14 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Refund: BCN→25%, BGM→75%, always paid in BGM
 - ✅ Request tracking (/track, own-only) + history; admin /track_request
 
-## Phase 5 — Mini Apps ⬜
+## Phase 5 — Mini Apps 🔜
+- ✅ Quiz + True/False as **Mini Apps with server-side scoring** (answers never
+  sent to client; sessions single-use; daily limits + HMAC initData auth)
+- ✅ Telegram initData HMAC validation (utils/webapp_auth.py)
+- ✅ Starter question bank auto-seed + game API (/api/game/new, /api/game/submit)
 - ⬜ eBook reader Mini App (PDF/EPUB, pagination, bookmarks, page memory)
 - ⬜ Audiobook player Mini App (seek, speed, resume position)
-- ⬜ Games as Mini Apps: Quiz, True/False, + new ones (leaderboards)
+- ⬜ Admin question management + leaderboards
 
 ## Phase 6 — Admin & growth 🔜
 - ✅ Referrals (+0.5 / +0.25 BGM, paid on join-gate clear) + leaderboard
