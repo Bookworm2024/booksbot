@@ -80,9 +80,14 @@ async def cmd_start(message: Message, command: CommandObject) -> None:
     doc = await ensure_user(uid, message.from_user.first_name or "Reader",
                             message.from_user.username or "")
 
+    arg = (command.args or "").strip()
+    # inline-mode deep link: ?start=dl_<fuid> → offer the file (token-gated)
+    if arg.startswith("dl_"):
+        await _deeplink_download(message, uid, arg[3:])
+        return
     # referral attribution from the deep-link payload (?start=<referrer_id>)
-    if command.args:
-        await remember_referrer(uid, command.args.strip())
+    if arg:
+        await remember_referrer(uid, arg)
 
     # new-user log
     if doc.get("is_new") and LOG_CHANNEL_ID:
@@ -123,6 +128,28 @@ async def _render_gate_or_dashboard(message: Message, *, override_user: int = 0,
         await send_challenge(message, uid)
         return
     await _send_dashboard(message, name)
+
+
+async def _deeplink_download(message: Message, uid: int, fuid: str) -> None:
+    """Land from an inline-search deep link → enforce join-gate, then offer the
+    file via the normal token-gated download button."""
+    from utils.files import get_file, icon_for
+    missing = await _not_joined(message.bot, uid)
+    if missing:
+        await message.answer(
+            "👋 Almost there — join our channels, then tap the link again:",
+            reply_markup=_join_kb(missing))
+        return
+    f = await get_file(fuid)
+    if not f:
+        await message.answer("❌ That title is no longer available.",
+                             reply_markup=_dashboard_kb())
+        return
+    await message.answer(
+        f"📚 <b>{f.get('name','Your book')}</b>\n{icon_for(f.get('ext',''))} "
+        f".{(f.get('ext') or '').upper()}\n\n💸 1 BCN/BGM to download.",
+        reply_markup=kb([btn("📥 Get it now", f"dl:{fuid}", style="success")],
+                        [btn("🏠 Menu", "menu_home", style="primary")]))
 
 
 async def _send_dashboard(message: Message, name: str) -> None:

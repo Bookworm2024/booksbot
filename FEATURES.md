@@ -40,9 +40,9 @@ Legend counts toward ~500 features across 14 pillars.
 
 ## 3. Powerful Search
 - ✅ All-words archive search, paginated
-- 🔜 Fuzzy/typo-tolerant search · author & format filters
-- 🔜 Search-as-you-type inline mode (@bot query)
-- 🔜 Filters: language, year, size, format · sort options
+- ✅ Type filters (All / PDF / EPUB / Audio) in results
+- ✅ Inline mode (`@bot query`) — search from any chat, deep-links into bot
+- 🔜 Fuzzy/typo-tolerant search · author filter · sort options
 - ⬜ Saved searches · search history · semantic (embedding) search
 
 ## 4. Games & Brain (mini apps, book/nerd themed)

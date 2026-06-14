@@ -67,12 +67,19 @@ async def index_file(doc: dict[str, Any]) -> bool:
     return await db.safe_insert("files", doc)
 
 
-async def search(query: str, *, skip: int = 0, limit: int = 10) -> tuple[list[dict], int]:
-    """Return (page, total_matches). Every query word must be in name_lc."""
+async def search(query: str, *, skip: int = 0, limit: int = 10,
+                 ftype: str | None = None) -> tuple[list[dict], int]:
+    """Return (page, total_matches). Every query word must be in name_lc.
+    Optional ftype filter: 'pdf'/'epub'/'mobi' (by ext) or 'audio' (by kind)."""
     words = _norm_words(query)
     if not words:
         return [], 0
-    flt = {"$and": [{"name_lc": {"$regex": re.escape(w)}} for w in words]}
+    clauses = [{"name_lc": {"$regex": re.escape(w)}} for w in words]
+    if ftype == "audio":
+        clauses.append({"kind": "audio"})
+    elif ftype in ("pdf", "epub", "mobi"):
+        clauses.append({"ext": ftype})
+    flt = {"$and": clauses}
     db = await MongoManager.get()
     total = await db.count_global("files", flt)
     # Bound memory: only materialise up to _MAX_SCAN matches for pagination.

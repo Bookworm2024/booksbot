@@ -90,11 +90,25 @@ async def cb_page(call: CallbackQuery, state: FSMContext) -> None:
     await _render_results(call.message, state, query, page, edit=True)
 
 
+_FILTERS = [("all", "All"), ("pdf", "📄 PDF"), ("epub", "📘 EPUB"), ("audio", "🎧 Audio")]
+
+
+@router.callback_query(F.data.startswith("sf:"))
+async def cb_filter(call: CallbackQuery, state: FSMContext) -> None:
+    await call.answer()
+    data = await state.get_data()
+    await state.update_data(sf=call.data.split(":", 1)[1], sp=0)
+    await _render_results(call.message, state, data.get("sq", ""), 0, edit=True)
+
+
 async def _render_results(message: Message, state: FSMContext, query: str,
                           page: int, *, edit: bool) -> None:
-    results, total = await search(query, skip=page * _PER_PAGE, limit=_PER_PAGE)
+    data = await state.get_data()
+    sf = data.get("sf", "all")
+    ftype = None if sf == "all" else sf
+    results, total = await search(query, skip=page * _PER_PAGE, limit=_PER_PAGE, ftype=ftype)
 
-    if total == 0:
+    if total == 0 and sf == "all":
         await _add_watchlist(message.chat.id, query)
         text = ("❌ <b>No matches found.</b>\n\n"
                 f"✨ Added <code>{query}</code> to your <b>Watchlist</b> — I'll DM you "
@@ -105,6 +119,9 @@ async def _render_results(message: Message, state: FSMContext, query: str,
         return
 
     rows = []
+    # filter row (active filter highlighted)
+    rows.append([btn(("● " if v == sf else "") + lbl, f"sf:{v}",
+                     style="success" if v == sf else "primary") for v, lbl in _FILTERS])
     for f in results:
         label = f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:40]}"
         rows.append([btn(label, f"dl:{f['file_unique_id']}", style="success")])
@@ -119,9 +136,10 @@ async def _render_results(message: Message, state: FSMContext, query: str,
     rows.append([btn("🔍 New Search", "req_auto", style="primary"),
                  btn("🔙 Menu", "menu_home", style="danger")])
 
-    pages = (total + _PER_PAGE - 1) // _PER_PAGE
+    pages = max(1, (total + _PER_PAGE - 1) // _PER_PAGE)
+    note = "" if total else "\n\n<i>No matches with this filter.</i>"
     text = (f"🔍 <b>Results for</b> <code>{query}</code>\n"
-            f"📊 {total} match(es) · page {page + 1}/{pages}\n\n"
+            f"📊 {total} match(es) · page {page + 1}/{pages}{note}\n\n"
             f"💸 Cost: <b>1 BCN/BGM</b> per download.")
     await (message.edit_text if edit else message.answer)(text, reply_markup=kb(*rows))
 

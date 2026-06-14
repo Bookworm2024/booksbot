@@ -29,7 +29,7 @@ from config import (
 from database.connection import MongoManager
 from handlers import (
     admin, broadcast, captcha, discover, economy, favorites, games, indexer,
-    invite, payments, qadmin, rate, recommend, referral, request,
+    inline, invite, payments, qadmin, rate, recommend, referral, request,
     requests_manual, revenue, start, stats, support, track,
 )
 from handlers.payments import heleket_webhook
@@ -82,6 +82,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(support.router)
     dp.include_router(rate.router)
     dp.include_router(stats.router)
+    dp.include_router(inline.router)
     dp.include_router(invite.router)
     dp.include_router(broadcast.router)
     dp.include_router(qadmin.router)
