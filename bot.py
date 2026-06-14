@@ -31,7 +31,7 @@ from handlers import (
     admin, broadcast, captcha, discover, economy, favorites, games, gift,
     indexer, inline, invite, payments, qadmin, rate, recommend, referral,
     request, requests_manual, revenue, settings_admin, start, stats, support,
-    track,
+    track, vip,
 )
 from handlers.payments import heleket_webhook
 from handlers.bookle_api import api_bookle_new, api_bookle_guess
@@ -77,6 +77,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(economy.router)
     dp.include_router(payments.router)
     dp.include_router(gift.router)
+    dp.include_router(vip.router)
     dp.include_router(recommend.router)
     dp.include_router(favorites.router)
     dp.include_router(discover.router)

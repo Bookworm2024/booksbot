@@ -203,6 +203,7 @@ async def cb_account(call: CallbackQuery) -> None:
         reply_markup=kb(
             [btn("💼 Balance", "acc_balance", style="primary"),
              btn("💎 Buy BGM", "acc_buy", style="success")],
+            [btn("👑 Premium (VIP)", "acc_vip", style="success")],
             [btn("🎟 Redeem Code", "acc_redeem", style="success"),
              btn("🎁 Refer & Earn", "acc_refer", style="primary")],
             [btn("🚨 Track Request", "acc_track", style="primary"),

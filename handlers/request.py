@@ -164,21 +164,26 @@ async def cb_download(call: CallbackQuery) -> None:
         return
 
     from utils.settings import get_float
-    cost = await get_float("download_cost")
-    bgm, bcn = await get_balances(uid)
-    if bgm + bcn < cost:
-        await call.answer()
-        await call.message.answer(
-            f"❌ <b>Insufficient balance.</b>\nYou need {cost:g} BCN/BGM to download.\n"
-            "💡 Use /claim for free BCN or buy BGM.",
-            reply_markup=kb([btn("💎 Buy BGM", "acc_buy", style="success")]),
-        )
-        return
+    from utils.vip import download_factor
+    cost = round(await get_float("download_cost") * await download_factor(uid), 4)
 
-    currency = await spend(uid, cost)
-    if not currency:
-        await call.answer("Balance changed — not enough tokens.", show_alert=True)
-        return
+    if cost <= 0:
+        currency = "VIP"  # Gold VIP → free downloads
+    else:
+        bgm, bcn = await get_balances(uid)
+        if bgm + bcn < cost:
+            await call.answer()
+            await call.message.answer(
+                f"❌ <b>Insufficient balance.</b>\nYou need {cost:g} BCN/BGM to download.\n"
+                "💡 Use /claim for free BCN, buy BGM, or go 💎 Premium for cheaper downloads.",
+                reply_markup=kb([btn("💎 Buy BGM", "acc_buy", style="success"),
+                                 btn("💎 Premium", "acc_vip", style="primary")]),
+            )
+            return
+        currency = await spend(uid, cost)
+        if not currency:
+            await call.answer("Balance changed — not enough tokens.", show_alert=True)
+            return
 
     await call.answer("📤 Sending…")
     caption = (f"{icon_for(f.get('ext',''))} <b>{f.get('name','Your File')}</b>\n\n"
@@ -201,7 +206,8 @@ async def cb_download(call: CallbackQuery) -> None:
         logger.warning("Delivery failed for %s: %s", fuid, exc)
 
     if not delivered:
-        await refund(uid, cost, currency)
+        if currency != "VIP":
+            await refund(uid, cost, currency)
         await call.message.answer(
             "❌ <b>Delivery failed.</b> Your token was refunded.\n"
             "<i>The file may have been removed, or I'm not in the archive channel.</i>")

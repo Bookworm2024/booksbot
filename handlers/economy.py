@@ -45,11 +45,14 @@ async def _balance_view(uid: int):
                                   "downloads": 1}) or {}
     eb = int(u.get("ebook_requests") or 0)
     ab = int(u.get("audiobook_requests") or 0)
+    from utils.vip import badge
+    vip = await badge(uid)
     claim_line = ("🎁 <b>Daily Bonus:</b> READY — /claim now"
                   if left == 0 else f"🎁 <b>Daily Bonus:</b> in {_fmt_dur(left)}")
     text = (
         "<b>💼 Your Wallet</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
+        + (f"{vip}\n" if vip else "")
+        + "━━━━━━━━━━━━━━━━━━\n"
         f"💎 <b>BGM:</b> <code>{bgm:.3f}</code>  <i>(permanent)</i>\n"
         f"🪙 <b>BCN:</b> <code>{bcn:.3f}</code>  <i>(expires 24h)</i>\n"
         f"⚖️ <b>Total:</b> <code>{bgm + bcn:.3f}</code>\n\n"
@@ -89,9 +92,11 @@ async def _do_claim(uid: int) -> tuple[str, object]:
                 kb([btn("💎 Buy BGM (skip wait)", "acc_buy", style="success")],
                    [btn("🔙 Back", "menu_account", style="danger")]))
     from utils.settings import get_float
+    from utils.vip import claim_multiplier
     lo = await get_float("claim_min")
     hi = await get_float("claim_max")
-    bonus = round(random.uniform(min(lo, hi), max(lo, hi)), 2)
+    mult = await claim_multiplier(uid)
+    bonus = round(random.uniform(min(lo, hi), max(lo, hi)) * mult, 2)
     await set_daily_bcn(uid, bonus)
     return (f"✨ <b>Claim Successful!</b>\n\n💰 <b>+{bonus:.2f} BCN</b>\n"
             "📅 Valid for 24 hours.",
