@@ -296,6 +296,8 @@ async def submit(uid: int, session_id: str, client_answers: list) -> dict:
     # leaderboard stats (positive earnings + games played)
     await db.safe_update("users", {"user_id": uid},
                          {"$inc": {"games_played": 1, "game_bgm": max(0.0, total_delta)}})
+    from utils.missions import mark
+    await mark(uid, "play_game")
 
     return {
         "ok": True, "correct": correct, "wrong": wrong, "skipped": skipped,

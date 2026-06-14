@@ -56,6 +56,8 @@ async def _spin(message: Message, uid: int) -> None:
         return
     prize = random.choice(_BAG)
     await add_bgm(uid, prize)
+    from utils.missions import mark
+    await mark(uid, "spin")
     jackpot = "🎉 <b>JACKPOT!</b>\n" if prize >= 5 else ""
     await message.answer(
         f"🎡 <b>Daily Spin</b>\n━━━━━━━━━━━━━━━━━━\n{jackpot}"

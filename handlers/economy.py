@@ -98,6 +98,8 @@ async def _do_claim(uid: int) -> tuple[str, object]:
     mult = await claim_multiplier(uid)
     bonus = round(random.uniform(min(lo, hi), max(lo, hi)) * mult, 2)
     await set_daily_bcn(uid, bonus)
+    from utils.missions import mark
+    await mark(uid, "claim")
     return (f"✨ <b>Claim Successful!</b>\n\n💰 <b>+{bonus:.2f} BCN</b>\n"
             "📅 Valid for 24 hours.",
             kb([btn("💼 View Balance", "acc_balance", style="primary")],

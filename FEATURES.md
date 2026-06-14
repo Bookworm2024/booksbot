@@ -104,7 +104,8 @@ Legend counts toward ~500 features across 14 pillars.
 - 🔜 Share-to-earn · invite quests · streak rewards
 - ✅ Daily Spin-the-Wheel (free, weighted BGM prizes, once/day, atomic)
 - ✅ Daily login-streak reward (escalating to day-7, resets on a missed day)
-- 🔜 Loot crates · quests/missions board
+- ✅ Daily missions/quests board (play/download/spin/claim → earn + claim BGM)
+- 🔜 Loot crates · battle pass
 - 🔜 Quests/missions with BGM payouts · battle pass
 - ⬜ Social proof ("X downloaded today") · viral share cards
 - ⬜ Channel cross-promo swaps · partner programs

@@ -219,6 +219,8 @@ async def cb_download(call: CallbackQuery) -> None:
                          {"$inc": {"downloads": 1}})
     from utils.files import bump_download
     await bump_download(fuid)
+    from utils.missions import mark
+    await mark(uid, "download")
     if LOG_CHANNEL_ID:
         try:
             await call.bot.send_message(

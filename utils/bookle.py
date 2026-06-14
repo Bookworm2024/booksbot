@@ -107,6 +107,8 @@ async def guess(uid: int, raw: str) -> dict:
         await add_bgm(uid, reward)
         await db.safe_update("users", {"user_id": uid},
                              {"$inc": {"games_played": 1, "game_bgm": reward}})
+        from utils.missions import mark
+        await mark(uid, "play_game")
 
     sess.update(update)
     return _public(sess)

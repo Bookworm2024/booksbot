@@ -43,7 +43,8 @@ async def cb_games(call: CallbackQuery) -> None:
              webapp_btn("🖋️ Author Match", "game.html", query="game=author", style="success")],
             [webapp_btn("🟩 Bookle (daily)", "bookle.html", style="success"),
              btn("🎡 Daily Spin", "daily_spin", style="success")],
-            [btn("🏆 Leaderboard", "game_leaderboard", style="primary")],
+            [btn("🎯 Daily Missions", "menu_missions", style="primary"),
+             btn("🏆 Leaderboard", "game_leaderboard", style="primary")],
             [btn("🔙 Back", "menu_home", style="danger")],
         ))
 
