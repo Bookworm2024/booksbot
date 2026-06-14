@@ -121,16 +121,16 @@ PORT: int            = _int("PORT", 8080)
 # Public HTTPS base (e.g. https://booksbot.koyeb.app). Required for Mini Apps —
 # Telegram only opens web_app buttons over HTTPS.
 def _public_url() -> str:
-    """Normalize BOT_PUBLIC_URL defensively: ensure an https scheme and strip a
-    trailing '/health' (a common copy-paste slip) and trailing slashes. Telegram
-    only accepts HTTPS web_app URLs, so a missing scheme would break every Mini
-    App button."""
+    """Normalize BOT_PUBLIC_URL bulletproof-ly. Telegram only accepts HTTPS
+    web_app URLs, so we FORCE an https scheme: strip whatever scheme is present
+    (even a typo like 'ttps://' or 'http://') and re-add 'https://'. Also strip a
+    trailing '/health' (a common copy-paste slip) and trailing slashes."""
     u = os.getenv("BOT_PUBLIC_URL", "").strip().rstrip("/")
     if not u:
         return ""
-    if "://" not in u:
-        u = "https://" + u
-    u = u.replace("http://", "https://")
+    if "://" in u:
+        u = u.split("://", 1)[1]   # drop any (possibly malformed) scheme
+    u = "https://" + u
     if u.endswith("/health"):
         u = u[: -len("/health")].rstrip("/")
     return u
