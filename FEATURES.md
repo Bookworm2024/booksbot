@@ -49,10 +49,10 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Quiz (3 levels, server-scored)
 - ✅ True/False (server-scored)
 - ✅ Guess-the-Book (from blurb) · ✅ First-Line quiz · ✅ Author Match
-- 🔜 Cover-Guess · Title Anagram/Word-Builder · "Bookle" (Wordle-style)
-- 🔜 Speed-Reading WPM challenge · Memory match (covers)
-- 🔜 Literary Hangman · Crossword (literary clues) · Wordle-style "Bookle"
-- 🔜 Daily challenge · weekly tournament · global leaderboards
+- ✅ "Bookle" — Wordle-style daily word game (server-scored, shared daily word)
+- ✅ Games leaderboard (top earners across all games)
+- 🔜 Cover-Guess · Title Anagram/Word-Builder · Speed-Reading WPM · Memory match
+- 🔜 Literary Hangman · Crossword · daily challenge · weekly tournament
 - 🔜 Streak bonuses · achievements/badges · XP & levels
 - ⬜ Trivia battles (1v1) · clan/guild competitions
 - ⬜ Boss-quiz events · seasonal themed events

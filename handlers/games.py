@@ -41,5 +41,28 @@ async def cb_games(call: CallbackQuery) -> None:
             [webapp_btn("📚 Guess the Book", "game.html", query="game=guess", style="success")],
             [webapp_btn("✍️ First Line", "game.html", query="game=firstline", style="success"),
              webapp_btn("🖋️ Author Match", "game.html", query="game=author", style="success")],
+            [webapp_btn("🟩 Bookle (daily)", "bookle.html", style="success"),
+             btn("🏆 Leaderboard", "game_leaderboard", style="primary")],
             [btn("🔙 Back", "menu_home", style="danger")],
         ))
+
+
+@router.callback_query(F.data == "game_leaderboard")
+async def cb_leaderboard(call: CallbackQuery) -> None:
+    from database.connection import MongoManager
+    await call.answer()
+    db = await MongoManager.get()
+    top = await db.find_global("users", {"game_bgm": {"$gt": 0}},
+                               sort=[("game_bgm", -1)], limit=10,
+                               proj={"first_name": 1, "game_bgm": 1, "games_played": 1})
+    if not top:
+        body = "No games played yet — be the first! 🎮"
+    else:
+        medals = ["🥇", "🥈", "🥉"] + ["🏅"] * 7
+        body = "\n".join(
+            f"{medals[i]} {(t.get('first_name') or 'Player')[:18]} — "
+            f"<b>{t.get('game_bgm',0):.2f} BGM</b> ({int(t.get('games_played',0))} games)"
+            for i, t in enumerate(top))
+    await call.message.edit_text(
+        "<b>🏆 Games Leaderboard</b>\n━━━━━━━━━━━━━━━━━━\n" + body,
+        reply_markup=kb([btn("🔙 Back", "menu_games", style="danger")]))

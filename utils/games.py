@@ -293,6 +293,10 @@ async def submit(uid: int, session_id: str, client_answers: list) -> dict:
         bgm, _ = await get_balances(uid)
         await add_bgm(uid, -min(abs(total_delta), bgm))
 
+    # leaderboard stats (positive earnings + games played)
+    await db.safe_update("users", {"user_id": uid},
+                         {"$inc": {"games_played": 1, "game_bgm": max(0.0, total_delta)}})
+
     return {
         "ok": True, "correct": correct, "wrong": wrong, "skipped": skipped,
         "net_bgm": round(net, 4), "speed_bonus": bonus,

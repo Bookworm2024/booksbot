@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Bookle</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    gap:14px; padding:16px; font-family: system-ui, sans-serif;
+    background: var(--tg-theme-bg-color,#0f1115); color: var(--tg-theme-text-color,#e8e8e8); }
+  h1 { font-size:1.2rem; margin:.2rem 0; } .hint{ color:var(--tg-theme-hint-color,#8a8f98); font-size:.85rem; }
+  #grid { display:grid; grid-template-rows:repeat(6,1fr); gap:6px; }
+  .row { display:grid; grid-template-columns:repeat(5,48px); gap:6px; }
+  .cell { width:48px; height:48px; display:grid; place-items:center; font-weight:800; font-size:1.3rem;
+    border:2px solid #3a3f47; border-radius:8px; text-transform:uppercase; }
+  .c { background:#2e7d32; border-color:#2e7d32; color:#fff; }
+  .p { background:#b59f3b; border-color:#b59f3b; color:#fff; }
+  .a { background:#3a3f47; border-color:#3a3f47; color:#fff; }
+  #kb { display:flex; flex-direction:column; gap:6px; width:100%; max-width:380px; }
+  #kb .krow { display:flex; gap:5px; justify-content:center; }
+  #kb button { flex:1; min-width:26px; height:48px; border:0; border-radius:7px; font-weight:700; font-size:.95rem;
+    background: var(--tg-theme-secondary-bg-color,#262b33); color: var(--tg-theme-text-color,#e8e8e8); cursor:pointer; }
+  #kb button.wide { flex:1.5; font-size:.8rem; }
+  #kb button.c{background:#2e7d32;color:#fff} #kb button.p{background:#b59f3b;color:#fff} #kb button.a{background:#23272e;color:#777}
+  #msg { min-height:1.2em; font-weight:700; text-align:center; }
+</style>
+</head>
+<body>
+<h1>🟩 Bookle</h1>
+<div class="hint">Guess the daily book-word in 6 tries · 1 game/day</div>
+<div id="grid"></div>
+<div id="msg"></div>
+<div id="kb"></div>
+
+<script>
+const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
+const INIT = tg?.initData || "";
+const grid = document.getElementById("grid"), kbEl = document.getElementById("kb"), msg = document.getElementById("msg");
+let LEN=5, MAX=6, guesses=[], status="active", cur="";
+const kbState = {};
+
+function buildGrid(){ grid.innerHTML="";
+  for(let r=0;r<MAX;r++){ const row=document.createElement("div"); row.className="row";
+    for(let c=0;c<LEN;c++){ const cell=document.createElement("div"); cell.className="cell"; cell.id=`r${r}c${c}`; row.appendChild(cell); }
+    grid.appendChild(row); } }
+function paint(){
+  for(let r=0;r<MAX;r++) for(let c=0;c<LEN;c++){ const el=document.getElementById(`r${r}c${c}`); el.textContent=""; el.className="cell"; }
+  guesses.forEach((gx,r)=>{ for(let c=0;c<LEN;c++){ const el=document.getElementById(`r${r}c${c}`);
+    el.textContent=gx.g[c]; el.classList.add(gx.fb[c]); const k=gx.g[c];
+    const rank={a:0,p:1,c:2}; if(!(k in kbState)||rank[gx.fb[c]]>rank[kbState[k]]) kbState[k]=gx.fb[c]; } });
+  if(status==="active" && guesses.length<MAX){ for(let c=0;c<cur.length;c++){ const el=document.getElementById(`r${guesses.length}c${c}`); el.textContent=cur[c]; } }
+  renderKb();
+}
+const ROWS=["QWERTYUIOP","ASDFGHJKL","ZXCVBNM"];
+function renderKb(){ kbEl.innerHTML="";
+  ROWS.forEach((rw,ri)=>{ const row=document.createElement("div"); row.className="krow";
+    if(ri===2){ const e=document.createElement("button"); e.className="wide"; e.textContent="ENTER"; e.onclick=submitGuess; row.appendChild(e); }
+    rw.split("").forEach(ch=>{ const b=document.createElement("button"); b.textContent=ch;
+      if(kbState[ch]) b.classList.add(kbState[ch]); b.onclick=()=>type(ch); row.appendChild(b); });
+    if(ri===2){ const d=document.createElement("button"); d.className="wide"; d.textContent="⌫"; d.onclick=()=>{cur=cur.slice(0,-1);paint();}; row.appendChild(d); }
+    kbEl.appendChild(row); }); }
+function type(ch){ if(status!=="active") return; if(cur.length<LEN){ cur+=ch; paint(); } }
+
+async function load(){ try{ const r=await (await fetch("/api/bookle/new",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({init_data:INIT})})).json(); apply(r); }catch(e){ msg.textContent="Network error."; } }
+async function submitGuess(){ if(status!=="active") return; if(cur.length!==LEN){ msg.textContent="Need 5 letters"; return; }
+  msg.textContent="";
+  let r; try{ r=await (await fetch("/api/bookle/guess",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({init_data:INIT,guess:cur})})).json(); }catch(e){ msg.textContent="Network error."; return; }
+  if(r.error){ msg.textContent=r.error; return; } cur=""; apply(r); }
+function apply(r){ if(r.error){ msg.textContent=r.error; return; }
+  LEN=r.length||5; MAX=r.max||6; guesses=r.guesses||[]; status=r.status||"active"; buildGrid(); paint();
+  if(status==="won"){ msg.innerHTML=`🎉 <b>Solved!</b> +${(r.reward||0)} BGM`; tg?.HapticFeedback?.notificationOccurred?.("success"); }
+  else if(status==="lost"){ msg.innerHTML=`❌ Out of tries — it was <b>${r.word}</b>`; tg?.HapticFeedback?.notificationOccurred?.("warning"); }
+  else if(guesses.length===0){ msg.textContent="Type your first guess 👇"; }
+}
+load();
+</script>
+</body>
+</html>
