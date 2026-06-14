@@ -107,6 +107,9 @@ class MongoManager:
                 await db.bookle_sessions.create_index([("uid", ASCENDING), ("day", ASCENDING)], unique=True)
                 await db.users.create_index([("game_bgm", DESCENDING)])
                 await db.users.create_index([("last_active", ASCENDING)])
+                await db.users.create_index([("downloads", DESCENDING)])
+                await db.users.create_index([("ref_count", DESCENDING)])
+                await db.users.create_index([("login_streak", DESCENDING)])
             except OperationFailure as exc:
                 # "already exists with different options" etc. are benign.
                 logger.debug("Index note on cluster %d: %s", idx, exc)

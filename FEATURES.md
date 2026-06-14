@@ -124,9 +124,9 @@ Legend counts toward ~500 features across 14 pillars.
 - ⬜ Shareable profile cards · friends/following
 
 ## 10. Social & Community
+- ✅ Leaderboards hub — Top Readers / Gamers / Referrers / Streaks (+ your rank)
 - 🔜 Book clubs / reading rooms · group reading challenges
 - 🔜 Comments/reactions on titles · discussion threads
-- 🔜 Leaderboards (downloads, quizzes, referrals, reading time)
 - ⬜ Buddy reading · shared shelves · author AMAs
 
 ## 11. Content Pipeline (uploaders/admins)

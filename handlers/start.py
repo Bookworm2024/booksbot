@@ -224,9 +224,10 @@ async def cb_account(call: CallbackQuery) -> None:
 async def cb_tools(call: CallbackQuery) -> None:
     await call.answer()
     rows = [
-        [btn("📊 Bot Stats", "tool_stats", style="primary"),
-         btn("⭐ Rate Us", "menu_rate", style="primary")],
-        [btn("📜 Public Logs", "tool_logs", style="primary")],
+        [btn("🏆 Leaderboards", "lb_hub", style="primary"),
+         btn("📊 Bot Stats", "tool_stats", style="primary")],
+        [btn("⭐ Rate Us", "menu_rate", style="primary"),
+         btn("📜 Public Logs", "tool_logs", style="primary")],
     ]
     if call.from_user.id in ADMIN_IDS:
         rows.append([btn("🛠 Admin Centre", "admin_open", style="danger")])
