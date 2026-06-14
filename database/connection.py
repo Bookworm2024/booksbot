@@ -87,6 +87,8 @@ class MongoManager:
                 # Text index powers fast title search across the file archive.
                 await db.files.create_index([("name", TEXT)], default_language="english")
                 await db.files.create_index([("name_lc", ASCENDING)])
+                await db.files.create_index([("indexed_at", DESCENDING)])
+                await db.files.create_index([("dl_count", DESCENDING)])
                 await db.requests.create_index([("request_id", ASCENDING)], unique=True)
                 await db.requests.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)])
                 await db.favorites.create_index([("user_id", ASCENDING), ("file_unique_id", ASCENDING)], unique=True)

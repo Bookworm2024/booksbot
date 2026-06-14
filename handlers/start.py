@@ -157,11 +157,12 @@ async def cb_library(call: CallbackQuery) -> None:
     await call.message.edit_text(
         "<b>📖 My Library</b>\n\nYour personal reading hub.",
         reply_markup=kb(
-            [btn("🤖 AI Recommendations", "lib_recommend", style="success"),
-             btn("📝 Book Summary", "lib_summary", style="success")],
-            [btn("📖 Continue Reading", "lib_continue", style="primary"),
-             btn("⭐ Favorites", "lib_favorites", style="primary")],
-            [btn("📊 My Reading", "lib_stats", style="primary")],
+            [btn("🔭 Discover", "lib_discover", style="success"),
+             btn("🤖 AI Recommendations", "lib_recommend", style="success")],
+            [btn("📝 Book Summary", "lib_summary", style="success"),
+             btn("📖 Continue Reading", "lib_continue", style="primary")],
+            [btn("⭐ Favorites", "lib_favorites", style="primary"),
+             btn("📊 My Reading", "lib_stats", style="primary")],
             [btn("🔙 Back", "menu_home", style="danger")],
         ),
     )

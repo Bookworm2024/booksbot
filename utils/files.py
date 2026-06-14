@@ -91,3 +91,36 @@ async def get_file(file_unique_id: str) -> dict | None:
 async def archive_count() -> int:
     db = await MongoManager.get()
     return await db.count_global("files")
+
+
+_DISC_PROJ = {"name": 1, "ext": 1, "kind": 1, "file_unique_id": 1, "dl_count": 1}
+
+
+async def recent_files(limit: int = 48) -> list[dict]:
+    """Newest-indexed files (New Arrivals)."""
+    from pymongo import DESCENDING
+    db = await MongoManager.get()
+    return await db.find_global("files", {}, limit=limit,
+                                sort=[("indexed_at", DESCENDING)], proj=_DISC_PROJ)
+
+
+async def popular_files(limit: int = 48) -> list[dict]:
+    """Most-downloaded files (all-time)."""
+    from pymongo import DESCENDING
+    db = await MongoManager.get()
+    return await db.find_global("files", {"dl_count": {"$gt": 0}}, limit=limit,
+                                sort=[("dl_count", DESCENDING)], proj=_DISC_PROJ)
+
+
+async def bump_download(file_unique_id: str) -> None:
+    db = await MongoManager.get()
+    await db.safe_update("files", {"file_unique_id": file_unique_id},
+                         {"$inc": {"dl_count": 1}}, upsert=False)
+
+
+async def book_of_the_day(day_index: int) -> dict | None:
+    """Deterministic daily pick from a bounded recent window."""
+    pool = await recent_files(limit=200)
+    if not pool:
+        return None
+    return pool[day_index % len(pool)]

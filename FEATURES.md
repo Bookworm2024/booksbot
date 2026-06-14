@@ -29,11 +29,11 @@ Legend counts toward ~500 features across 14 pillars.
 ## 2. Book Discovery & Content
 - ✅ AI recommendations (genre → 100 titles)
 - ✅ AI book summaries (overview, themes, takeaways)
+- ✅ Discover hub: 🆕 New Arrivals · 🔥 Popular (download-ranked)
+- ✅ Book of the Day (deterministic daily) · 💬 Daily literary Quote
 - 🔜 "Similar to this" recommendations · mood-based picks
 - 🔜 Author spotlight · series detector & next-in-series
-- 🔜 New-arrivals feed · trending this week · staff picks
-- 🔜 Genre browse hub · curated collections / shelves
-- 🔜 Book of the day · daily quote · reading challenges
+- 🔜 Genre browse hub · curated collections / shelves · reading challenges
 - ⬜ Goodreads-style ratings/reviews per title
 - ⬜ Personal reading goals & yearly wrap-up
 - ⬜ Wishlist/TBR list with reminders

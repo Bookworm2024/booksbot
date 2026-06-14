@@ -28,9 +28,9 @@ from config import (
 )
 from database.connection import MongoManager
 from handlers import (
-    admin, broadcast, captcha, economy, favorites, games, indexer, invite,
-    payments, qadmin, rate, recommend, referral, request, requests_manual,
-    revenue, start, stats, support, track,
+    admin, broadcast, captcha, discover, economy, favorites, games, indexer,
+    invite, payments, qadmin, rate, recommend, referral, request,
+    requests_manual, revenue, start, stats, support, track,
 )
 from handlers.payments import heleket_webhook
 from handlers.games_api import api_game_new, api_game_submit
@@ -76,6 +76,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(payments.router)
     dp.include_router(recommend.router)
     dp.include_router(favorites.router)
+    dp.include_router(discover.router)
     dp.include_router(games.router)
     dp.include_router(referral.router)
     dp.include_router(support.router)

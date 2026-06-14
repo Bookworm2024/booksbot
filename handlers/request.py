@@ -191,6 +191,8 @@ async def cb_download(call: CallbackQuery) -> None:
     db = await MongoManager.get()
     await db.safe_update("users", {"user_id": uid},
                          {"$inc": {"downloads": 1}})
+    from utils.files import bump_download
+    await bump_download(fuid)
     if LOG_CHANNEL_ID:
         try:
             await call.bot.send_message(
