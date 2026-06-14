@@ -30,8 +30,9 @@ from database.connection import MongoManager
 from handlers import (
     admin, admin_tools, broadcast, captcha, daily, discover, economy, favorites,
     featured_admin, games, gift, indexer, inline, invite, payments, qadmin,
-    missions, notifs, rate, recommend, referral, request, requests_manual,
-    revenue, settings_admin, spin, start, stats, support, track, vip,
+    missions, notifs, profile, rate, recommend, referral, request,
+    requests_manual, revenue, settings_admin, spin, start, stats, support,
+    track, vip,
 )
 from handlers.payments import heleket_webhook
 from handlers.admin_api import api_admin_overview
@@ -90,6 +91,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(spin.router)
     dp.include_router(daily.router)
     dp.include_router(missions.router)
+    dp.include_router(profile.router)
     dp.include_router(referral.router)
     dp.include_router(support.router)
     dp.include_router(notifs.router)

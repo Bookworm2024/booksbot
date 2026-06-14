@@ -204,8 +204,9 @@ async def cb_account(call: CallbackQuery) -> None:
     await call.message.edit_text(
         "<b>👤 My Account</b>\n\nProfile, tokens, rewards and activity.",
         reply_markup=kb(
-            [btn("💼 Balance", "acc_balance", style="primary"),
-             btn("💎 Buy BGM", "acc_buy", style="success")],
+            [btn("👤 Profile", "acc_profile", style="primary"),
+             btn("💼 Balance", "acc_balance", style="primary")],
+            [btn("💎 Buy BGM", "acc_buy", style="success")],
             [btn("🎁 Daily Reward", "daily_reward", style="success"),
              btn("👑 Premium (VIP)", "acc_vip", style="success")],
             [btn("🎟 Redeem Code", "acc_redeem", style="success"),
