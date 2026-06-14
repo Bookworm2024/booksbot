@@ -63,7 +63,10 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Admin question manager (add quiz/TF, counts)
 - ✅ Public logs / invite link (/get_link, 24h single-use, 1/day)
 - ✅ Safe in-house captcha (CAPTCHA_ENABLED) replacing 3rd-party verification
-- ✅ Payments — UPI manual flow (UTR + screenshot → admin approve → credit BGM)
+- ✅ Payments — UPI **email auto-verified** (ported from inflowads): pick BGM →
+  pay ₹ to UPI ID → submit UTR → IMAP monitor reads the FamPay credit email,
+  matches UTR + exact amount (±₹2) → auto-credits BGM. Ledger handles emails
+  that arrive before/after the UTR. Atomic single-credit via _confirm_payment.
 - ✅ Payments — crypto (**Heleket**, same gateway as inflowads): coin/network →
   USD pack (≥$5 min) → invoice → signed /heleket-webhook auto-credits BGM
   (activates when HELEKET_API_KEY + HELEKET_MERCHANT_ID set)

@@ -130,6 +130,12 @@ BCN_EXPIRY_SECONDS: int = _int("BCN_EXPIRY_SECONDS", 86400)
 # ── payments (Buy BGM) ───────────────────────────────────────────────────────
 UPI_ID: str            = os.getenv("UPI_ID", "sendrajbooks@fam")
 PAYMENT_QR_URL: str    = os.getenv("PAYMENT_QR_URL", "")  # static QR image URL
+# Email-monitored UPI auto-verify (FamPay receipts → rajsom8877@gmail.com).
+IMAP_HOST: str         = os.getenv("IMAP_HOST", "imap.gmail.com")
+IMAP_USER: str         = os.getenv("IMAP_USER", "")          # rajsom8877@gmail.com
+IMAP_PASSWORD: str     = os.getenv("IMAP_PASSWORD", "")      # Gmail app password
+FAMPAY_SENDER: str     = os.getenv("FAMPAY_SENDER", "no-reply@famapp.in")
+EMAIL_LOG_CHANNEL: int = _int("EMAIL_LOG_CHANNEL", 0)
 BGM_PRICE_INR: float   = _float_env("BGM_PRICE_INR", 2.0)
 BGM_PRICE_USD: float   = _float_env("BGM_PRICE_USD", 0.023)
 MIN_BGM_PURCHASE: int  = _int("MIN_BGM_PURCHASE", 10)

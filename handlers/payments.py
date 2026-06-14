@@ -13,8 +13,7 @@ Crypto flow (Heleket gateway, same as inflowads):
   BGM automatically. Activates when HELEKET_API_KEY + HELEKET_MERCHANT_ID are set.
 """
 import logging
-import random
-import string
+import re
 from datetime import datetime, timezone
 
 from aiogram import F, Router
@@ -27,7 +26,8 @@ from aiohttp import web
 
 from config import (
     ADMIN_IDS, BGM_PRICE_INR, BGM_PRICE_USD, BOT_PUBLIC_URL, HELEKET_API_KEY,
-    HELEKET_MERCHANT_ID, MIN_BGM_PURCHASE, PAYMENT_QR_URL, UPI_ID,
+    HELEKET_MERCHANT_ID, IMAP_PASSWORD, IMAP_USER, MIN_BGM_PURCHASE,
+    PAYMENT_QR_URL, UPI_ID,
 )
 from database.connection import MongoManager
 from utils.heleket import (
@@ -42,17 +42,21 @@ router = Router()
 
 
 class PayFSM(StatesGroup):
-    awaiting_utr = State()
-    awaiting_screenshot = State()
-    admin_amount = State()
-
-
-def _pid() -> str:
-    return "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    awaiting_amount = State()   # UPI: how many BGM
+    awaiting_utr = State()      # UPI: the transaction reference
 
 
 def _now():
     return datetime.now(timezone.utc)
+
+
+# Accept a standard 12-digit bank UTR or a FamPay FMPIB id.
+_UTR_OK = re.compile(r'^(?:\d{12}|FMPIB\d+)$', re.IGNORECASE)
+_AMOUNT_TOLERANCE_INR = 2.0
+
+
+def _upi_enabled() -> bool:
+    return bool(IMAP_USER and IMAP_PASSWORD)
 
 
 # ── Buy menu ─────────────────────────────────────────────────────────────────
@@ -75,8 +79,9 @@ def _buy_view():
         "━━━━━━━━━━━━━━━━━━\n"
         "Permanent tokens — never expire.\n\n"
         f"🏦 <b>UPI (INR):</b> ₹{BGM_PRICE_INR:g}/BGM · min {MIN_BGM_PURCHASE} (₹{min_inr})\n"
-        f"🌐 <b>Crypto:</b> ${BGM_PRICE_USD:g}/BGM · min {MIN_BGM_PURCHASE}\n\n"
-        "<i>UPI is verified manually by admins; crypto is automatic.</i>"
+        f"🌐 <b>Crypto:</b> ${BGM_PRICE_USD:g}/BGM\n\n"
+        "<i>Both auto-credit — UPI is verified from the payment receipt, crypto "
+        "on-chain.</i>"
     )
     return text, kb(
         [btn("💳 Pay via UPI (INR)", "pay_upi", style="success")],
@@ -85,145 +90,122 @@ def _buy_view():
     )
 
 
-# ── UPI ──────────────────────────────────────────────────────────────────────
+# ── UPI (email auto-verified, like inflowads) ───────────────────────────────────
 @router.callback_query(F.data == "pay_upi")
-async def cb_upi(call: CallbackQuery) -> None:
+async def cb_upi(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
+    if not _upi_enabled():
+        await call.message.edit_text(
+            "💳 <b>UPI is temporarily unavailable.</b>\nPlease use crypto, or "
+            "reach out via /support.\n<i>(Admin: set IMAP_USER + IMAP_PASSWORD.)</i>",
+            reply_markup=kb([btn("🌐 Pay via Crypto", "pay_crypto", style="primary")],
+                            [btn("🔙 Back", "acc_buy", style="danger")]))
+        return
+    await state.set_state(PayFSM.awaiting_amount)
     min_inr = int(MIN_BGM_PURCHASE * BGM_PRICE_INR)
-    text = (
-        "<b>💳 UPI Payment</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        f"🏦 <b>UPI ID:</b> <code>{UPI_ID}</code>\n"
-        f"💰 <b>Min:</b> {MIN_BGM_PURCHASE} BGM = ₹{min_inr}\n\n"
-        "1️⃣ Pay the amount to the UPI ID (or scan the QR).\n"
-        "2️⃣ Tap <b>Paid</b> and send your 12-digit UTR + screenshot.\n\n"
-        "<i>Verified manually — allow a little time.</i>"
-    )
+    await call.message.edit_text(
+        "<b>💳 UPI Payment</b>\n━━━━━━━━━━━━━━━━━━\n"
+        f"How many <b>BGM</b> do you want? (min {MIN_BGM_PURCHASE} = ₹{min_inr})\n\n"
+        "Send a number — /cancel to abort.")
+
+
+@router.message(PayFSM.awaiting_amount, F.text)
+async def on_amount(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if raw.lower() == "/cancel":
+        await state.clear()
+        await message.answer("❌ Cancelled.")
+        return
+    if not raw.isdigit() or int(raw) < MIN_BGM_PURCHASE:
+        await message.answer(f"⚠️ Enter a whole number ≥ {MIN_BGM_PURCHASE}.")
+        return
+    bgm = int(raw)
+    inr = round(bgm * BGM_PRICE_INR, 2)
+    uid = message.chat.id
+    order_id = make_order_id(uid)
+    db = await MongoManager.get()
+    await db.safe_insert("payments", {
+        "order_id": order_id, "user_id": uid, "username": message.from_user.username or "",
+        "method": "upi", "bgm": bgm, "total_due_inr": inr, "status": "waiting",
+        "submitted_utr": None, "created_at": _now(),
+    })
+    await state.update_data(order_id=order_id, total=inr)
+    await state.set_state(PayFSM.awaiting_utr)
     rows = []
     if PAYMENT_QR_URL:
         rows.append([url_btn("📷 View QR", PAYMENT_QR_URL)])
-    rows.append([btn("✅ Paid", "pay_paid", style="success")])
-    rows.append([btn("🔙 Back", "acc_buy", style="danger")])
-    await call.message.edit_text(text, reply_markup=kb(*rows))
-
-
-@router.callback_query(F.data == "pay_paid")
-async def cb_paid(call: CallbackQuery, state: FSMContext) -> None:
-    await call.answer()
-    await state.set_state(PayFSM.awaiting_utr)
-    await call.message.answer("🧾 Send your <b>UTR / transaction reference</b> "
-                              "(the number on your payment receipt) — /cancel to abort:")
+    await message.answer(
+        f"<b>💳 Pay ₹{inr:.2f}</b> for <b>{bgm} BGM</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"🏦 <b>UPI ID:</b> <code>{UPI_ID}</code>\n\n"
+        f"1️⃣ Send <b>exactly ₹{inr:.2f}</b> to the UPI ID (or scan the QR).\n"
+        "2️⃣ Then send your <b>UTR / transaction reference</b> here.\n\n"
+        "<i>You'll be credited automatically — usually within 1–2 minutes.</i>",
+        reply_markup=kb(*rows) if rows else None)
 
 
 @router.message(PayFSM.awaiting_utr, F.text)
 async def on_utr(message: Message, state: FSMContext) -> None:
-    utr = (message.text or "").strip()
-    if utr.lower() == "/cancel":
+    txt = (message.text or "").strip()
+    if txt.lower() == "/cancel":
         await state.clear()
         await message.answer("❌ Cancelled.")
         return
-    if not utr.isdigit() or len(utr) < 9:
-        await message.answer("⚠️ That doesn't look like a valid UTR. Re-check your receipt.")
+    utr = txt.upper()
+    if not _UTR_OK.match(utr):
+        await message.answer("⚠️ Send a valid 12-digit UTR (or FMPIB id) from your receipt.")
         return
+    data = await state.get_data()
+    order_id = data.get("order_id")
     db = await MongoManager.get()
-    if await db.find_one_global("payments", {"utr": utr}):
+
+    # reject a UTR already consumed by a confirmed payment
+    if await db.find_one_global("payments", {"submitted_utr": utr, "status": "paid"}):
+        await message.answer("❌ This transaction reference was already used.")
+        return
+    order = await db.find_one_global("payments", {"order_id": order_id})
+    if not order or order.get("status") not in ("waiting", "utr_submitted"):
         await state.clear()
-        await message.answer("❌ This UTR has already been submitted.")
+        await message.answer("⚠️ Session expired — start the purchase again via 💎 Buy BGM.")
         return
-    await state.update_data(utr=utr)
-    await state.set_state(PayFSM.awaiting_screenshot)
-    await message.answer("📸 Now send the <b>payment screenshot</b> (photo or file):")
 
-
-@router.message(PayFSM.awaiting_screenshot, F.photo | F.document)
-async def on_screenshot(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
+    await db.safe_update("payments", {"order_id": order_id},
+                         {"$set": {"submitted_utr": utr, "status": "utr_submitted"}})
     await state.clear()
-    utr = data.get("utr")
-    shot = message.photo[-1].file_id if message.photo else message.document.file_id
-    uid = message.chat.id
-    pid = _pid()
+
+    # ledger pre-match: the credit email may have already arrived & be parked
+    total = float(order.get("total_due_inr") or 0)
+    led = await db.find_one_global("fampay_ledger", {"utr": utr, "status": "unclaimed"})
+    if led and abs(float(led.get("amount") or 0) - total) <= _AMOUNT_TOLERANCE_INR:
+        order["submitted_utr"] = utr
+        await _confirm_payment(order, message.bot, email_txn_id=utr,
+                               email_amount_inr=float(led.get("amount") or total))
+        await db.safe_update("fampay_ledger", {"utr": utr}, {"$set": {"status": "claimed"}})
+        return
+
+    await message.answer(
+        "✅ <b>Reference recorded.</b>\nWe'll credit your BGM automatically the moment "
+        "the payment lands (usually 1–2 min). You can close this chat.")
+
+
+async def _confirm_payment(doc: dict, bot, *, email_txn_id: str = "",
+                           email_amount_inr: float = 0.0) -> None:
+    """Credit a UPI payment exactly once. Called by the email monitor and the
+    ledger pre-match. The atomic status flip guarantees single crediting."""
     db = await MongoManager.get()
-    await db.safe_insert("payments", {
-        "payment_id": pid, "user_id": uid, "method": "upi", "utr": utr,
-        "screenshot": shot, "status": "pending", "created_at": _now(),
-    })
-    await message.answer("✅ <b>Submitted!</b> Your payment is in the verification queue. "
-                         "You'll be notified once approved.")
-    caption = (f"📥 <b>UPI Deposit</b>\n🆔 <code>{pid}</code>\n"
-               f"👤 <a href='tg://user?id={uid}'>{message.from_user.first_name}</a> "
-               f"(<code>{uid}</code>)\n🧾 UTR: <code>{utr}</code>")
-    akb = kb([btn("✅ Approve", f"pay_ok:{pid}", style="success"),
-              btn("❌ Decline", f"pay_no:{pid}", style="danger")])
-    for admin in ADMIN_IDS:
-        try:
-            await message.bot.send_photo(admin, shot, caption=caption, reply_markup=akb)
-        except Exception:  # noqa: BLE001
-            pass
-
-
-# ── admin approve / decline ─────────────────────────────────────────────────────
-@router.callback_query(F.data.startswith("pay_ok:"))
-async def cb_approve(call: CallbackQuery, state: FSMContext) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
-        return
-    pid = call.data.split(":", 1)[1]
-    db = await MongoManager.get()
-    pay = await db.find_one_global("payments", {"payment_id": pid})
-    if not pay or pay.get("status") != "pending":
-        await call.answer("Already processed.", show_alert=True)
-        return
-    await call.answer()
-    await state.set_state(PayFSM.admin_amount)
-    await state.update_data(pid=pid, target=pay["user_id"])
-    await call.message.answer(f"💎 How many <b>BGM</b> to credit for <code>{pid}</code>?")
-
-
-@router.message(PayFSM.admin_amount, F.text)
-async def on_amount(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    await state.clear()
-    raw = (message.text or "").strip()
-    if not raw.replace(".", "", 1).isdigit():
-        await message.answer("❌ Enter a number.")
-        return
-    amount = float(raw)
-    pid, target = data.get("pid"), data.get("target")
-    db = await MongoManager.get()
-    pay = await db.find_one_global("payments", {"payment_id": pid})
-    if not pay or pay.get("status") != "pending":
-        await message.answer("❌ Already processed.")
-        return
-    await add_bgm(target, amount)
-    await db.safe_update("payments", {"payment_id": pid},
-                         {"$set": {"status": "approved", "amount_bgm": amount,
-                                   "approved_by": message.chat.id, "approved_at": _now()}})
-    await message.answer(f"✅ Credited {amount:g} BGM to <code>{target}</code>.")
+    flipped = await db.find_one_and_update_global(
+        "payments", {"order_id": doc["order_id"], "status": {"$ne": "paid"}},
+        {"$set": {"status": "paid", "paid_at": _now(),
+                  "email_txn_id": email_txn_id, "email_amount_inr": email_amount_inr}})
+    if not flipped:
+        return  # already credited
+    bgm = float(flipped.get("bgm") or 0)
+    await add_bgm(flipped["user_id"], bgm)
     try:
-        await message.bot.send_message(
-            target, f"🎉 <b>Payment approved!</b>\n💎 <b>+{amount:g} BGM</b> added to your wallet.")
-    except Exception:  # noqa: BLE001
-        pass
-
-
-@router.callback_query(F.data.startswith("pay_no:"))
-async def cb_decline(call: CallbackQuery) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
-        return
-    pid = call.data.split(":", 1)[1]
-    db = await MongoManager.get()
-    pay = await db.find_one_global("payments", {"payment_id": pid})
-    if not pay or pay.get("status") != "pending":
-        await call.answer("Already processed.", show_alert=True)
-        return
-    await db.safe_update("payments", {"payment_id": pid}, {"$set": {"status": "declined"}})
-    await call.answer("Declined")
-    try:
-        await call.bot.send_message(
-            pay["user_id"], "❌ <b>Payment declined.</b> If you believe this is a mistake, "
-            "contact support via /support with your receipt.")
+        await bot.send_message(
+            flipped["user_id"],
+            f"🎉 <b>Payment confirmed!</b>\n💎 <b>+{bgm:g} BGM</b> added to your wallet.\n"
+            f"🧾 Ref: <code>{email_txn_id or flipped.get('submitted_utr','')}</code>")
     except Exception:  # noqa: BLE001
         pass
 

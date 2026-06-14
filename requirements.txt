@@ -16,6 +16,9 @@ pymongo>=4.6.0,<5
 # Web server for Mini Apps (reader / player / games) + health endpoint
 aiohttp>=3.9.0,<4
 
+# UPI email-monitor (reads FamPay payment receipts via IMAP)
+imap-tools>=1.6.0,<2
+
 # Utilities
 python-dotenv>=1.0.1,<2
 pytz>=2024.1,<2027

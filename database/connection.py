@@ -94,6 +94,12 @@ class MongoManager:
                 await db.codes.create_index([("code", ASCENDING)], unique=True)
                 await db.code_claims.create_index([("code", ASCENDING), ("user_id", ASCENDING)], unique=True)
                 await db.crypto_orders.create_index([("order_id", ASCENDING)], unique=True)
+                # UPI email-monitor collections
+                await db.payments.create_index([("order_id", ASCENDING)], unique=True)
+                await db.payments.create_index([("submitted_utr", ASCENDING), ("status", ASCENDING)])
+                await db.processed_emails.create_index([("uid", ASCENDING)], unique=True)
+                await db.fampay_ledger.create_index([("utr", ASCENDING)])
+                await db.raw_emails.create_index([("uid", ASCENDING)], unique=True)
             except OperationFailure as exc:
                 # "already exists with different options" etc. are benign.
                 logger.debug("Index note on cluster %d: %s", idx, exc)

@@ -38,6 +38,7 @@ from handlers.reader_api import (
     api_file, api_reader_state_get, api_reader_state_set,
 )
 from middlewares.ban import BanMiddleware
+from utils.email_monitor import run_email_monitor
 from utils.games import ensure_seed
 
 logging.basicConfig(
@@ -133,12 +134,16 @@ async def main() -> None:
     dp = _build_dispatcher()
     runner = await _start_web(bot)
 
+    # Background workers (UPI email auto-verify; no-op if IMAP unset).
+    monitor_task = asyncio.create_task(run_email_monitor(bot))
+
     try:
         me = await bot.get_me()
         logger.info("Starting polling as @%s", me.username)
         await bot.delete_webhook(drop_pending_updates=True)
         await dp.start_polling(bot)
     finally:
+        monitor_task.cancel()
         await runner.cleanup()
         await bot.session.close()
 
