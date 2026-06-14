@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>BooksBot Viewer</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100vh; background: var(--tg-theme-bg-color,#0f1115);
+    color: var(--tg-theme-text-color,#e8e8e8); font-family: system-ui, sans-serif; }
+  #bar { display:flex; align-items:center; gap:8px; padding:8px 10px; position:sticky; top:0; z-index:5;
+    background: var(--tg-theme-secondary-bg-color,#1c2027); }
+  #bar button { border:0; border-radius:10px; padding:8px 12px; font-weight:700; cursor:pointer;
+    background: var(--tg-theme-secondary-bg-color,#262b33); color: var(--tg-theme-text-color,#e8e8e8); }
+  #bar .pri { background: var(--tg-theme-button-color,#3390ec); color:#fff; }
+  #title { flex:1; font-size:.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #stage { padding:12px; display:flex; flex-direction:column; align-items:center; gap:12px; }
+  img#img { max-width:100%; border-radius:8px; transition:transform .2s; }
+  video#vid { width:100%; max-width:900px; border-radius:8px; background:#000; }
+  pre#txt { white-space:pre-wrap; word-break:break-word; width:100%; max-width:760px; line-height:1.6;
+    font-size:16px; font-family: Georgia, serif; }
+  .ctl { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+  .ctl button.on { background: var(--tg-theme-button-color,#3390ec); color:#fff; }
+  #msg { padding:48px 20px; text-align:center; }
+</style>
+</head>
+<body>
+<div id="bar"><div id="title">Loading…</div></div>
+<div id="stage"></div>
+<div id="msg" style="display:none"></div>
+
+<script>
+const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
+const q = new URLSearchParams(location.search);
+const FUID = q.get("fuid"), EXT = (q.get("ext")||"").toLowerCase(), INIT = tg?.initData||"";
+const stage = document.getElementById("stage"), msg = document.getElementById("msg"), title = document.getElementById("title");
+
+const AUDIO = ["mp3","m4a","m4b","wav","ogg","flac","aac"];
+const VIDEO = ["mp4","webm","mov","mkv","m4v"];
+const IMAGE = ["jpg","jpeg","png","gif","webp","bmp"];
+const TEXT  = ["txt","md","markdown","log","csv"];
+const DOC   = ["pdf","epub"];
+
+function showMsg(t){ msg.style.display="block"; msg.innerHTML=t+`<br><br><button onclick="tg?.close()" style="padding:10px 16px;border:0;border-radius:10px;background:#3390ec;color:#fff">Close</button>`; stage.style.display="none"; }
+function saveState(extra){ fetch("/api/reader/state",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({init_data:INIT,fuid:FUID,...extra})}); }
+async function getState(){ try{ return await (await fetch(`/api/reader/state?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`)).json(); }catch(e){ return {}; } }
+
+// route docs/audio to their dedicated readers
+if (DOC.includes(EXT)) { location.replace(`reader.html?fuid=${FUID}&ext=${EXT}`); }
+else if (AUDIO.includes(EXT)) { location.replace(`player.html?fuid=${FUID}&ext=${EXT}`); }
+else { boot(); }
+
+async function fetchFile(){
+  const r = await fetch(`/api/file?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`);
+  if(!r.ok){ const j = await r.json().catch(()=>({})); throw j.error||r.status; }
+  return r;
+}
+
+async function boot(){
+  if(!FUID){ return showMsg("⚠️ No file specified."); }
+  title.textContent = EXT.toUpperCase()+" file";
+  let r;
+  try { r = await fetchFile(); }
+  catch(err){
+    const m = err==="too_large" ? "📄 Too large to open in-app — receive it in chat."
+      : err==="not_in_library" ? "🔒 Add it to Favorites first."
+      : err==="stream_unavailable" ? "📄 This archive file can't be streamed — receive it in chat."
+      : "❌ Couldn't load this file.";
+    return showMsg(m);
+  }
+  if (VIDEO.includes(EXT)) return renderVideo(URL.createObjectURL(await r.blob()));
+  if (IMAGE.includes(EXT)) return renderImage(URL.createObjectURL(await r.blob()));
+  if (TEXT.includes(EXT))  return renderText(await r.text());
+  // unknown type
+  showMsg("📦 This format opens best in chat. Use “📥 Chat” from your favorites.");
+}
+
+/* ---------- VIDEO ---------- */
+async function renderVideo(src){
+  const st = await getState();
+  stage.innerHTML = `<video id="vid" controls playsinline></video>
+    <div class="ctl" id="sp"></div>`;
+  const v = document.getElementById("vid"); v.src = src;
+  v.addEventListener("loadedmetadata", ()=>{ if(st.position && st.position<v.duration) v.currentTime=st.position; });
+  let last=0;
+  v.addEventListener("timeupdate", ()=>{ if(Date.now()-last>5000){ last=Date.now(); saveState({position:v.currentTime}); }});
+  v.addEventListener("pause", ()=>saveState({position:v.currentTime}));
+  const sp=document.getElementById("sp");
+  [0.75,1,1.25,1.5,2].forEach(rate=>{ const b=document.createElement("button"); b.textContent=rate+"×";
+    if(rate===1)b.classList.add("on");
+    b.onclick=()=>{ v.playbackRate=rate; sp.querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); };
+    sp.appendChild(b); });
+}
+
+/* ---------- IMAGE ---------- */
+function renderImage(src){
+  stage.innerHTML = `<img id="img" src="${src}" alt="">`;
+  const img=document.getElementById("img"); let z=false;
+  img.onclick=()=>{ z=!z; img.style.transform = z?"scale(2)":"scale(1)"; img.style.cursor = z?"zoom-out":"zoom-in"; };
+}
+
+/* ---------- TEXT / MARKDOWN ---------- */
+async function renderText(content){
+  const st = await getState();
+  stage.innerHTML = `<div class="ctl"><button id="a-">A−</button><button id="a+">A+</button></div><pre id="txt"></pre>`;
+  const pre=document.getElementById("txt"); pre.textContent = content;
+  let fs = st.position && st.position>=12 ? st.position : 16; pre.style.fontSize=fs+"px";
+  document.getElementById("a-").onclick=()=>{ fs=Math.max(12,fs-2); pre.style.fontSize=fs+"px"; saveState({position:fs}); };
+  document.getElementById("a+").onclick=()=>{ fs=Math.min(30,fs+2); pre.style.fontSize=fs+"px"; saveState({position:fs}); };
+}
+</script>
+</body>
+</html>

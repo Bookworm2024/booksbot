@@ -15,7 +15,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import ANTHROPIC_API_KEY
 from database.connection import MongoManager
-from utils.ai import recommend_titles
+from utils.ai import recommend_titles, summarize_book
 from utils.keyboards import btn, kb
 from utils.wallet import get_balances, refund, spend
 
@@ -28,6 +28,7 @@ _BATCH = 20
 
 class RecFSM(StatesGroup):
     awaiting_genre = State()
+    awaiting_summary_title = State()
 
 
 @router.message(Command("recommend"))
@@ -146,3 +147,72 @@ async def cb_end(call: CallbackQuery) -> None:
                          {"$set": {"rec_titles": [], "rec_sent": 0, "rec_genre": ""}})
     await call.message.edit_text("✅ <b>Session ended.</b> Happy reading!",
                                  reply_markup=kb([btn("🏠 Menu", "menu_home", style="primary")]))
+
+
+# ── AI book summary ─────────────────────────────────────────────────────────
+@router.message(Command("summary"))
+async def cmd_summary(message: Message) -> None:
+    await _summary_intro(message, message.chat.id)
+
+
+@router.callback_query(F.data == "lib_summary")
+async def cb_summary(call: CallbackQuery) -> None:
+    await call.answer()
+    await _summary_intro(call.message, call.from_user.id)
+
+
+async def _summary_intro(message: Message, uid: int) -> None:
+    if not ANTHROPIC_API_KEY:
+        await message.answer("📝 AI summaries aren't enabled yet (admin: set ANTHROPIC_API_KEY).")
+        return
+    bgm, bcn = await get_balances(uid)
+    if bgm + bcn < _COST:
+        await message.answer("❌ <b>Insufficient balance.</b> A summary costs 1 BCN/BGM.")
+        return
+    await message.answer(
+        "📝 <b>AI Book Summary</b>\n━━━━━━━━━━━━━━━━━━\n"
+        "Get a crisp, spoiler-light summary of any book — overview, themes, "
+        "who it's for, and key takeaways.\n\n"
+        f"💎 Cost: <b>1 BCN/BGM</b> · Balance: {bcn:.2f} BCN · {bgm:.2f} BGM",
+        reply_markup=kb([btn("🚀 Proceed & Pay", "sum_proceed", style="success")],
+                        [btn("🔙 Back", "menu_library", style="danger")]))
+
+
+@router.callback_query(F.data == "sum_proceed")
+async def cb_sum_proceed(call: CallbackQuery, state: FSMContext) -> None:
+    uid = call.from_user.id
+    currency = await spend(uid, _COST)
+    if not currency:
+        await call.answer("Insufficient balance.", show_alert=True)
+        return
+    await call.answer()
+    await state.set_state(RecFSM.awaiting_summary_title)
+    await state.update_data(currency=currency)
+    await call.message.edit_text("✍️ <b>Send the book title</b> (and author if you can). "
+                                 "/cancel to abort.")
+
+
+@router.message(RecFSM.awaiting_summary_title, F.text)
+async def on_summary_title(message: Message, state: FSMContext) -> None:
+    title = (message.text or "").strip()
+    if title.lower() == "/cancel":
+        await state.clear()
+        await message.answer("❌ Cancelled.")
+        return
+    data = await state.get_data()
+    currency = data.get("currency", "BGM")
+    await state.clear()
+    uid = message.chat.id
+    notice = await message.answer(f"📝 Summarizing <b>{title}</b>…")
+    summary = await summarize_book(title)
+    if not summary:
+        refund_amt = 0.75 if currency == "BCN" else 0.9
+        await refund(uid, refund_amt, "BGM")
+        await notice.edit_text(
+            f"❌ I couldn't find <b>{title}</b>. Refunded <b>{refund_amt} BGM</b>. "
+            "Try the exact title + author.")
+        return
+    await notice.edit_text(
+        f"📘 <b>{title}</b>\n━━━━━━━━━━━━━━━━━━\n{summary}",
+        reply_markup=kb([btn("📝 Another Summary", "lib_summary", style="success")],
+                        [btn("🔙 Library", "menu_library", style="danger")]))

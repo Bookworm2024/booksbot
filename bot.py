@@ -29,8 +29,8 @@ from config import (
 from database.connection import MongoManager
 from handlers import (
     admin, broadcast, captcha, economy, favorites, games, indexer, invite,
-    payments, qadmin, rate, recommend, referral, request, requests_manual, start,
-    stats, support, track,
+    payments, qadmin, rate, recommend, referral, request, requests_manual,
+    revenue, start, stats, support, track,
 )
 from handlers.payments import heleket_webhook
 from handlers.games_api import api_game_new, api_game_submit
@@ -84,6 +84,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(invite.router)
     dp.include_router(broadcast.router)
     dp.include_router(qadmin.router)
+    dp.include_router(revenue.router)
     dp.include_router(admin.router)
     # indexer last — channel_post observer, no overlap with user handlers.
     dp.include_router(indexer.router)

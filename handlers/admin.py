@@ -43,10 +43,11 @@ def _panel_kb(is_super: bool):
          btn("📡 Broadcast", "admin_broadcast", style="primary")],
     ]
     if is_super:
-        rows.append([btn("➕ Add BGM", "admin_addbgm", style="success"),
-                     btn("🎟️ Create Code", "admin_create", style="success")])
-        rows.append([btn("🎮 Questions", "admin_qbank", style="primary"),
-                     btn("🛡 Manage Admins", "admin_manage", style="primary")])
+        rows.append([btn("💰 Revenue", "admin_revenue", style="success"),
+                     btn("➕ Add BGM", "admin_addbgm", style="success")])
+        rows.append([btn("🎟️ Create Code", "admin_create", style="success"),
+                     btn("🎮 Questions", "admin_qbank", style="primary")])
+        rows.append([btn("🛡 Manage Admins", "admin_manage", style="primary")])
     return kb(*rows)
 
 

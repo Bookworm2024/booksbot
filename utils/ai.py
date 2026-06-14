@@ -68,3 +68,59 @@ async def recommend_titles(genre: str) -> list[str] | None:
         if line and len(line) > 2:
             titles.append(line)
     return titles if len(titles) >= 10 else None
+
+
+async def _call(prompt: str, max_tokens: int = 900) -> str | None:
+    """Single-shot Claude text call. Returns the text or None on failure."""
+    if not ANTHROPIC_API_KEY:
+        return None
+    payload = {"model": ANTHROPIC_MODEL, "max_tokens": max_tokens,
+               "messages": [{"role": "user", "content": prompt}]}
+    headers = {"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+               "content-type": "application/json"}
+    try:
+        timeout = aiohttp.ClientTimeout(total=40)
+        async with aiohttp.ClientSession(timeout=timeout) as s:
+            async with s.post(_URL, json=payload, headers=headers) as r:
+                if r.status != 200:
+                    logger.warning("Anthropic %s: %s", r.status, (await r.text())[:200])
+                    return None
+                data = await r.json()
+        text = "".join(b.get("text", "") for b in data.get("content", [])
+                       if b.get("type") == "text").strip()
+        return text or None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Anthropic call failed: %s", exc)
+        return None
+
+
+async def summarize_book(title: str) -> str | None:
+    """Return an HTML-formatted summary of a book, or None if unknown/unavailable."""
+    title = (title or "").strip()
+    if not title:
+        return None
+    prompt = (
+        f"Give a concise, spoiler-light summary of the book \"{title}\". "
+        "If you don't recognize it as a real published book, reply with exactly: UNKNOWN.\n"
+        "Otherwise use EXACTLY this template with these labels:\n"
+        "Overview: <2-3 sentences>\n"
+        "Themes: <comma-separated>\n"
+        "Best for: <who'd enjoy it>\n"
+        "Takeaways: <three '- ' bullet lines>\n"
+        "Keep it under 180 words. Plain text only, no markdown headers."
+    )
+    text = await _call(prompt, max_tokens=700)
+    if not text or "UNKNOWN" in text[:30].upper():
+        return None
+    # light formatting → HTML
+    out = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        for lbl in ("Overview:", "Themes:", "Best for:", "Takeaways:"):
+            if line.startswith(lbl):
+                line = line.replace(lbl, f"<b>{lbl}</b>", 1)
+                break
+        out.append(line)
+    return "\n".join(out)

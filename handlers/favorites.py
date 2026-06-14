@@ -83,11 +83,11 @@ async def _render(call: CallbackQuery, page: int) -> None:
         is_audio = f.get("kind") == "audio" or ext in _AUDIO_EXT
         # title row
         rows.append([btn(f"{icon_for(ext)} {name}", f"fav_get:{fuid}", style="primary")])
-        # action row: open in Mini App · receive in chat · remove
+        # action row: open in the universal viewer (routes by type) · chat · remove
         open_btn = webapp_btn(
-            "🎧 Listen" if is_audio else "📖 Read",
-            "player.html" if is_audio else "reader.html",
-            query=f"fuid={fuid}&ext={ext}", style="success", fallback_cb=f"fav_get:{fuid}")
+            "🎧 Listen" if is_audio else "📖 Open",
+            "view.html", query=f"fuid={fuid}&ext={ext}",
+            style="success", fallback_cb=f"fav_get:{fuid}")
         rows.append([open_btn,
                      btn("📥 Chat", f"fav_get:{fuid}", style="primary"),
                      btn("🗑", f"fav_del:{fuid}", style="danger")])
