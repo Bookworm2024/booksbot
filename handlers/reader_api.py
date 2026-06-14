@@ -13,6 +13,7 @@ tells the user to grab it in chat. Running a local Bot API server
 (TELEGRAM_API_BASE) lifts that limit to ~2 GB.
 """
 import logging
+from datetime import datetime, timezone
 from io import BytesIO
 
 from aiohttp import web
@@ -99,6 +100,7 @@ async def api_reader_state_set(request: web.Request) -> web.Response:
         # generic: int pages (PDF) or CFI strings (EPUB)
         update["bookmarks"] = body["bookmarks"][:200]
     if update:
+        update["updated_at"] = datetime.now(timezone.utc)
         db = await MongoManager.get()
         await db.safe_update("reader_state", {"user_id": uid, "fuid": fuid},
                              {"$set": {"user_id": uid, "fuid": fuid, **update}})

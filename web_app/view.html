@@ -41,6 +41,7 @@ const AUDIO = ["mp3","m4a","m4b","wav","ogg","flac","aac"];
 const VIDEO = ["mp4","webm","mov","mkv","m4v"];
 const IMAGE = ["jpg","jpeg","png","gif","webp","bmp"];
 const TEXT  = ["txt","md","markdown","log","csv"];
+const COMIC = ["cbz"];
 const DOC   = ["pdf","epub"];
 
 function showMsg(t){ msg.style.display="block"; msg.innerHTML=t+`<br><br><button onclick="tg?.close()" style="padding:10px 16px;border:0;border-radius:10px;background:#3390ec;color:#fff">Close</button>`; stage.style.display="none"; }
@@ -73,6 +74,8 @@ async function boot(){
   if (VIDEO.includes(EXT)) return renderVideo(URL.createObjectURL(await r.blob()));
   if (IMAGE.includes(EXT)) return renderImage(URL.createObjectURL(await r.blob()));
   if (TEXT.includes(EXT))  return renderText(await r.text());
+  if (COMIC.includes(EXT)) return renderComic(await r.arrayBuffer());
+  if (EXT==="cbr") return showMsg("📚 CBR (RAR) isn't supported in-app yet — receive it in chat. (CBZ works here.)");
   // unknown type
   showMsg("📦 This format opens best in chat. Use “📥 Chat” from your favorites.");
 }
@@ -99,6 +102,25 @@ function renderImage(src){
   stage.innerHTML = `<img id="img" src="${src}" alt="">`;
   const img=document.getElementById("img"); let z=false;
   img.onclick=()=>{ z=!z; img.style.transform = z?"scale(2)":"scale(1)"; img.style.cursor = z?"zoom-out":"zoom-in"; };
+}
+
+/* ---------- COMIC (CBZ = zip of images) ---------- */
+async function renderComic(buf){
+  await new Promise((res,rej)=>{ const s=document.createElement("script");
+    s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+  let zip; try { zip = await JSZip.loadAsync(buf); } catch(e){ return showMsg("❌ Couldn't open this comic archive."); }
+  const names = Object.keys(zip.files).filter(n=>/\.(jpe?g|png|gif|webp)$/i.test(n) && !zip.files[n].dir).sort();
+  if(!names.length) return showMsg("📚 No images found in this comic.");
+  const st = await getState(); let i = Math.min(Math.max(0, st.page||0), names.length-1);
+  stage.innerHTML = `<img id="page" style="max-width:100%;border-radius:6px"><div class="ctl">
+    <button id="p">‹ Prev</button><span id="pi" style="align-self:center"></span><button id="n">Next ›</button></div>`;
+  const img=document.getElementById("page"), pi=document.getElementById("pi");
+  async function show(k){ i=Math.min(Math.max(0,k),names.length-1);
+    const b64=await zip.files[names[i]].async("base64"); img.src="data:image/*;base64,"+b64;
+    pi.textContent=`${i+1}/${names.length}`; title.textContent=`Comic · ${i+1}/${names.length}`; saveState({page:i}); }
+  document.getElementById("p").onclick=()=>show(i-1);
+  document.getElementById("n").onclick=()=>show(i+1);
+  show(i);
 }
 
 /* ---------- TEXT / MARKDOWN ---------- */

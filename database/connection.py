@@ -100,6 +100,7 @@ class MongoManager:
                 await db.processed_emails.create_index([("uid", ASCENDING)], unique=True)
                 await db.fampay_ledger.create_index([("utr", ASCENDING)])
                 await db.raw_emails.create_index([("uid", ASCENDING)], unique=True)
+                await db.reader_state.create_index([("user_id", ASCENDING), ("updated_at", DESCENDING)])
             except OperationFailure as exc:
                 # "already exists with different options" etc. are benign.
                 logger.debug("Index note on cluster %d: %s", idx, exc)

@@ -128,6 +128,36 @@ async def cb_fav_get(call: CallbackQuery) -> None:
         await call.message.answer("❌ Couldn't retrieve this file right now.")
 
 
+@router.callback_query(F.data == "lib_continue")
+async def cb_continue(call: CallbackQuery) -> None:
+    """Continue-Reading shelf — recently opened files with one-tap resume."""
+    await call.answer()
+    uid = call.from_user.id
+    db = await MongoManager.get()
+    states = await db.find_global("reader_state", {"user_id": uid},
+                                  sort=[("updated_at", -1)], limit=8)
+    if not states:
+        await call.message.edit_text(
+            "📖 <b>Nothing in progress yet.</b>\nOpen a book or audiobook and it'll "
+            "show up here to resume.",
+            reply_markup=kb([btn("🔙 Back", "menu_library", style="danger")]))
+        return
+    rows = []
+    for st in states:
+        fuid = st.get("fuid")
+        fav = await db.find_one_global("favorites", {"user_id": uid, "file_unique_id": fuid})
+        if not fav:
+            continue
+        ext = (fav.get("ext") or "").lower()
+        label = f"{icon_for(ext)} {fav.get('name','Untitled')[:32]}"
+        rows.append([webapp_btn(label, "view.html", query=f"fuid={fuid}&ext={ext}",
+                                style="success", fallback_cb=f"fav_get:{fuid}")])
+    rows.append([btn("🔙 Back", "menu_library", style="danger")])
+    await call.message.edit_text(
+        "📖 <b>Continue Reading</b>\n━━━━━━━━━━━━━━━━━━\nPick up where you left off:",
+        reply_markup=kb(*rows))
+
+
 @router.callback_query(F.data.startswith("fav_del:"))
 async def cb_fav_del(call: CallbackQuery) -> None:
     uid = call.from_user.id

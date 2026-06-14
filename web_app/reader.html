@@ -6,16 +6,25 @@
 <title>BooksBot Reader</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-  :root { color-scheme: light dark; }
+  :root { color-scheme: light dark; --rbg: var(--tg-theme-bg-color,#0f1115); --rfg: var(--tg-theme-text-color,#e8e8e8); }
+  :root[data-theme="sepia"] { --rbg:#f4ecd8; --rfg:#5b4636; }
+  :root[data-theme="dark"]  { --rbg:#15171b; --rfg:#cfcfcf; }
+  :root[data-theme="light"] { --rbg:#ffffff; --rfg:#15171b; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--tg-theme-bg-color,#0f1115);
-    color: var(--tg-theme-text-color,#e8e8e8); font-family: system-ui, sans-serif; }
-  #bar { display:flex; align-items:center; gap:8px; padding:8px 10px;
-    background: var(--tg-theme-secondary-bg-color,#1c2027); position:sticky; top:0; z-index:5; }
+  html, body { margin:0; height:100%; background: var(--rbg); color: var(--rfg);
+    font-family: system-ui, sans-serif; transition: background .2s, color .2s; }
+  #bar { display:flex; align-items:center; gap:8px; padding:8px 10px; position:sticky; top:0; z-index:6;
+    background: var(--tg-theme-secondary-bg-color,#1c2027); color: var(--tg-theme-text-color,#e8e8e8); }
   #bar button { border:0; border-radius:10px; padding:8px 12px; font-weight:700; cursor:pointer;
-    background: var(--tg-theme-button-color,#3390ec); color: var(--tg-theme-button-text-color,#fff); }
-  #bar .ghost { background:transparent; color:var(--tg-theme-text-color,#e8e8e8); }
+    background: var(--tg-theme-button-color,#3390ec); color:#fff; }
+  #bar .ghost { background:transparent; color: var(--tg-theme-text-color,#e8e8e8); }
   #info { flex:1; text-align:center; font-size:.85rem; }
+  #panel { display:none; gap:10px; padding:10px; flex-wrap:wrap; align-items:center;
+    background: var(--tg-theme-secondary-bg-color,#1c2027); position:sticky; top:46px; z-index:5; }
+  #panel .grp { display:flex; gap:6px; align-items:center; }
+  #panel button { border:0; border-radius:8px; padding:7px 10px; cursor:pointer; font-weight:700;
+    background:#2a2f37; color:#e8e8e8; }
+  #panel button.on { background: var(--tg-theme-button-color,#3390ec); color:#fff; }
   #stage { padding:10px; display:flex; justify-content:center; }
   #pdfc { max-width:100%; box-shadow:0 2px 14px rgba(0,0,0,.4); border-radius:6px; }
   #epub { width:100%; height: calc(100vh - 56px); }
@@ -30,7 +39,16 @@
   <button class="ghost" id="prev">‹</button>
   <div id="info">Loading…</div>
   <button class="ghost" id="next">›</button>
+  <button class="ghost" id="cog">Aa</button>
   <button id="bm">🔖</button>
+</div>
+<div id="panel">
+  <div class="grp"><b style="font-size:.8rem">Theme</b>
+    <button data-theme="light">☀️</button><button data-theme="sepia">📜</button><button data-theme="dark">🌙</button></div>
+  <div class="grp"><b style="font-size:.8rem">Font</b>
+    <button id="f-">A−</button><button id="f+">A+</button></div>
+  <div class="grp"><b style="font-size:.8rem">Spacing</b>
+    <button id="s-">≣−</button><button id="s+">≣+</button></div>
 </div>
 <div id="bmwrap"></div>
 <div id="stage"><canvas id="pdfc" style="display:none"></canvas><div id="epub" style="display:none"></div></div>
@@ -41,99 +59,96 @@ const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
 const q = new URLSearchParams(location.search);
 const FUID = q.get("fuid"); const EXT = (q.get("ext")||"").toLowerCase();
 const INIT = tg?.initData || "";
-const info = document.getElementById("info");
-const msg = document.getElementById("msg");
+const info = document.getElementById("info"); const msg = document.getElementById("msg");
 let state = { page:0, loc:"", bookmarks:[] };
 let mode = null, pdfDoc = null, pageNum = 1, rendition = null, book = null;
 
+// ── reading preferences (localStorage; global, not per-file) ──
+const PREFS = Object.assign({theme:"light", font:18, spacing:1.6},
+  JSON.parse(localStorage.getItem("rprefs")||"{}"));
+function savePrefs(){ localStorage.setItem("rprefs", JSON.stringify(PREFS)); }
+function filterFor(t){ return t==="dark" ? "invert(0.92) hue-rotate(180deg)" : t==="sepia" ? "sepia(0.45)" : "none"; }
+function applyPrefs(){
+  document.documentElement.setAttribute("data-theme", PREFS.theme);
+  document.querySelectorAll("#panel button[data-theme]").forEach(b=>
+    b.classList.toggle("on", b.dataset.theme===PREFS.theme));
+  const c = document.getElementById("pdfc"); if(c) c.style.filter = filterFor(PREFS.theme);
+  if(rendition) applyEpubTheme();
+}
+function applyEpubTheme(){
+  try{
+    rendition.themes.register("r", { body: {
+      background: PREFS.theme==="dark"?"#15171b":PREFS.theme==="sepia"?"#f4ecd8":"#fff",
+      color: PREFS.theme==="dark"?"#cfcfcf":PREFS.theme==="sepia"?"#5b4636":"#15171b",
+      "line-height": String(PREFS.spacing) } });
+    rendition.themes.select("r");
+    rendition.themes.fontSize(PREFS.font+"px");
+  }catch(e){}
+}
+document.getElementById("cog").onclick=()=>{ const p=document.getElementById("panel");
+  p.style.display = p.style.display==="flex"?"none":"flex"; };
+document.querySelectorAll("#panel button[data-theme]").forEach(b=>
+  b.onclick=()=>{ PREFS.theme=b.dataset.theme; savePrefs(); applyPrefs(); });
+document.getElementById("f-").onclick=()=>{ PREFS.font=Math.max(12,PREFS.font-1); savePrefs(); applyPrefs(); };
+document.getElementById("f+").onclick=()=>{ PREFS.font=Math.min(30,PREFS.font+1); savePrefs(); applyPrefs(); };
+document.getElementById("s-").onclick=()=>{ PREFS.spacing=Math.max(1.2,+(PREFS.spacing-0.1).toFixed(1)); savePrefs(); applyPrefs(); };
+document.getElementById("s+").onclick=()=>{ PREFS.spacing=Math.min(2.4,+(PREFS.spacing+0.1).toFixed(1)); savePrefs(); applyPrefs(); };
+
 function showMsg(t){ msg.style.display="block"; msg.innerHTML=t; document.getElementById("stage").style.display="none"; }
-async function api(path, opt){ return (await fetch(path, opt)).json(); }
+async function api(p,o){ return (await fetch(p,o)).json(); }
 async function loadState(){ try{ state = await api(`/api/reader/state?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`); }catch(e){} }
-function saveState(extra){ fetch("/api/reader/state",{method:"POST",headers:{"Content-Type":"application/json"},
-  body: JSON.stringify({init_data:INIT, fuid:FUID, ...extra})}); }
+function saveState(x){ fetch("/api/reader/state",{method:"POST",headers:{"Content-Type":"application/json"},
+  body: JSON.stringify({init_data:INIT, fuid:FUID, ...x})}); }
+function esc(s){ return (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+async function getBytes(){ const r=await fetch(`/api/file?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`);
+  if(!r.ok){ const j=await r.json().catch(()=>({})); throw j.error||r.status; } return await r.arrayBuffer(); }
 
-async function getBytes(){
-  const r = await fetch(`/api/file?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`);
-  if(!r.ok){ const j = await r.json().catch(()=>({})); throw j.error||r.status; }
-  return await r.arrayBuffer();
-}
+function renderBookmarks(){ const w=document.getElementById("bmwrap"); w.innerHTML="";
+  (state.bookmarks||[]).forEach(b=>{ const s=document.createElement("span"); s.className="bm";
+    s.textContent="🔖 "+(mode==="pdf"?("p."+b):"mark");
+    s.onclick=()=> mode==="pdf"? gotoPdf(b) : rendition.display(b); w.appendChild(s); }); }
 
-function renderBookmarks(){
-  const w = document.getElementById("bmwrap"); w.innerHTML="";
-  (state.bookmarks||[]).forEach(b=>{
-    const s=document.createElement("span"); s.className="bm"; s.textContent="🔖 "+(mode==="pdf"?("p."+b):"mark");
-    s.onclick=()=> mode==="pdf"? gotoPdf(b) : rendition.display(b);
-    w.appendChild(s);
-  });
-}
-
-/* ---------- PDF ---------- */
-async function initPdf(buf){
-  mode="pdf";
+/* PDF */
+async function initPdf(buf){ mode="pdf";
   await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.mjs").then(m=>window.pdfjsLib=m);
   pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.mjs";
   pdfDoc = await pdfjsLib.getDocument({data:buf}).promise;
   pageNum = Math.min(Math.max(1, state.page||1), pdfDoc.numPages);
-  document.getElementById("pdfc").style.display="block";
-  gotoPdf(pageNum);
-  renderBookmarks();
-}
-async function gotoPdf(n){
-  pageNum = Math.min(Math.max(1,n), pdfDoc.numPages);
-  const page = await pdfDoc.getPage(pageNum);
-  const canvas = document.getElementById("pdfc"); const ctx = canvas.getContext("2d");
-  const vw = Math.min(window.innerWidth-20, 900);
-  const v1 = page.getViewport({scale:1}); const scale = vw / v1.width;
-  const vp = page.getViewport({scale});
-  canvas.width=vp.width; canvas.height=vp.height;
+  document.getElementById("pdfc").style.display="block"; applyPrefs(); gotoPdf(pageNum); renderBookmarks(); }
+async function gotoPdf(n){ pageNum=Math.min(Math.max(1,n), pdfDoc.numPages);
+  const page=await pdfDoc.getPage(pageNum); const canvas=document.getElementById("pdfc"); const ctx=canvas.getContext("2d");
+  const vw=Math.min(window.innerWidth-20,900); const scale=vw/page.getViewport({scale:1}).width;
+  const vp=page.getViewport({scale}); canvas.width=vp.width; canvas.height=vp.height;
   await page.render({canvasContext:ctx, viewport:vp}).promise;
-  info.textContent = `Page ${pageNum} / ${pdfDoc.numPages}`;
-  saveState({page:pageNum});
-}
+  info.textContent=`Page ${pageNum} / ${pdfDoc.numPages}`; saveState({page:pageNum}); }
 
-/* ---------- EPUB ---------- */
-async function initEpub(buf){
-  mode="epub";
-  await new Promise((res,rej)=>{ const s=document.createElement("script");
-    s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
-  await new Promise((res,rej)=>{ const s=document.createElement("script");
-    s.src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
-  document.getElementById("epub").style.display="block";
-  book = ePub(buf);
-  rendition = book.renderTo("epub", {width:"100%", height:"100%", spread:"none"});
-  await rendition.display(state.loc || undefined);
-  info.textContent = "EPUB";
-  rendition.on("relocated", (loc)=>{ state.loc = loc.start.cfi; saveState({loc:state.loc});
-    info.textContent = `${Math.round((loc.start.percentage||0)*100)}%`; });
-  renderBookmarks();
-}
+/* EPUB */
+async function initEpub(buf){ mode="epub";
+  await new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+  await new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+  document.getElementById("epub").style.display="block"; book=ePub(buf);
+  rendition=book.renderTo("epub",{width:"100%",height:"100%",spread:"none"});
+  applyEpubTheme(); await rendition.display(state.loc||undefined); info.textContent="EPUB";
+  rendition.on("relocated",(loc)=>{ state.loc=loc.start.cfi; saveState({loc:state.loc});
+    info.textContent=`${Math.round((loc.start.percentage||0)*100)}%`; }); renderBookmarks(); }
 
 document.getElementById("prev").onclick=()=> mode==="pdf"? gotoPdf(pageNum-1) : rendition?.prev();
 document.getElementById("next").onclick=()=> mode==="pdf"? gotoPdf(pageNum+1) : rendition?.next();
-document.getElementById("bm").onclick=()=>{
-  const mark = mode==="pdf"? pageNum : state.loc;
+document.getElementById("bm").onclick=()=>{ const mark=mode==="pdf"?pageNum:state.loc;
   if(mark && !(state.bookmarks||[]).includes(mark)){ (state.bookmarks=state.bookmarks||[]).push(mark);
-    saveState({bookmarks:state.bookmarks}); renderBookmarks();
-    tg?.HapticFeedback?.impactOccurred?.("light"); }
-};
+    saveState({bookmarks:state.bookmarks}); renderBookmarks(); tg?.HapticFeedback?.impactOccurred?.("light"); } };
 
 (async ()=>{
   if(!FUID){ return showMsg("⚠️ No file specified."); }
-  await loadState();
-  let buf;
-  try{ buf = await getBytes(); }
-  catch(err){
-    const m = err==="too_large" ? "📄 This file is too large to open in the reader. Receive it in chat instead."
+  applyPrefs(); await loadState(); let buf;
+  try{ buf=await getBytes(); }
+  catch(err){ const m = err==="too_large" ? "📄 Too large to open in the reader. Receive it in chat."
       : err==="stream_unavailable" ? "📄 This archive file can't be streamed. Receive it in chat."
-      : err==="not_in_library" ? "🔒 Add this to your Favorites first."
-      : "❌ Couldn't load this file.";
-    return showMsg(m+`<br><br><button onclick="tg?.close()" style="margin-top:12px;padding:10px 16px;border:0;border-radius:10px">Close</button>`);
-  }
-  try{
-    if(EXT==="pdf") await initPdf(buf);
-    else if(EXT==="epub") await initEpub(buf);
-    else showMsg("📄 Unsupported format for in-app reading. Receive it in chat.");
-  }catch(e){ showMsg("❌ Failed to render: "+e); }
+      : err==="not_in_library" ? "🔒 Add this to your Favorites first." : "❌ Couldn't load this file.";
+    return showMsg(m+`<br><br><button onclick="tg?.close()" style="margin-top:12px;padding:10px 16px;border:0;border-radius:10px;background:#3390ec;color:#fff">Close</button>`); }
+  try{ if(EXT==="pdf") await initPdf(buf); else if(EXT==="epub") await initEpub(buf);
+    else showMsg("📄 Unsupported format for in-app reading."); }
+  catch(e){ showMsg("❌ Failed to render: "+e); }
 })();
 </script>
 </body>

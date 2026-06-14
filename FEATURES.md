@@ -16,12 +16,12 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Video player (mp4/webm/mov): speed, resume, fullscreen
 - ✅ Image viewer (jpg/png/gif/webp): tap-zoom
 - ✅ Text/Markdown reader: font size, scroll memory
-- 🔜 MOBI/AZW3 support · CBZ/CBR comic reader
-- 🔜 Reading themes (sepia/dark/paper), font family & size, line spacing
+- ✅ CBZ comic reader (zip-of-images, paged) · ✅ reading themes (light/sepia/dark)
+- ✅ Font size + line-spacing controls (persisted) · ✅ Continue-Reading shelf
+- 🔜 MOBI/AZW3 support · CBR comic reader · font-family picker
 - 🔜 TTS read-aloud for ebooks · sleep timer for audio
 - 🔜 Per-book notes & highlights · highlight export
 - 🔜 Reading streaks, time-read stats, "books finished" shelf
-- 🔜 Continue-reading carousel on the dashboard
 - ⬜ Sync position across devices · last-page push notification
 - ⬜ Dictionary tap-lookup · translate selection · Wikipedia lookup
 - ⬜ Adjustable playback EQ for audiobooks · chapter markers
