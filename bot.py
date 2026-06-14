@@ -28,7 +28,7 @@ from config import (
 )
 from database.connection import MongoManager
 from handlers import (
-    admin, admin_tools, broadcast, captcha, discover, economy, favorites,
+    admin, admin_tools, broadcast, captcha, daily, discover, economy, favorites,
     featured_admin, games, gift, indexer, inline, invite, payments, qadmin,
     rate, recommend, referral, request, requests_manual, revenue,
     settings_admin, spin, start, stats, support, track, vip,
@@ -87,6 +87,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(discover.router)
     dp.include_router(games.router)
     dp.include_router(spin.router)
+    dp.include_router(daily.router)
     dp.include_router(referral.router)
     dp.include_router(support.router)
     dp.include_router(rate.router)

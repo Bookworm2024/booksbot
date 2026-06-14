@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 _REF_BONUS = 0.5
 _NEW_BONUS = 0.25
+# extra one-time bonus when the referrer's count reaches a milestone
+_MILESTONES = {5: 2.0, 10: 5.0, 25: 15.0, 50: 40.0, 100: 100.0}
 
 
 async def remember_referrer(uid: int, raw: str) -> None:
@@ -47,12 +49,25 @@ async def grant_referral(bot, uid: int) -> None:
     await db.safe_update("users", {"user_id": uid}, {"$set": {"referral_rewarded": True}})
     await add_bgm(uid, _NEW_BONUS)
     await add_bgm(ref, _REF_BONUS)
-    await db.safe_update("users", {"user_id": ref}, {"$inc": {"ref_count": 1}})
+    # atomic increment returns the new count → check milestone exactly once
+    updated = await db.find_one_and_update_global(
+        "users", {"user_id": ref}, {"$inc": {"ref_count": 1}})
+    new_count = int((updated or {}).get("ref_count") or 0)
     try:
         await bot.send_message(uid, f"🎁 <b>Referral Bonus!</b> +{_NEW_BONUS} BGM added.")
     except Exception:  # noqa: BLE001
         pass
     try:
-        await bot.send_message(ref, f"🎉 <b>New Referral!</b> You earned +{_REF_BONUS} BGM.")
+        await bot.send_message(ref, f"🎉 <b>New Referral!</b> You earned +{_REF_BONUS} BGM "
+                                    f"(total {new_count}).")
     except Exception:  # noqa: BLE001
         pass
+    # milestone bonus
+    bonus = _MILESTONES.get(new_count)
+    if bonus:
+        await add_bgm(ref, bonus)
+        try:
+            await bot.send_message(
+                ref, f"🏆 <b>Milestone!</b> {new_count} referrals → <b>+{bonus:g} BGM</b> bonus!")
+        except Exception:  # noqa: BLE001
+            pass
