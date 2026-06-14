@@ -48,8 +48,8 @@ Legend counts toward ~500 features across 14 pillars.
 ## 4. Games & Brain (mini apps, book/nerd themed)
 - ✅ Quiz (3 levels, server-scored)
 - ✅ True/False (server-scored)
-- 🔜 Guess-the-Book (from blurb) · Guess-the-Author
-- 🔜 Cover-Guess · First-Line quiz · Title Anagram/Word-Builder
+- ✅ Guess-the-Book (from blurb) · ✅ First-Line quiz · ✅ Author Match
+- 🔜 Cover-Guess · Title Anagram/Word-Builder · "Bookle" (Wordle-style)
 - 🔜 Speed-Reading WPM challenge · Memory match (covers)
 - 🔜 Literary Hangman · Crossword (literary clues) · Wordle-style "Bookle"
 - 🔜 Daily challenge · weekly tournament · global leaderboards

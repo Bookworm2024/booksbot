@@ -44,7 +44,8 @@
 const tg = window.Telegram?.WebApp;
 tg?.ready(); tg?.expand();
 const params = new URLSearchParams(location.search);
-const GAME = params.get("game") === "tf" ? "tf" : "quiz";
+const VALID = ["quiz","tf","guess","firstline","author"];
+const GAME = VALID.includes(params.get("game")) ? params.get("game") : "quiz";
 const app = document.getElementById("app");
 
 let session = null, idx = 0, answers = [], timerInt = null, deadline = 0;
@@ -53,7 +54,7 @@ function h(html) { app.innerHTML = html; }
 function esc(s){ return (s||"").replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
 function screenStart() {
-  if (GAME === "tf") return start("beginner");
+  if (GAME !== "quiz") return start("beginner");   // only quiz has difficulty levels
   h(`<h1>🧠 Quiz</h1><p class="hint">Pick a difficulty. 8 questions · 2 plays/day.</p>
      <button class="big primary" data-l="beginner">🟢 Beginner</button>
      <button class="big" data-l="moderate">🟡 Moderate</button>
@@ -93,9 +94,11 @@ function renderQ() {
   const q = session.questions[idx];
   const total = session.questions.length;
   const pct = Math.round((idx / total) * 100);
+  const isMCQ = !!q.options;          // MCQ when the question carries options
   let opts = "";
-  if (GAME === "quiz") {
+  if (isMCQ) {
     for (const k of ["A","B","C","D"]) {
+      if (q.options[k] == null) continue;
       opts += `<button class="opt" data-a="${k}"><b>${k}.</b> ${esc(q.options[k])}</button>`;
     }
   } else {
@@ -109,7 +112,7 @@ function renderQ() {
      ${opts}
      <button class="big skip" data-skip="1">⏭ Skip (−${session.skip_cost})</button>`);
   app.querySelectorAll("button[data-a]").forEach(b =>
-    b.onclick = () => answer(GAME === "tf" ? (b.dataset.a === "true") : b.dataset.a));
+    b.onclick = () => answer(isMCQ ? b.dataset.a : (b.dataset.a === "true")));
   app.querySelector("button[data-skip]").onclick = () => answer(null);
 }
 

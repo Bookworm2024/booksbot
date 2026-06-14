@@ -30,9 +30,17 @@ QUIZ_REWARD = {
 
 CONFIG = {
     "quiz": {"count": 8, "daily": 2, "time_limit": 900, "skip_cost": 0.1,
-             "speed_bonus": 0.5, "speed_secs": 120, "levels": True},
+             "speed_bonus": 0.5, "speed_secs": 120, "levels": True, "mcq": True},
     "tf":   {"count": 20, "daily": 2, "time_limit": 900, "skip_cost": 0.01,
-             "correct": 0.05, "wrong": 0.01, "timeout_penalty": 0.1, "levels": False},
+             "correct": 0.05, "wrong": 0.01, "timeout_penalty": 0.1,
+             "levels": False, "mcq": False},
+    # MCQ book games (share the quiz engine; single-level, fixed rewards)
+    "guess":     {"count": 6, "daily": 3, "time_limit": 600, "skip_cost": 0.05,
+                  "correct": 0.08, "wrong": 0.04, "levels": False, "mcq": True},
+    "firstline": {"count": 6, "daily": 3, "time_limit": 600, "skip_cost": 0.05,
+                  "correct": 0.08, "wrong": 0.04, "levels": False, "mcq": True},
+    "author":    {"count": 6, "daily": 3, "time_limit": 600, "skip_cost": 0.05,
+                  "correct": 0.07, "wrong": 0.035, "levels": False, "mcq": True},
 }
 
 
@@ -95,6 +103,50 @@ _SEED_TF = [
 ]
 
 
+_SEED_GUESS = [  # blurb → which book?
+    ("A young wizard discovers he's famous and attends a school of magic.",
+     {"A": "Harry Potter", "B": "The Hobbit", "C": "Eragon", "D": "Percy Jackson"}, "A"),
+    ("A dystopia where a totalitarian state watches everyone via telescreens.",
+     {"A": "Brave New World", "B": "1984", "C": "Fahrenheit 451", "D": "We"}, "B"),
+    ("A girl falls down a rabbit hole into a nonsensical wonderland.",
+     {"A": "Peter Pan", "B": "The Wizard of Oz", "C": "Alice in Wonderland", "D": "Coraline"}, "C"),
+    ("An obsessive captain hunts a giant white whale across the seas.",
+     {"A": "Treasure Island", "B": "Moby-Dick", "C": "The Old Man and the Sea", "D": "20,000 Leagues"}, "B"),
+    ("A wealthy man throws lavish parties pining for a lost love across the bay.",
+     {"A": "The Great Gatsby", "B": "Wuthering Heights", "C": "Atonement", "D": "Rebecca"}, "A"),
+    ("Four siblings enter a magical land through a wardrobe.",
+     {"A": "The Golden Compass", "B": "Narnia", "C": "Inkheart", "D": "Stardust"}, "B"),
+]
+_SEED_FIRSTLINE = [  # famous opening line → which book?
+    ("\"Call me Ishmael.\"",
+     {"A": "Moby-Dick", "B": "Dracula", "C": "Frankenstein", "D": "Robinson Crusoe"}, "A"),
+    ("\"It was the best of times, it was the worst of times.\"",
+     {"A": "Great Expectations", "B": "A Tale of Two Cities", "C": "Oliver Twist", "D": "Hard Times"}, "B"),
+    ("\"It is a truth universally acknowledged, that a single man... must be in want of a wife.\"",
+     {"A": "Emma", "B": "Jane Eyre", "C": "Pride and Prejudice", "D": "Middlemarch"}, "C"),
+    ("\"All happy families are alike; each unhappy family is unhappy in its own way.\"",
+     {"A": "War and Peace", "B": "Anna Karenina", "C": "Doctor Zhivago", "D": "Fathers and Sons"}, "B"),
+    ("\"It was a bright cold day in April, and the clocks were striking thirteen.\"",
+     {"A": "1984", "B": "Animal Farm", "C": "Brave New World", "D": "Fahrenheit 451"}, "A"),
+    ("\"In a hole in the ground there lived a hobbit.\"",
+     {"A": "The Silmarillion", "B": "The Hobbit", "C": "The Fellowship of the Ring", "D": "Eragon"}, "B"),
+]
+_SEED_AUTHOR = [  # book → who wrote it?
+    ("Who wrote 'The Old Man and the Sea'?",
+     {"A": "Steinbeck", "B": "Hemingway", "C": "Faulkner", "D": "Fitzgerald"}, "B"),
+    ("Who wrote 'Beloved'?",
+     {"A": "Toni Morrison", "B": "Alice Walker", "C": "Maya Angelou", "D": "Zora Neale Hurston"}, "A"),
+    ("Who wrote 'The Name of the Rose'?",
+     {"A": "Calvino", "B": "Eco", "C": "Saramago", "D": "Borges"}, "B"),
+    ("Who wrote 'Norwegian Wood'?",
+     {"A": "Murakami", "B": "Ishiguro", "C": "Mishima", "D": "Kawabata"}, "A"),
+    ("Who wrote 'The Handmaid's Tale'?",
+     {"A": "Le Guin", "B": "Atwood", "C": "Butler", "D": "Jemisin"}, "B"),
+    ("Who wrote 'Things Fall Apart'?",
+     {"A": "Achebe", "B": "Soyinka", "C": "Ngugi", "D": "Adichie"}, "A"),
+]
+
+
 async def ensure_seed() -> None:
     db = await MongoManager.get()
     if await db.count_global("questions", {"game": "quiz"}) == 0:
@@ -104,6 +156,12 @@ async def ensure_seed() -> None:
     if await db.count_global("questions", {"game": "tf"}) == 0:
         for q, a in _SEED_TF:
             await db.safe_insert("questions", {"game": "tf", "q": q, "a": bool(a)})
+    for gtype, seed in (("guess", _SEED_GUESS), ("firstline", _SEED_FIRSTLINE),
+                        ("author", _SEED_AUTHOR)):
+        if await db.count_global("questions", {"game": gtype}) == 0:
+            for q, opts, a in seed:
+                await db.safe_insert("questions", {"game": gtype, "q": q,
+                                                   "options": opts, "a": a})
 
 
 # ── daily limit ──────────────────────────────────────────────────────────────
@@ -141,7 +199,7 @@ async def new_session(uid: int, game: str, level: str = "beginner") -> dict:
     public_q = []
     for q in chosen:
         item = {"q": q.get("q")}
-        if game == "quiz":
+        if cfg.get("mcq"):
             item["options"] = q.get("options")
         public_q.append(item)
 
@@ -180,25 +238,23 @@ async def submit(uid: int, session_id: str, client_answers: list) -> dict:
     answers = (client_answers or [])[:n]
     correct = wrong = skipped = 0
 
-    if game == "quiz":
-        rwd, pen = QUIZ_REWARD[sess["level"]]
-        for i in range(n):
-            given = answers[i] if i < len(answers) else None
-            truth = correct_list[i]["a"]
+    is_mcq = cfg.get("mcq")
+    rwd, pen = (QUIZ_REWARD[sess["level"]] if game == "quiz"
+                else (cfg["correct"], cfg["wrong"]))
+    for i in range(n):
+        given = answers[i] if i < len(answers) else None
+        truth = correct_list[i]["a"]
+        if is_mcq:
             if given is None or given == "":
                 skipped += 1
             elif str(given).upper() == str(truth).upper():
                 correct += 1
             else:
                 wrong += 1
-    else:  # tf
-        rwd, pen = cfg["correct"], cfg["wrong"]
-        for i in range(n):
-            given = answers[i] if i < len(answers) else None
-            truth = bool(correct_list[i]["a"])
+        else:  # true/false (boolean)
             if given is None:
                 skipped += 1
-            elif bool(given) == truth:
+            elif bool(given) == bool(truth):
                 correct += 1
             else:
                 wrong += 1
