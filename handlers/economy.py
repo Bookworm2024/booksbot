@@ -88,7 +88,10 @@ async def _do_claim(uid: int) -> tuple[str, object]:
         return (f"⏳ <b>Claim on cooldown.</b>\nNext claim in <b>{_fmt_dur(left)}</b>.",
                 kb([btn("💎 Buy BGM (skip wait)", "acc_buy", style="success")],
                    [btn("🔙 Back", "menu_account", style="danger")]))
-    bonus = round(random.uniform(3.0, 5.0), 2)
+    from utils.settings import get_float
+    lo = await get_float("claim_min")
+    hi = await get_float("claim_max")
+    bonus = round(random.uniform(min(lo, hi), max(lo, hi)), 2)
     await set_daily_bcn(uid, bonus)
     return (f"✨ <b>Claim Successful!</b>\n\n💰 <b>+{bonus:.2f} BCN</b>\n"
             "📅 Valid for 24 hours.",

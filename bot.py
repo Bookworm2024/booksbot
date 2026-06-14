@@ -30,7 +30,7 @@ from database.connection import MongoManager
 from handlers import (
     admin, broadcast, captcha, discover, economy, favorites, games, indexer,
     inline, invite, payments, qadmin, rate, recommend, referral, request,
-    requests_manual, revenue, start, stats, support, track,
+    requests_manual, revenue, settings_admin, start, stats, support, track,
 )
 from handlers.payments import heleket_webhook
 from handlers.bookle_api import api_bookle_new, api_bookle_guess
@@ -88,6 +88,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(broadcast.router)
     dp.include_router(qadmin.router)
     dp.include_router(revenue.router)
+    dp.include_router(settings_admin.router)
     dp.include_router(admin.router)
     # indexer last — channel_post observer, no overlap with user handlers.
     dp.include_router(indexer.router)

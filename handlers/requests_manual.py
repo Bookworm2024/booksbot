@@ -65,10 +65,12 @@ def _now():
 @router.callback_query(F.data == "req_manual")
 async def cb_req_manual(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
+    from utils.settings import get_float
+    cost = await get_float("request_cost")
     bgm, bcn = await get_balances(call.from_user.id)
-    if bgm + bcn < _COST:
+    if bgm + bcn < cost:
         await call.message.edit_text(
-            f"🚫 <b>Insufficient balance.</b>\nManual requests cost <b>{_COST:.0f} tokens</b>.\n"
+            f"🚫 <b>Insufficient balance.</b>\nManual requests cost <b>{cost:g} tokens</b>.\n"
             f"You have {bgm + bcn:.2f}.",
             reply_markup=kb([btn("💎 Buy BGM", "acc_buy", style="success")],
                             [btn("🔙 Back", "menu_request", style="danger")]))
@@ -76,7 +78,7 @@ async def cb_req_manual(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_data({})
     await call.message.edit_text(
         "<b>👤 Admin Request</b>\n\nWhat are you requesting?\n"
-        f"💰 Cost: <b>{_COST:.0f} BCN/BGM</b> (deducted on confirm).",
+        f"💰 Cost: <b>{cost:g} BCN/BGM</b> (deducted on confirm).",
         reply_markup=kb(
             [btn("📘 Ebook", "mreq_ebook", style="primary"),
              btn("🎧 Audiobook", "mreq_audio", style="success")],
@@ -136,6 +138,8 @@ async def on_cover(message: Message, state: FSMContext) -> None:
     cover_id = message.photo[-1].file_id if message.photo else message.document.file_id
     await state.update_data(cover_id=cover_id)
     data = await state.get_data()
+    from utils.settings import get_float
+    cost = await get_float("request_cost")
     fmt = f"\n📂 <b>Format:</b> {data.get('format')}" if data.get("category") == "ebook" else ""
     await message.answer_photo(
         cover_id,
@@ -143,7 +147,7 @@ async def on_cover(message: Message, state: FSMContext) -> None:
                  f"📖 <b>Title:</b> {data.get('title')}\n"
                  f"✍️ <b>Author:</b> {data.get('author')}\n"
                  f"📂 <b>Type:</b> {data.get('category').title()}{fmt}\n"
-                 f"💰 <b>Cost:</b> {_COST:.0f} BCN/BGM"),
+                 f"💰 <b>Cost:</b> {cost:g} BCN/BGM"),
         reply_markup=kb([btn("✅ Approve & Submit", "mreq_confirm", style="success")],
                         [btn("❌ Cancel", "mreq_cancel", style="danger")]))
 
@@ -169,7 +173,9 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
         await state.clear()
         return
     uid = call.from_user.id
-    currency = await spend(uid, _COST)
+    from utils.settings import get_float
+    cost = await get_float("request_cost")
+    currency = await spend(uid, cost)
     if not currency:
         await call.answer("Insufficient balance.", show_alert=True)
         await state.clear()
@@ -182,7 +188,7 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
         "title": data["title"], "author": data.get("author", ""),
         "format": data.get("format", ""), "category": data["category"],
         "cover_id": data.get("cover_id"), "type": "manual",
-        "currency_used": currency, "cost": _COST, "status": "pending",
+        "currency_used": currency, "cost": cost, "status": "pending",
         "created_at": _now(),
     }
     db = await MongoManager.get()

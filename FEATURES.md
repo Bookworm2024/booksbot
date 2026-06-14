@@ -60,7 +60,9 @@ Legend counts toward ~500 features across 14 pillars.
 ## 5. Money — Admin Revenue Engine 💰
 - ✅ Revenue dashboard (UPI ₹, crypto $, BGM sold, top buyers, today)
 - ✅ UPI auto-verify (FamPay email) · ✅ crypto (Heleket)
-- 🔜 Live-editable pricing (BGM price, costs) without redeploy
+- ✅ Live-editable pricing (⚙️ Pricing) — download/request cost, claim range,
+  BGM price; applies instantly, no redeploy
+- 🔜 BGM price wired into Buy menus · per-item dynamic surge pricing
 - 🔜 Daily deals / flash sales / happy-hour multipliers
 - 🔜 Coupon & promo campaigns with usage caps
 - 🔜 BGM bundles (buy more, save) · first-purchase bonus

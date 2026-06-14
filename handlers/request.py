@@ -163,17 +163,19 @@ async def cb_download(call: CallbackQuery) -> None:
         await call.answer("This file is no longer available.", show_alert=True)
         return
 
+    from utils.settings import get_float
+    cost = await get_float("download_cost")
     bgm, bcn = await get_balances(uid)
-    if bgm + bcn < _DOWNLOAD_COST:
+    if bgm + bcn < cost:
         await call.answer()
         await call.message.answer(
-            "❌ <b>Insufficient balance.</b>\nYou need 1 BCN/BGM to download.\n"
+            f"❌ <b>Insufficient balance.</b>\nYou need {cost:g} BCN/BGM to download.\n"
             "💡 Use /claim for free BCN or buy BGM.",
             reply_markup=kb([btn("💎 Buy BGM", "acc_buy", style="success")]),
         )
         return
 
-    currency = await spend(uid, _DOWNLOAD_COST)
+    currency = await spend(uid, cost)
     if not currency:
         await call.answer("Balance changed — not enough tokens.", show_alert=True)
         return
@@ -199,7 +201,7 @@ async def cb_download(call: CallbackQuery) -> None:
         logger.warning("Delivery failed for %s: %s", fuid, exc)
 
     if not delivered:
-        await refund(uid, _DOWNLOAD_COST, currency)
+        await refund(uid, cost, currency)
         await call.message.answer(
             "❌ <b>Delivery failed.</b> Your token was refunded.\n"
             "<i>The file may have been removed, or I'm not in the archive channel.</i>")
