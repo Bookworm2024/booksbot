@@ -20,6 +20,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
+from pymongo import DESCENDING
+
 from database.connection import MongoManager
 
 _AUDIO_EXT = {"mp3", "m4b", "m4a", "wav", "ogg", "flac", "aac"}
@@ -131,3 +133,32 @@ async def book_of_the_day(day_index: int) -> dict | None:
     if not pool:
         return None
     return pool[day_index % len(pool)]
+
+
+# ── genres (AI-tagged) ──────────────────────────────────────────────────────
+GENRES = ["Fiction", "Sci-Fi", "Fantasy", "Mystery", "Thriller", "Romance",
+          "Horror", "Non-Fiction", "Self-Help", "Biography", "History",
+          "Business", "Science", "Children", "Poetry", "Other"]
+
+
+async def set_genre(file_unique_id: str, genre: str) -> None:
+    db = await MongoManager.get()
+    await db.safe_update("files", {"file_unique_id": file_unique_id},
+                         {"$set": {"genre": genre}}, upsert=False)
+
+
+async def untagged_files(limit: int = 25) -> list[dict]:
+    db = await MongoManager.get()
+    return await db.find_global("files", {"genre": {"$exists": False}}, limit=limit,
+                                proj={"name": 1, "file_unique_id": 1})
+
+
+async def untagged_count() -> int:
+    db = await MongoManager.get()
+    return await db.count_global("files", {"genre": {"$exists": False}})
+
+
+async def files_by_genre(genre: str, limit: int = 48) -> list[dict]:
+    db = await MongoManager.get()
+    return await db.find_global("files", {"genre": genre}, limit=limit,
+                                sort=[("dl_count", DESCENDING)], proj=_DISC_PROJ)

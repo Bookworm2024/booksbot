@@ -62,12 +62,46 @@ async def cb_discover(call: CallbackQuery) -> None:
 def _hub():
     return (
         "<b>🔭 Discover</b>\n━━━━━━━━━━━━━━━━━━\nFind your next read.",
-        kb([btn("⭐ Featured", "disc_feat", style="success")],
+        kb([btn("⭐ Featured", "disc_feat", style="success"),
+            btn("🏷 Genres", "disc_genres", style="success")],
            [btn("🆕 New Arrivals", "disc_new:0", style="success"),
             btn("🔥 Popular", "disc_pop:0", style="success")],
            [btn("📅 Book of the Day", "disc_botd", style="primary"),
             btn("💬 Daily Quote", "disc_quote", style="primary")],
            [btn("🔙 Back", "menu_library", style="danger")]))
+
+
+@router.callback_query(F.data == "disc_genres")
+async def cb_genres(call: CallbackQuery) -> None:
+    await call.answer()
+    from utils.files import GENRES
+    rows, row = [], []
+    for g in GENRES:
+        row.append(btn(g, f"disc_g:{g}", style="primary"))
+        if len(row) == 2:
+            rows.append(row); row = []
+    if row:
+        rows.append(row)
+    rows.append([btn("🔙 Discover", "lib_discover", style="danger")])
+    await call.message.edit_text("🏷 <b>Browse by Genre</b>\nPick a genre:", reply_markup=kb(*rows))
+
+
+@router.callback_query(F.data.startswith("disc_g:"))
+async def cb_genre_files(call: CallbackQuery) -> None:
+    await call.answer()
+    from utils.files import files_by_genre
+    genre = call.data.split(":", 1)[1]
+    items = await files_by_genre(genre, limit=20)
+    if not items:
+        await call.message.edit_text(
+            f"🏷 <b>{genre}</b>\nNo books tagged here yet.",
+            reply_markup=kb([btn("🔙 Genres", "disc_genres", style="danger")]))
+        return
+    rows = [[btn(f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:36]}",
+                 f"dl:{f['file_unique_id']}", style="success")] for f in items]
+    rows.append([btn("🔙 Genres", "disc_genres", style="danger")])
+    await call.message.edit_text(
+        f"🏷 <b>{genre}</b> · 1 BCN/BGM each", reply_markup=kb(*rows))
 
 
 @router.callback_query(F.data == "disc_feat")

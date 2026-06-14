@@ -94,6 +94,24 @@ async def _call(prompt: str, max_tokens: int = 900) -> str | None:
         return None
 
 
+async def classify_genre(title: str) -> str | None:
+    """Classify a book title into one of files.GENRES (or 'Other'). None if no key."""
+    from utils.files import GENRES
+    title = (title or "").strip()
+    if not title or not ANTHROPIC_API_KEY:
+        return None
+    prompt = (f"Classify the book titled \"{title}\" into exactly ONE of these "
+              f"genres: {', '.join(GENRES)}. Reply with ONLY the genre, nothing else.")
+    text = await _call(prompt, max_tokens=12)
+    if not text:
+        return None
+    low = text.lower()
+    for g in GENRES:
+        if g.lower() in low:
+            return g
+    return "Other"
+
+
 async def summarize_book(title: str) -> str | None:
     """Return an HTML-formatted summary of a book, or None if unknown/unavailable."""
     title = (title or "").strip()

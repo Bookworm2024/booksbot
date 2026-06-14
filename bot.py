@@ -32,7 +32,7 @@ from handlers import (
     featured_admin, games, gift, indexer, inline, invite, payments, qadmin,
     leaderboards, missions, notifs, profile, rate, recommend, referral,
     request, requests_manual, revenue, settings_admin, spin, start, stats,
-    support, track, vip,
+    support, tagger, track, vip,
 )
 from handlers.payments import heleket_webhook
 from handlers.admin_api import api_admin_overview
@@ -105,6 +105,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(revenue.router)
     dp.include_router(settings_admin.router)
     dp.include_router(featured_admin.router)
+    dp.include_router(tagger.router)
     dp.include_router(admin_tools.router)
     dp.include_router(admin.router)
     # indexer last — channel_post observer, no overlap with user handlers.

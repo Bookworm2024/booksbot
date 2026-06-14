@@ -131,8 +131,8 @@ Legend counts toward ~500 features across 14 pillars.
 
 ## 11. Content Pipeline (uploaders/admins)
 - ✅ Telethon backfill (30k archive) · real-time indexer · watchlist
-- 🔜 Auto-tagging & metadata enrichment (AI) · cover fetch
-- 🔜 Duplicate detection · quality flags · OCR for scans
+- ✅ AI genre auto-tagging (admin batch) → 🏷 Browse-by-Genre in Discover
+- 🔜 Metadata enrichment · cover fetch · duplicate detection · OCR for scans
 - 🔜 Uploader rewards/leaderboard · bounty requests
 - ⬜ Auto-categorize into genres · series grouping · multi-format linking
 
