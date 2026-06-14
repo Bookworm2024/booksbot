@@ -88,7 +88,8 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Maintenance mode (blocks non-admins; middleware-enforced)
 - ✅ Admin Mini-App dashboard (📊 users/VIP/archive/downloads, revenue ₹+$,
   requests, BGM/BCN circulation, maintenance state; admin-gated initData)
-- 🔜 Bulk actions (bulk BGM grant, bulk message, bulk ban) · dashboard write-ops
+- ✅ Bulk BGM grant (to all users, atomic update_many)
+- 🔜 Bulk message / bulk ban · dashboard write-ops
 - 🔜 Scheduled broadcasts · A/B broadcast · audience segments · feature flags
 - 🔜 Role-based admin permissions (granular) · audit log
 - 🔜 Auto-moderation rules · spam/abuse detection
@@ -100,7 +101,8 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Referrals (+0.5/+0.25 BGM) + leaderboard
 - 🔜 Multi-tier referrals · referral contests · milestone rewards
 - 🔜 Share-to-earn · invite quests · streak rewards
-- 🔜 Daily login rewards calendar · spin-the-wheel · loot crates
+- ✅ Daily Spin-the-Wheel (free, weighted BGM prizes, once/day, atomic)
+- 🔜 Daily login rewards calendar · loot crates
 - 🔜 Quests/missions with BGM payouts · battle pass
 - ⬜ Social proof ("X downloaded today") · viral share cards
 - ⬜ Channel cross-promo swaps · partner programs

@@ -53,7 +53,8 @@ def _panel_kb(is_super: bool):
         rows.append([btn("🎟️ Create Code", "admin_create", style="success"),
                      btn("🎮 Questions", "admin_qbank", style="primary")])
         rows.append([btn("🛠 Maintenance", "admin_maint", style="danger"),
-                     btn("🛡 Manage Admins", "admin_manage", style="primary")])
+                     btn("🎁 Bulk Grant", "admin_bulk", style="success")])
+        rows.append([btn("🛡 Manage Admins", "admin_manage", style="primary")])
     return kb(*rows)
 
 

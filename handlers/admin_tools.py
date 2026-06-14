@@ -27,6 +27,7 @@ class ToolsFSM(StatesGroup):
     addbgm_user = State()
     addbgm_amount = State()
     lookup = State()
+    bulk_amount = State()
 
 
 def _is_admin(uid: int) -> bool:
@@ -126,6 +127,53 @@ async def on_lookup(message: Message, state: FSMContext) -> None:
         f"🎮 Game BGM: <code>{float(u.get('game_bgm') or 0):.2f}</code>\n"
         f"📅 Joined: {joined_s}",
         reply_markup=kb([btn("➕ Add BGM", "admin_addbgm", style="success")]))
+
+
+# ── Bulk BGM grant (to ALL users) ───────────────────────────────────────────────
+@router.callback_query(F.data == "admin_bulk")
+async def cb_bulk(call: CallbackQuery, state: FSMContext) -> None:
+    if call.from_user.id not in ADMIN_IDS:
+        await call.answer("Access denied", show_alert=True)
+        return
+    await call.answer()
+    await state.set_state(ToolsFSM.bulk_amount)
+    await call.message.answer("🎁 <b>Bulk Grant</b>\nHow much BGM to give <b>every user</b>? "
+                              "/cancel to abort.")
+
+
+@router.message(ToolsFSM.bulk_amount, F.text)
+async def on_bulk_amount(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if raw.lower() == "/cancel":
+        await state.clear(); await message.answer("❌ Cancelled."); return
+    try:
+        amount = round(float(raw), 3)
+        if amount <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("⚠️ Enter a positive number."); return
+    await state.clear()
+    db = await MongoManager.get()
+    total = await db.count_global("users")
+    await message.answer(
+        f"⚠️ Grant <b>{amount:g} BGM</b> to all <b>{total}</b> users?",
+        reply_markup=kb([btn("✅ Confirm", f"bulk_do:{amount}", style="success")],
+                        [btn("❌ Cancel", "admin_open", style="danger")]))
+
+
+@router.callback_query(F.data.startswith("bulk_do:"))
+async def cb_bulk_do(call: CallbackQuery) -> None:
+    if call.from_user.id not in ADMIN_IDS:
+        await call.answer("Access denied", show_alert=True)
+        return
+    amount = float(call.data.split(":", 1)[1])
+    await call.answer("Granting…")
+    db = await MongoManager.get()
+    affected = 0
+    for idx in db.healthy:
+        res = await db.dbs[idx]["users"].update_many({}, {"$inc": {"bookgem": amount}})
+        affected += res.modified_count
+    await call.message.edit_text(f"✅ Granted <b>{amount:g} BGM</b> to <b>{affected}</b> users.")
 
 
 # ── Maintenance mode ─────────────────────────────────────────────────────────
