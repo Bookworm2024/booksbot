@@ -19,7 +19,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS, SUPER_ADMIN_ID
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, kb, webapp_btn
 from utils.users import set_ban
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,7 @@ def _is_admin(uid: int) -> bool:
 
 def _panel_kb(is_super: bool):
     rows = [
+        [webapp_btn("📊 Dashboard", "admin.html", style="success", fallback_cb="admin_open")],
         [btn("🚫 Ban User", "admin_ban", style="danger"),
          btn("✅ Unban User", "admin_unban", style="success")],
         [btn("📬 Requests", "admin_requests", style="primary"),

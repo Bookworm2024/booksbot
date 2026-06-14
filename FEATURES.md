@@ -86,8 +86,9 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Live settings/pricing editor · revenue dashboard · flash-sale · featured
 - ✅ Add BGM to a user · 👤 360° user lookup (balance/VIP/requests/flags)
 - ✅ Maintenance mode (blocks non-admins; middleware-enforced)
-- 🔜 Full admin Mini-App dashboard (users, money, content, logs)
-- 🔜 Bulk actions (bulk BGM grant, bulk message, bulk ban)
+- ✅ Admin Mini-App dashboard (📊 users/VIP/archive/downloads, revenue ₹+$,
+  requests, BGM/BCN circulation, maintenance state; admin-gated initData)
+- 🔜 Bulk actions (bulk BGM grant, bulk message, bulk ban) · dashboard write-ops
 - 🔜 Scheduled broadcasts · A/B broadcast · audience segments · feature flags
 - 🔜 Role-based admin permissions (granular) · audit log
 - 🔜 Auto-moderation rules · spam/abuse detection

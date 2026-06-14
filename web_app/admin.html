@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>BooksBot Admin</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:16px; font-family: system-ui, sans-serif;
+    background: var(--tg-theme-bg-color,#0f1115); color: var(--tg-theme-text-color,#e8e8e8); }
+  h1 { font-size:1.2rem; margin:.2rem 0 2px; } .sub{ color:var(--tg-theme-hint-color,#8a8f98); font-size:.8rem; margin-bottom:14px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .card { background: var(--tg-theme-secondary-bg-color,#1c2027); border-radius:14px; padding:14px; }
+  .card .k { font-size:.72rem; color:var(--tg-theme-hint-color,#8a8f98); text-transform:uppercase; letter-spacing:.04em; }
+  .card .v { font-size:1.5rem; font-weight:800; margin-top:4px; }
+  .card .s { font-size:.75rem; color:var(--tg-theme-hint-color,#8a8f98); margin-top:2px; }
+  .wide { grid-column:1 / -1; }
+  .row { display:flex; justify-content:space-between; padding:4px 0; font-size:.9rem; }
+  .pill { display:inline-block; padding:3px 8px; border-radius:8px; font-size:.72rem; font-weight:700; }
+  .on { background:#7a1f1f; color:#fff; } .off { background:#1f5a2a; color:#fff; }
+  .accent { color: var(--tg-theme-button-color,#3390ec); }
+  #msg { text-align:center; padding:40px; }
+  button.refresh { width:100%; margin-top:12px; padding:12px; border:0; border-radius:12px; font-weight:700;
+    background: var(--tg-theme-button-color,#3390ec); color:#fff; cursor:pointer; }
+</style>
+</head>
+<body>
+<h1>📊 Admin Dashboard</h1>
+<div class="sub" id="sub">Loading…</div>
+<div id="content"></div>
+
+<script>
+const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
+const INIT = tg?.initData || "";
+const content = document.getElementById("content"), sub = document.getElementById("sub");
+function n(x){ return (x||0).toLocaleString(); }
+
+async function load(){
+  let d;
+  try { d = await (await fetch(`/api/admin/overview?init_data=${encodeURIComponent(INIT)}`)).json(); }
+  catch(e){ content.innerHTML = `<div id="msg">Network error.</div>`; return; }
+  if (d.error){ content.innerHTML = `<div id="msg">🔒 ${d.error==="forbidden"?"Admins only.":"Auth failed."}</div>`; return; }
+  sub.innerHTML = `Maintenance: <span class="pill ${d.maintenance?'on':'off'}">${d.maintenance?'ON':'OFF'}</span>`;
+  const r = d.revenue, rq = d.requests;
+  content.innerHTML = `
+    <div class="grid">
+      <div class="card"><div class="k">Users</div><div class="v">${n(d.users)}</div><div class="s">+${n(d.new_today)} today</div></div>
+      <div class="card"><div class="k">VIP</div><div class="v">${n(d.vip)}</div><div class="s">active subs</div></div>
+      <div class="card"><div class="k">Archive</div><div class="v">${n(d.files)}</div><div class="s">files indexed</div></div>
+      <div class="card"><div class="k">Downloads</div><div class="v">${n(d.downloads)}</div><div class="s">all-time</div></div>
+      <div class="card wide"><div class="k">💰 Revenue</div>
+        <div class="row"><span>UPI</span><b>₹${n(r.inr)}</b></div>
+        <div class="row"><span>Crypto</span><b>$${n(r.usd)}</b></div>
+        <div class="row"><span>Today</span><b class="accent">₹${n(r.inr_today)} · $${n(r.usd_today)}</b></div>
+        <div class="row"><span>≈ Gross</span><b>₹${n(r.gross_inr)}</b></div>
+      </div>
+      <div class="card wide"><div class="k">📨 Requests</div>
+        <div class="row"><span>⏳ Pending</span><b>${n(rq.pending)}</b></div>
+        <div class="row"><span>✅ Fulfilled</span><b>${n(rq.fulfilled)}</b></div>
+        <div class="row"><span>❌ Cancelled</span><b>${n(rq.cancelled)}</b></div>
+      </div>
+      <div class="card"><div class="k">💎 BGM</div><div class="v">${n(d.bgm)}</div><div class="s">in circulation</div></div>
+      <div class="card"><div class="k">🪙 BCN</div><div class="v">${n(d.bcn)}</div><div class="s">in circulation</div></div>
+    </div>
+    <button class="refresh" onclick="load()">🔄 Refresh</button>`;
+}
+load();
+</script>
+</body>
+</html>

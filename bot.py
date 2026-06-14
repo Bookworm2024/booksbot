@@ -34,6 +34,7 @@ from handlers import (
     settings_admin, start, stats, support, track, vip,
 )
 from handlers.payments import heleket_webhook
+from handlers.admin_api import api_admin_overview
 from handlers.bookle_api import api_bookle_new, api_bookle_guess
 from handlers.games_api import api_game_new, api_game_submit
 from handlers.reader_api import (
@@ -118,6 +119,7 @@ async def _start_web(bot: Bot) -> web.AppRunner:
     app.router.add_post("/api/game/submit", api_game_submit)
     app.router.add_post("/api/bookle/new", api_bookle_new)
     app.router.add_post("/api/bookle/guess", api_bookle_guess)
+    app.router.add_get("/api/admin/overview", api_admin_overview)
     # Reader / audiobook Mini-App API
     app.router.add_get("/api/file", api_file)
     app.router.add_get("/api/reader/state", api_reader_state_get)
