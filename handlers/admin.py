@@ -48,8 +48,10 @@ def _panel_kb(is_super: bool):
         rows.append([btn("🔥 Flash Sale", "admin_deal", style="success"),
                      btn("⭐ Featured", "admin_featured", style="success")])
         rows.append([btn("➕ Add BGM", "admin_addbgm", style="success"),
-                     btn("🎟️ Create Code", "admin_create", style="success")])
-        rows.append([btn("🎮 Questions", "admin_qbank", style="primary"),
+                     btn("👤 User Lookup", "admin_userinfo", style="primary")])
+        rows.append([btn("🎟️ Create Code", "admin_create", style="success"),
+                     btn("🎮 Questions", "admin_qbank", style="primary")])
+        rows.append([btn("🛠 Maintenance", "admin_maint", style="danger"),
                      btn("🛡 Manage Admins", "admin_manage", style="primary")])
     return kb(*rows)
 
@@ -129,7 +131,8 @@ async def do_unban(message: Message, state: FSMContext) -> None:
 
 
 # ── stubs for later phases ──────────────────────────────────────────────────────
-# admin_requests → requests_manual · admin_broadcast → broadcast · admin_qbank → qadmin
-@router.callback_query(F.data.in_({"admin_addbgm", "admin_create", "admin_manage"}))
+# Live elsewhere: requests_manual, broadcast, qadmin, revenue, settings_admin,
+# featured_admin, admin_tools (add BGM / user lookup / maintenance).
+@router.callback_query(F.data.in_({"admin_create", "admin_manage"}))
 async def cb_admin_stub(call: CallbackQuery) -> None:
     await call.answer("Coming in a later phase.", show_alert=True)

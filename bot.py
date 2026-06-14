@@ -28,10 +28,10 @@ from config import (
 )
 from database.connection import MongoManager
 from handlers import (
-    admin, broadcast, captcha, discover, economy, favorites, featured_admin,
-    games, gift, indexer, inline, invite, payments, qadmin, rate, recommend,
-    referral, request, requests_manual, revenue, settings_admin, start, stats,
-    support, track, vip,
+    admin, admin_tools, broadcast, captcha, discover, economy, favorites,
+    featured_admin, games, gift, indexer, inline, invite, payments, qadmin,
+    rate, recommend, referral, request, requests_manual, revenue,
+    settings_admin, start, stats, support, track, vip,
 )
 from handlers.payments import heleket_webhook
 from handlers.bookle_api import api_bookle_new, api_bookle_guess
@@ -40,6 +40,7 @@ from handlers.reader_api import (
     api_file, api_reader_state_get, api_reader_state_set,
 )
 from middlewares.ban import BanMiddleware
+from middlewares.maintenance import MaintenanceMiddleware
 from utils.email_monitor import run_email_monitor
 from utils.games import ensure_seed
 
@@ -65,9 +66,11 @@ def _build_bot() -> Bot:
 
 def _build_dispatcher() -> Dispatcher:
     dp = Dispatcher(storage=MemoryStorage())
-    # Moderation gate runs before every handler.
+    # Moderation + maintenance gates run before every handler.
     dp.message.middleware(BanMiddleware())
     dp.callback_query.middleware(BanMiddleware())
+    dp.message.middleware(MaintenanceMiddleware())
+    dp.callback_query.middleware(MaintenanceMiddleware())
     # start first (owns the dashboard + nav), then feature routers.
     dp.include_router(start.router)
     dp.include_router(captcha.router)
@@ -93,6 +96,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(revenue.router)
     dp.include_router(settings_admin.router)
     dp.include_router(featured_admin.router)
+    dp.include_router(admin_tools.router)
     dp.include_router(admin.router)
     # indexer last — channel_post observer, no overlap with user handlers.
     dp.include_router(indexer.router)

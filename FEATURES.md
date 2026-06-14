@@ -83,12 +83,12 @@ Legend counts toward ~500 features across 14 pillars.
 
 ## 6. Admin Power Tools (ease of working)
 - ✅ Admin panel, ban/unban, request queue, broadcast, question bank
-- 🔜 Live settings editor (every constant editable in-bot)
+- ✅ Live settings/pricing editor · revenue dashboard · flash-sale · featured
+- ✅ Add BGM to a user · 👤 360° user lookup (balance/VIP/requests/flags)
+- ✅ Maintenance mode (blocks non-admins; middleware-enforced)
 - 🔜 Full admin Mini-App dashboard (users, money, content, logs)
-- 🔜 User lookup 360° (balance, history, requests, flags)
 - 🔜 Bulk actions (bulk BGM grant, bulk message, bulk ban)
-- 🔜 Scheduled broadcasts · A/B broadcast · audience segments
-- 🔜 Maintenance mode · feature flags · kill-switches
+- 🔜 Scheduled broadcasts · A/B broadcast · audience segments · feature flags
 - 🔜 Role-based admin permissions (granular) · audit log
 - 🔜 Auto-moderation rules · spam/abuse detection
 - ⬜ Canned replies · macro buttons · staff shifts
