@@ -30,8 +30,8 @@ from database.connection import MongoManager
 from handlers import (
     admin, admin_tools, broadcast, captcha, daily, discover, economy, favorites,
     featured_admin, games, gift, indexer, inline, invite, payments, qadmin,
-    missions, rate, recommend, referral, request, requests_manual, revenue,
-    settings_admin, spin, start, stats, support, track, vip,
+    missions, notifs, rate, recommend, referral, request, requests_manual,
+    revenue, settings_admin, spin, start, stats, support, track, vip,
 )
 from handlers.payments import heleket_webhook
 from handlers.admin_api import api_admin_overview
@@ -44,6 +44,7 @@ from middlewares.ban import BanMiddleware
 from middlewares.maintenance import MaintenanceMiddleware
 from utils.email_monitor import run_email_monitor
 from utils.games import ensure_seed
+from utils.reminders import run_reminder_loop
 
 logging.basicConfig(
     level=logging.INFO,
@@ -91,6 +92,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(missions.router)
     dp.include_router(referral.router)
     dp.include_router(support.router)
+    dp.include_router(notifs.router)
     dp.include_router(rate.router)
     dp.include_router(stats.router)
     dp.include_router(inline.router)
@@ -154,8 +156,9 @@ async def main() -> None:
     dp = _build_dispatcher()
     runner = await _start_web(bot)
 
-    # Background workers (UPI email auto-verify; no-op if IMAP unset).
+    # Background workers (UPI email auto-verify; comeback reminders).
     monitor_task = asyncio.create_task(run_email_monitor(bot))
+    reminder_task = asyncio.create_task(run_reminder_loop(bot))
 
     try:
         me = await bot.get_me()
@@ -164,6 +167,7 @@ async def main() -> None:
         await dp.start_polling(bot)
     finally:
         monitor_task.cancel()
+        reminder_task.cancel()
         await runner.cleanup()
         await bot.session.close()
 

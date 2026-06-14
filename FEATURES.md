@@ -112,9 +112,9 @@ Legend counts toward ~500 features across 14 pillars.
 
 ## 8. Engagement & Retention
 - ✅ Daily BCN claim · ratings · support inbox
-- 🔜 Push reminders (claim ready, watchlist hit, unfinished book)
+- ✅ Comeback push reminders (hourly loop, nudges inactive users once/day)
+- ✅ Notification preferences (🔔 toggle, default ON)
 - 🔜 Personalized weekly digest · "for you" feed
-- 🔜 Notification center & preferences
 - ⬜ Streak insurance · comeback bonuses · anniversary gifts
 
 ## 9. Personalization & Profiles
