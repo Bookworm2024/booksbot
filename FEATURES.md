@@ -62,16 +62,16 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ UPI auto-verify (FamPay email) · ✅ crypto (Heleket)
 - ✅ Live-editable pricing (⚙️ Pricing) — download/request cost, claim range,
   BGM price; applies instantly, no redeploy
+- ✅ BGM bundles (buy more, save — bonus % on UPI & crypto purchases)
+- ✅ Gift BGM to a friend (atomic transfer)
 - 🔜 BGM price wired into Buy menus · per-item dynamic surge pricing
 - 🔜 Daily deals / flash sales / happy-hour multipliers
-- 🔜 Coupon & promo campaigns with usage caps
-- 🔜 BGM bundles (buy more, save) · first-purchase bonus
+- 🔜 Coupon & promo campaigns with usage caps · first-purchase bonus
 - 🔜 VIP / Premium subscription tiers (monthly BGM + perks)
 - 🔜 Sponsored/featured book slots (paid placement)
 - 🔜 Sell ad slots inside the bot · affiliate payouts
 - 🔜 Abandoned-cart / win-back nudges · low-balance upsell
-- 🔜 Dynamic surge pricing on popular titles
-- ⬜ Gift BGM to a friend · gift cards · tipping authors/uploaders
+- ⬜ Gift cards · tipping authors/uploaders
 - ⬜ Revenue forecasting · cohort LTV · churn alerts
 - ⬜ Per-admin commission tracking · payout ledger
 - ⬜ Tax/INR↔USD reporting · CSV/Sheet export

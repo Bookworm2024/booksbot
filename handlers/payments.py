@@ -30,6 +30,7 @@ from config import (
     PAYMENT_QR_URL, UPI_ID,
 )
 from database.connection import MongoManager
+from utils.bundles import bonus_for, tiers_blurb
 from utils.heleket import (
     CRYPTO_CHOICES, MIN_USD_AMOUNT, PAID_STATUSES, create_invoice, make_order_id,
     verify_webhook,
@@ -79,7 +80,8 @@ def _buy_view():
         "━━━━━━━━━━━━━━━━━━\n"
         "Permanent tokens — never expire.\n\n"
         f"🏦 <b>UPI (INR):</b> ₹{BGM_PRICE_INR:g}/BGM · min {MIN_BGM_PURCHASE} (₹{min_inr})\n"
-        f"🌐 <b>Crypto:</b> ${BGM_PRICE_USD:g}/BGM\n\n"
+        f"🌐 <b>Crypto:</b> ${BGM_PRICE_USD:g}/BGM\n"
+        f"🎁 <b>Bonus BGM:</b> {tiers_blurb()}\n\n"
         "<i>Both auto-credit — UPI is verified from the payment receipt, crypto "
         "on-chain.</i>"
     )
@@ -121,21 +123,23 @@ async def on_amount(message: Message, state: FSMContext) -> None:
         return
     bgm = int(raw)
     inr = round(bgm * BGM_PRICE_INR, 2)
+    bonus = bonus_for(bgm)
     uid = message.chat.id
     order_id = make_order_id(uid)
     db = await MongoManager.get()
     await db.safe_insert("payments", {
         "order_id": order_id, "user_id": uid, "username": message.from_user.username or "",
-        "method": "upi", "bgm": bgm, "total_due_inr": inr, "status": "waiting",
-        "submitted_utr": None, "created_at": _now(),
+        "method": "upi", "bgm": bgm, "bonus": bonus, "total_due_inr": inr,
+        "status": "waiting", "submitted_utr": None, "created_at": _now(),
     })
     await state.update_data(order_id=order_id, total=inr)
     await state.set_state(PayFSM.awaiting_utr)
     rows = []
     if PAYMENT_QR_URL:
         rows.append([url_btn("📷 View QR", PAYMENT_QR_URL)])
+    bonus_line = f"🎁 <b>Bonus:</b> +{bonus:g} BGM!\n" if bonus else ""
     await message.answer(
-        f"<b>💳 Pay ₹{inr:.2f}</b> for <b>{bgm} BGM</b>\n"
+        f"<b>💳 Pay ₹{inr:.2f}</b> for <b>{bgm} BGM</b>\n{bonus_line}"
         "━━━━━━━━━━━━━━━━━━\n"
         f"🏦 <b>UPI ID:</b> <code>{UPI_ID}</code>\n\n"
         f"1️⃣ Send <b>exactly ₹{inr:.2f}</b> to the UPI ID (or scan the QR).\n"
@@ -199,12 +203,15 @@ async def _confirm_payment(doc: dict, bot, *, email_txn_id: str = "",
                   "email_txn_id": email_txn_id, "email_amount_inr": email_amount_inr}})
     if not flipped:
         return  # already credited
-    bgm = float(flipped.get("bgm") or 0)
-    await add_bgm(flipped["user_id"], bgm)
+    base = float(flipped.get("bgm") or 0)
+    bonus = float(flipped.get("bonus") or 0)
+    total = base + bonus
+    await add_bgm(flipped["user_id"], total)
+    bonus_line = f" (incl. +{bonus:g} bonus)" if bonus else ""
     try:
         await bot.send_message(
             flipped["user_id"],
-            f"🎉 <b>Payment confirmed!</b>\n💎 <b>+{bgm:g} BGM</b> added to your wallet.\n"
+            f"🎉 <b>Payment confirmed!</b>\n💎 <b>+{total:g} BGM</b>{bonus_line} added.\n"
             f"🧾 Ref: <code>{email_txn_id or flipped.get('submitted_utr','')}</code>")
     except Exception:  # noqa: BLE001
         pass
@@ -246,8 +253,12 @@ async def cb_coin(call: CallbackQuery) -> None:
     if idx >= len(CRYPTO_CHOICES):
         return
     _c, _n, label = CRYPTO_CHOICES[idx]
-    rows = [[btn(f"💰 ${u} → {round(u / BGM_PRICE_USD):,} BGM", f"hk_buy:{idx}:{u}",
-                 style="success")] for u in _USD_PACKS]
+    rows = []
+    for u in _USD_PACKS:
+        b = round(u / BGM_PRICE_USD)
+        bn = bonus_for(b)
+        extra = f" +{bn:g}🎁" if bn else ""
+        rows.append([btn(f"💰 ${u} → {b:,} BGM{extra}", f"hk_buy:{idx}:{u}", style="success")])
     rows.append([btn("🔙 Back", "pay_crypto", style="danger")])
     await call.message.edit_text(
         f"🌐 <b>{label}</b>\n\nPick an amount — you'll get a secure Heleket pay "
@@ -264,6 +275,7 @@ async def cb_hk_buy(call: CallbackQuery) -> None:
         return
     crypto, network, label = CRYPTO_CHOICES[idx]
     bgm = round(usd / BGM_PRICE_USD)
+    bonus = bonus_for(bgm)
     await call.answer("Generating invoice…")
     uid = call.from_user.id
     order_id = make_order_id(uid)
@@ -276,8 +288,8 @@ async def cb_hk_buy(call: CallbackQuery) -> None:
         return
     db = await MongoManager.get()
     await db.safe_insert("crypto_orders", {
-        "order_id": order_id, "user_id": uid, "bgm": bgm, "amount_usd": usd,
-        "crypto": crypto, "network": network,
+        "order_id": order_id, "user_id": uid, "bgm": bgm, "bonus": bonus,
+        "amount_usd": usd, "crypto": crypto, "network": network,
         "heleket_uuid": result.get("uuid"), "status": "waiting", "created_at": _now(),
     })
     pay_url = result.get("url")
@@ -320,12 +332,13 @@ async def heleket_webhook(request: web.Request) -> web.Response:
         {"$set": {"status": "paid", "paid_at": _now()}})
     if not order:
         return web.Response(text="ok")  # unknown / already credited (idempotent)
-    await add_bgm(order["user_id"], float(order["bgm"]))
+    total = float(order.get("bgm") or 0) + float(order.get("bonus") or 0)
+    await add_bgm(order["user_id"], total)
     bot = request.app["bot"]
     try:
         await bot.send_message(order["user_id"],
                                f"🎉 <b>Crypto payment confirmed!</b>\n"
-                               f"💎 +{order['bgm']:,} BGM added to your wallet.")
+                               f"💎 +{total:g} BGM added to your wallet.")
     except Exception:  # noqa: BLE001
         pass
     return web.Response(text="ok")

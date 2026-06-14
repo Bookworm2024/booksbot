@@ -206,7 +206,8 @@ async def cb_account(call: CallbackQuery) -> None:
             [btn("🎟 Redeem Code", "acc_redeem", style="success"),
              btn("🎁 Refer & Earn", "acc_refer", style="primary")],
             [btn("🚨 Track Request", "acc_track", style="primary"),
-             btn("🆘 Support", "menu_support", style="primary")],
+             btn("🎁 Gift BGM", "acc_gift", style="success")],
+            [btn("🆘 Support", "menu_support", style="primary")],
             [btn("🔙 Back", "menu_home", style="danger")],
         ),
     )
