@@ -161,6 +161,7 @@ async def cb_library(call: CallbackQuery) -> None:
              btn("📝 Book Summary", "lib_summary", style="success")],
             [btn("📖 Continue Reading", "lib_continue", style="primary"),
              btn("⭐ Favorites", "lib_favorites", style="primary")],
+            [btn("📊 My Reading", "lib_stats", style="primary")],
             [btn("🔙 Back", "menu_home", style="danger")],
         ),
     )

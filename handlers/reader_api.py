@@ -100,8 +100,12 @@ async def api_reader_state_set(request: web.Request) -> web.Response:
         # generic: int pages (PDF) or CFI strings (EPUB)
         update["bookmarks"] = body["bookmarks"][:200]
     if update:
-        update["updated_at"] = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)
+        update["updated_at"] = now
         db = await MongoManager.get()
         await db.safe_update("reader_state", {"user_id": uid, "fuid": fuid},
                              {"$set": {"user_id": uid, "fuid": fuid, **update}})
+        # record today's reading activity for streaks (idempotent per day)
+        await db.safe_update("users", {"user_id": uid},
+                             {"$addToSet": {"reading_days": now.strftime("%Y-%m-%d")}})
     return web.json_response({"ok": True})

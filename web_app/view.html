@@ -126,11 +126,18 @@ async function renderComic(buf){
 /* ---------- TEXT / MARKDOWN ---------- */
 async function renderText(content){
   const st = await getState();
-  stage.innerHTML = `<div class="ctl"><button id="a-">A−</button><button id="a+">A+</button></div><pre id="txt"></pre>`;
+  stage.innerHTML = `<div class="ctl"><button id="a-">A−</button><button id="a+">A+</button>
+    <button id="say">🔊 Read</button></div><pre id="txt"></pre>`;
   const pre=document.getElementById("txt"); pre.textContent = content;
   let fs = st.position && st.position>=12 ? st.position : 16; pre.style.fontSize=fs+"px";
   document.getElementById("a-").onclick=()=>{ fs=Math.max(12,fs-2); pre.style.fontSize=fs+"px"; saveState({position:fs}); };
   document.getElementById("a+").onclick=()=>{ fs=Math.min(30,fs+2); pre.style.fontSize=fs+"px"; saveState({position:fs}); };
+  const say=document.getElementById("say");
+  say.onclick=()=>{ if(!window.speechSynthesis) return;
+    if(speechSynthesis.speaking){ speechSynthesis.cancel(); say.textContent="🔊 Read"; return; }
+    const u=new SpeechSynthesisUtterance(content.slice(0,9000)); u.onend=()=>say.textContent="🔊 Read";
+    speechSynthesis.speak(u); say.textContent="⏹ Stop"; };
+  window.addEventListener("pagehide", ()=>{ try{ speechSynthesis.cancel(); }catch(e){} });
 }
 </script>
 </body>

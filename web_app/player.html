@@ -66,7 +66,8 @@ function buildUI(src){
       <button id="play">▶️</button>
       <button class="sm" id="f15">15⏩</button>
     </div>
-    <div class="row speeds" id="speeds"></div>`;
+    <div class="row speeds" id="speeds"></div>
+    <div class="row speeds" id="sleep"></div>`;
   audio = new Audio(src);
   const seek=document.getElementById("seek"), cur=document.getElementById("cur"),
         dur=document.getElementById("dur"), play=document.getElementById("play");
@@ -91,6 +92,17 @@ function buildUI(src){
     if(r===1) b.classList.add("on");
     b.onclick=()=>{ audio.playbackRate=r; sp.querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); };
     sp.appendChild(b); });
+
+  // sleep timer — pause playback after N minutes
+  const slp=document.getElementById("sleep"); let sleepT=null;
+  [["💤",0],["15m",15],["30m",30],["45m",45],["60m",60]].forEach(([lbl,min])=>{
+    const b=document.createElement("button"); b.textContent=lbl; if(min===0) b.classList.add("on");
+    b.onclick=()=>{ if(sleepT) clearTimeout(sleepT); sleepT=null;
+      slp.querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on");
+      if(min>0){ sleepT=setTimeout(()=>{ audio.pause(); play.textContent="▶️"; saveState();
+        slp.querySelectorAll("button").forEach(x=>x.classList.remove("on")); slp.firstChild.classList.add("on"); }, min*60000); }
+    };
+    slp.appendChild(b); });
 }
 window.addEventListener("pagehide", ()=>{ if(audio) saveState(); });
 boot();

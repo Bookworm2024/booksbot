@@ -8,7 +8,7 @@ Re-delivering a favorite is FREE (the user already paid once), routed through
 copy_message from the archive channel like the paid path.
 """
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
@@ -126,6 +126,47 @@ async def cb_fav_get(call: CallbackQuery) -> None:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Favorite re-delivery failed: %s", exc)
         await call.message.answer("❌ Couldn't retrieve this file right now.")
+
+
+def _streak(days: list[str]) -> int:
+    """Consecutive-day streak ending today or yesterday, from YYYY-MM-DD list."""
+    s = set(days or [])
+    if not s:
+        return 0
+    today = datetime.now(timezone.utc).date()
+    cur = today if today.strftime("%Y-%m-%d") in s else today - timedelta(days=1)
+    if cur.strftime("%Y-%m-%d") not in s:
+        return 0
+    n = 0
+    while cur.strftime("%Y-%m-%d") in s:
+        n += 1
+        cur -= timedelta(days=1)
+    return n
+
+
+@router.callback_query(F.data == "lib_stats")
+async def cb_reading_stats(call: CallbackQuery) -> None:
+    await call.answer()
+    uid = call.from_user.id
+    db = await MongoManager.get()
+    u = await db.find_one_global("users", {"user_id": uid}, {"reading_days": 1}) or {}
+    days = u.get("reading_days") or []
+    states = await db.find_global("reader_state", {"user_id": uid}, proj={"bookmarks": 1})
+    in_progress = len(states)
+    bookmarks = sum(len(s.get("bookmarks") or []) for s in states)
+    favs = await db.count_global("favorites", {"user_id": uid})
+    streak = _streak(days)
+    fire = "🔥" * min(streak, 5) if streak else "—"
+    await call.message.edit_text(
+        "<b>📊 My Reading</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"🔥 <b>Streak:</b> {streak} day(s) {fire}\n"
+        f"📅 <b>Days read:</b> {len(days)}\n"
+        f"📖 <b>In progress:</b> {in_progress}\n"
+        f"🔖 <b>Bookmarks:</b> {bookmarks}\n"
+        f"⭐ <b>Favorites:</b> {favs}",
+        reply_markup=kb([btn("📖 Continue Reading", "lib_continue", style="success")],
+                        [btn("🔙 Back", "menu_library", style="danger")]))
 
 
 @router.callback_query(F.data == "lib_continue")

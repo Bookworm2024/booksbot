@@ -40,6 +40,7 @@
   <div id="info">Loading…</div>
   <button class="ghost" id="next">›</button>
   <button class="ghost" id="cog">Aa</button>
+  <button class="ghost" id="tts">🔊</button>
   <button id="bm">🔖</button>
 </div>
 <div id="panel">
@@ -137,6 +138,23 @@ document.getElementById("next").onclick=()=> mode==="pdf"? gotoPdf(pageNum+1) : 
 document.getElementById("bm").onclick=()=>{ const mark=mode==="pdf"?pageNum:state.loc;
   if(mark && !(state.bookmarks||[]).includes(mark)){ (state.bookmarks=state.bookmarks||[]).push(mark);
     saveState({bookmarks:state.bookmarks}); renderBookmarks(); tg?.HapticFeedback?.impactOccurred?.("light"); } };
+
+/* TTS read-aloud (device voices via Web Speech API) */
+const tts = document.getElementById("tts");
+async function currentText(){
+  if(mode==="pdf" && pdfDoc){ const p=await pdfDoc.getPage(pageNum); const tc=await p.getTextContent();
+    return tc.items.map(i=>i.str).join(" "); }
+  if(mode==="epub" && rendition){ const cs=rendition.getContents(); if(cs&&cs[0]) return cs[0].document.body.innerText||""; }
+  return "";
+}
+tts.onclick=async()=>{
+  if(!window.speechSynthesis){ return; }
+  if(speechSynthesis.speaking){ speechSynthesis.cancel(); tts.textContent="🔊"; return; }
+  const t=(await currentText()).slice(0,9000); if(!t) return;
+  const u=new SpeechSynthesisUtterance(t); u.rate=1; u.onend=()=>tts.textContent="🔊";
+  speechSynthesis.speak(u); tts.textContent="⏹";
+};
+window.addEventListener("pagehide", ()=>{ try{ speechSynthesis.cancel(); }catch(e){} });
 
 (async ()=>{
   if(!FUID){ return showMsg("⚠️ No file specified."); }
