@@ -69,7 +69,9 @@ Legend counts toward ~500 features across 14 pillars.
 - 🔜 Coupon & promo campaigns with usage caps · first-purchase bonus
 - ✅ VIP subscription tiers (Silver/Gold) — BGM-priced, 30d; perks: cheaper/free
   downloads, bigger daily claim, monthly BGM grant; badge in /balance
-- 🔜 Sponsored/featured book slots (paid placement)
+- ✅ Flash sales / happy-hour (admin-fired timed bonus on all purchases;
+  banner on dashboard + Buy menu; locked in at purchase time)
+- 🔜 Sponsored/featured book slots (paid placement) · coupons
 - 🔜 Sell ad slots inside the bot · affiliate payouts
 - 🔜 Abandoned-cart / win-back nudges · low-balance upsell
 - ⬜ Gift cards · tipping authors/uploaders

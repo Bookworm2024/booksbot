@@ -155,9 +155,12 @@ async def _deeplink_download(message: Message, uid: int, fuid: str) -> None:
 async def _send_dashboard(message: Message, name: str) -> None:
     # pay out referral the first time the user clears the join-gate
     await grant_referral(message.bot, message.chat.id)
+    from utils.deals import banner
+    deal = await banner()
     await message.answer(
         f"👋 <b>Welcome back, {name}!</b>\n\n"
-        "✨ <b>Your reading companion is ready.</b>\n\n"
+        + (f"{deal}\n\n" if deal else "")
+        + "✨ <b>Your reading companion is ready.</b>\n\n"
         "<blockquote>📚 <b>Explore Features:</b>\n"
         "• Request any eBook or Audiobook\n"
         "• Manage tokens and your library\n"

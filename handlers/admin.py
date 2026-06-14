@@ -45,6 +45,7 @@ def _panel_kb(is_super: bool):
     if is_super:
         rows.append([btn("💰 Revenue", "admin_revenue", style="success"),
                      btn("⚙️ Pricing", "admin_pricing", style="success")])
+        rows.append([btn("🔥 Flash Sale", "admin_deal", style="success")])
         rows.append([btn("➕ Add BGM", "admin_addbgm", style="success"),
                      btn("🎟️ Create Code", "admin_create", style="success")])
         rows.append([btn("🎮 Questions", "admin_qbank", style="primary"),

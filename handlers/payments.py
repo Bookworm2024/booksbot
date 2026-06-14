@@ -63,21 +63,25 @@ def _upi_enabled() -> bool:
 # ── Buy menu ─────────────────────────────────────────────────────────────────
 @router.message(Command("buy"))
 async def cmd_buy(message: Message) -> None:
-    await message.answer(*_buy_view())
+    text, markup = await _buy_view()
+    await message.answer(text, reply_markup=markup, disable_web_page_preview=True)
 
 
 @router.callback_query(F.data == "acc_buy")
 async def cb_buy(call: CallbackQuery) -> None:
     await call.answer()
-    text, markup = _buy_view()
+    text, markup = await _buy_view()
     await call.message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)
 
 
-def _buy_view():
+async def _buy_view():
+    from utils.deals import banner
+    deal = await banner()
     min_inr = int(MIN_BGM_PURCHASE * BGM_PRICE_INR)
     text = (
         "<b>💎 Buy BookGems (BGM)</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
+        + (f"{deal}\n" if deal else "")
+        + "━━━━━━━━━━━━━━━━━━\n"
         "Permanent tokens — never expire.\n\n"
         f"🏦 <b>UPI (INR):</b> ₹{BGM_PRICE_INR:g}/BGM · min {MIN_BGM_PURCHASE} (₹{min_inr})\n"
         f"🌐 <b>Crypto:</b> ${BGM_PRICE_USD:g}/BGM\n"
@@ -123,7 +127,8 @@ async def on_amount(message: Message, state: FSMContext) -> None:
         return
     bgm = int(raw)
     inr = round(bgm * BGM_PRICE_INR, 2)
-    bonus = bonus_for(bgm)
+    from utils.deals import deal_bonus
+    bonus = bonus_for(bgm) + await deal_bonus(bgm)
     uid = message.chat.id
     order_id = make_order_id(uid)
     db = await MongoManager.get()
@@ -275,7 +280,8 @@ async def cb_hk_buy(call: CallbackQuery) -> None:
         return
     crypto, network, label = CRYPTO_CHOICES[idx]
     bgm = round(usd / BGM_PRICE_USD)
-    bonus = bonus_for(bgm)
+    from utils.deals import deal_bonus
+    bonus = bonus_for(bgm) + await deal_bonus(bgm)
     await call.answer("Generating invoice…")
     uid = call.from_user.id
     order_id = make_order_id(uid)

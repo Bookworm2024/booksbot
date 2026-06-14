@@ -13,6 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from config import SUPER_ADMIN_ID
+from utils.deals import banner, clear_deal, get_deal, set_deal
 from utils.keyboards import btn, kb
 from utils.settings import DEFAULTS, all_settings, set_setting
 
@@ -24,6 +25,8 @@ _KEYS = list(DEFAULTS.keys())
 
 class PriceFSM(StatesGroup):
     awaiting_value = State()
+    deal_pct = State()
+    deal_hours = State()
 
 
 async def _panel():
@@ -84,3 +87,71 @@ async def on_value(message: Message, state: FSMContext) -> None:
     await set_setting(key, value)
     await message.answer(f"✅ <b>{DEFAULTS[key][1]}</b> set to <b>{value:g}</b>. "
                          "Applies immediately.")
+
+
+# ── flash sale / deals ─────────────────────────────────────────────────────────
+@router.callback_query(F.data == "admin_deal")
+async def cb_deal(call: CallbackQuery) -> None:
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("Super admin only", show_alert=True)
+        return
+    await call.answer()
+    cur = await banner() or "No active flash sale."
+    await call.message.edit_text(
+        f"<b>🔥 Flash Sale</b>\n━━━━━━━━━━━━━━━━━━\n{cur}\n\n"
+        "Fire a timed bonus on all BGM purchases.",
+        reply_markup=kb([btn("⚡ New Flash Sale", "deal_new", style="success")],
+                        [btn("🛑 End Sale", "deal_clear", style="danger")],
+                        [btn("🔙 Back", "admin_open", style="primary")]))
+
+
+@router.callback_query(F.data == "deal_new")
+async def cb_deal_new(call: CallbackQuery, state: FSMContext) -> None:
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("Super admin only", show_alert=True)
+        return
+    await call.answer()
+    await state.set_state(PriceFSM.deal_pct)
+    await call.message.answer("⚡ Bonus <b>percent</b> for the sale (e.g. 50): /cancel to abort.")
+
+
+@router.message(PriceFSM.deal_pct, F.text)
+async def on_deal_pct(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if raw.lower() == "/cancel":
+        await state.clear(); await message.answer("❌ Cancelled."); return
+    if not raw.isdigit() or not (1 <= int(raw) <= 500):
+        await message.answer("Enter a percent 1–500.")
+        return
+    await state.update_data(pct=int(raw))
+    await state.set_state(PriceFSM.deal_hours)
+    await message.answer("⏱ Duration in <b>hours</b> (e.g. 6):")
+
+
+@router.message(PriceFSM.deal_hours, F.text)
+async def on_deal_hours(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if raw.lower() == "/cancel":
+        await state.clear(); await message.answer("❌ Cancelled."); return
+    try:
+        hours = float(raw)
+        if not (0 < hours <= 168):
+            raise ValueError
+    except ValueError:
+        await message.answer("Enter hours 0–168.")
+        return
+    data = await state.get_data()
+    await state.clear()
+    until = await set_deal(data["pct"], hours)
+    await message.answer(f"🔥 <b>Flash sale live!</b> +{data['pct']}% bonus BGM "
+                         f"until {until.strftime('%d %b %H:%M UTC')}.")
+
+
+@router.callback_query(F.data == "deal_clear")
+async def cb_deal_clear(call: CallbackQuery) -> None:
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("Super admin only", show_alert=True)
+        return
+    await clear_deal()
+    await call.answer("Sale ended")
+    await cb_deal(call)
