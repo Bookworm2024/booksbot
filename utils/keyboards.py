@@ -60,7 +60,7 @@ def webapp_btn(label: str, page: str, *, query: str = "",
     else fall back to an in-chat callback so a button is always produced."""
     base = (BOT_PUBLIC_URL or "").rstrip("/")
     if base:
-        url = f"{base}/app/{page}"
+        url = f"{base}/app/{page}".replace("http://", "https://")
         if query:
             url = f"{url}?{query}"
         kw = {"text": label, "web_app": WebAppInfo(url=url)}

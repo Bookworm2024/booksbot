@@ -120,7 +120,23 @@ TELETHON_SESSION: str = os.getenv("TELETHON_SESSION", "")
 PORT: int            = _int("PORT", 8080)
 # Public HTTPS base (e.g. https://booksbot.koyeb.app). Required for Mini Apps —
 # Telegram only opens web_app buttons over HTTPS.
-BOT_PUBLIC_URL: str  = os.getenv("BOT_PUBLIC_URL", "").rstrip("/")
+def _public_url() -> str:
+    """Normalize BOT_PUBLIC_URL defensively: ensure an https scheme and strip a
+    trailing '/health' (a common copy-paste slip) and trailing slashes. Telegram
+    only accepts HTTPS web_app URLs, so a missing scheme would break every Mini
+    App button."""
+    u = os.getenv("BOT_PUBLIC_URL", "").strip().rstrip("/")
+    if not u:
+        return ""
+    if "://" not in u:
+        u = "https://" + u
+    u = u.replace("http://", "https://")
+    if u.endswith("/health"):
+        u = u[: -len("/health")].rstrip("/")
+    return u
+
+
+BOT_PUBLIC_URL: str  = _public_url()
 
 
 # ── economy ──────────────────────────────────────────────────────────────────
