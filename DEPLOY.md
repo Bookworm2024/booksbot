@@ -8,8 +8,13 @@ background workers — email monitor & reminders).
 1. app.koyeb.com → **Create Web Service** → **GitHub** → `Bookworm2024/booksbot`, branch `main`.
 2. Builder: **Dockerfile** (auto-detected).
 3. Instance: **Free** (or Nano), region near you.
-4. **Health check:** HTTP, path **`/health`**, port **8080**.
-5. Name it (e.g. `booksbot`) → your URL becomes `https://booksbot-<org>.koyeb.app`.
+4. **Ports / Public networking (CRITICAL):** expose port **8080**, protocol **HTTP**,
+   **Public HTTPS access Path = `/`** (root). ⚠️ Do NOT set the public path to
+   `/health` — that would route ONLY `/health` and break every Mini App + API.
+5. **Health check:** the default TCP check on port 8080 is fine. (If you use an
+   HTTP health check, its path is `/health` — but that's the *health-check* path,
+   NOT the public-access path in step 4.)
+6. Name it (e.g. `booksbot`) → your URL becomes `https://booksbot-<org>.koyeb.app`.
 
 ## 2. Environment variables
 ### Required (bot won't boot without these)
