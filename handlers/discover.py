@@ -62,11 +62,30 @@ async def cb_discover(call: CallbackQuery) -> None:
 def _hub():
     return (
         "<b>🔭 Discover</b>\n━━━━━━━━━━━━━━━━━━\nFind your next read.",
-        kb([btn("🆕 New Arrivals", "disc_new:0", style="success"),
+        kb([btn("⭐ Featured", "disc_feat", style="success")],
+           [btn("🆕 New Arrivals", "disc_new:0", style="success"),
             btn("🔥 Popular", "disc_pop:0", style="success")],
            [btn("📅 Book of the Day", "disc_botd", style="primary"),
             btn("💬 Daily Quote", "disc_quote", style="primary")],
            [btn("🔙 Back", "menu_library", style="danger")]))
+
+
+@router.callback_query(F.data == "disc_feat")
+async def cb_featured(call: CallbackQuery) -> None:
+    await call.answer()
+    from utils.featured import featured_files
+    items = await featured_files(limit=10)
+    if not items:
+        await call.message.edit_text(
+            "⭐ <b>No featured books right now.</b>",
+            reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
+        return
+    rows = [[btn(f"⭐ {icon_for(f.get('ext',''))} {f.get('name','Untitled')[:36]}",
+                 f"dl:{f['file_unique_id']}", style="success")] for f in items]
+    rows.append([btn("🔙 Discover", "lib_discover", style="danger")])
+    await call.message.edit_text(
+        "⭐ <b>Featured Books</b>\n━━━━━━━━━━━━━━━━━━\nHand-picked &amp; sponsored picks:",
+        reply_markup=kb(*rows))
 
 
 def _file_rows(items, page, total, base):

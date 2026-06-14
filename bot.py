@@ -28,10 +28,10 @@ from config import (
 )
 from database.connection import MongoManager
 from handlers import (
-    admin, broadcast, captcha, discover, economy, favorites, games, gift,
-    indexer, inline, invite, payments, qadmin, rate, recommend, referral,
-    request, requests_manual, revenue, settings_admin, start, stats, support,
-    track, vip,
+    admin, broadcast, captcha, discover, economy, favorites, featured_admin,
+    games, gift, indexer, inline, invite, payments, qadmin, rate, recommend,
+    referral, request, requests_manual, revenue, settings_admin, start, stats,
+    support, track, vip,
 )
 from handlers.payments import heleket_webhook
 from handlers.bookle_api import api_bookle_new, api_bookle_guess
@@ -92,6 +92,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(qadmin.router)
     dp.include_router(revenue.router)
     dp.include_router(settings_admin.router)
+    dp.include_router(featured_admin.router)
     dp.include_router(admin.router)
     # indexer last — channel_post observer, no overlap with user handlers.
     dp.include_router(indexer.router)

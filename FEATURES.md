@@ -71,7 +71,9 @@ Legend counts toward ~500 features across 14 pillars.
   downloads, bigger daily claim, monthly BGM grant; badge in /balance
 - ✅ Flash sales / happy-hour (admin-fired timed bonus on all purchases;
   banner on dashboard + Buy menu; locked in at purchase time)
-- 🔜 Sponsored/featured book slots (paid placement) · coupons
+- ✅ Sponsored/featured book slots — admin features a title for N days; ⭐ Featured
+  section in Discover (paid placement)
+- 🔜 Coupons (purchase discounts)
 - 🔜 Sell ad slots inside the bot · affiliate payouts
 - 🔜 Abandoned-cart / win-back nudges · low-balance upsell
 - ⬜ Gift cards · tipping authors/uploaders
