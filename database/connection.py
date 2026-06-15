@@ -108,6 +108,7 @@ class MongoManager:
                 await db.raw_emails.create_index([("uid", ASCENDING)], unique=True)
                 await db.reader_state.create_index([("user_id", ASCENDING), ("updated_at", DESCENDING)])
                 await db.bookle_sessions.create_index([("uid", ASCENDING), ("day", ASCENDING)], unique=True)
+                await db.hangman_games.create_index([("uid", ASCENDING)], unique=True)
                 await db.users.create_index([("game_bgm", DESCENDING)])
                 await db.users.create_index([("last_active", ASCENDING)])
                 await db.users.create_index([("downloads", DESCENDING)])

@@ -33,7 +33,7 @@ it's here, it's not done yet.
 
 ## 4. Games & Brain
 - 🔜 Cover-Guess · Title Anagram/Word-Builder · Speed-Reading WPM · Memory match
-- 🔜 Literary Hangman · Crossword · daily challenge · weekly tournament
+- 🔜 Crossword · daily challenge · weekly tournament
 - 🔜 Game streak bonuses · global XP & levels
 - ⬜ Trivia battles (1v1) · clan/guild competitions
 - ⬜ Boss-quiz events · seasonal themed events

@@ -55,8 +55,9 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Guess-the-Book (from blurb) · ✅ First-Line quiz · ✅ Author Match
 - ✅ "Bookle" — Wordle-style daily word game (server-scored, shared daily word)
 - ✅ Games leaderboard (top earners across all games)
+- ✅ Literary Hangman (chat-based, server-side word, 6 lives, BGM reward, 3/day)
 - 🔜 Cover-Guess · Title Anagram/Word-Builder · Speed-Reading WPM · Memory match
-- 🔜 Literary Hangman · Crossword · daily challenge · weekly tournament
+- 🔜 Crossword · daily challenge · weekly tournament
 - ✅ Achievements (🏅 board with progress + unlock notifications)
 - 🔜 Streak bonuses · global XP & levels
 - ⬜ Trivia battles (1v1) · clan/guild competitions
