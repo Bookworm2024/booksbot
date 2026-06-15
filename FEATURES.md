@@ -45,7 +45,8 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Fuzzy/typo-tolerant search (trigram candidate pool + similarity re-rank;
   auto-fallback when exact returns nothing — handles typos/reorder/partial)
 - ✅ Sort options in results (🎯 Best / 🆕 Newest / 🔥 Popular)
-- 🔜 Author filter (needs author metadata) · saved searches · search history
+- ✅ Saved searches + recent-search history (last 8, re-run with one tap)
+- 🔜 Author filter (needs author metadata)
 - ⬜ Semantic (embedding) search
 
 ## 4. Games & Brain (mini apps, book/nerd themed)

@@ -28,7 +28,7 @@ it's here, it's not done yet.
 - ⬜ Wishlist/TBR list with reminders
 
 ## 3. Powerful Search
-- 🔜 Author filter (needs author metadata) · saved searches · search history
+- 🔜 Author filter (needs author metadata)
 - ⬜ Semantic (embedding) search
 
 ## 4. Games & Brain

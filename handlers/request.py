@@ -67,11 +67,18 @@ async def cb_req_auto(call: CallbackQuery, state: FSMContext) -> None:
             reply_markup=kb([btn("🔙 Back", "menu_request", style="danger")]))
         return
     await state.set_state(RequestFSM.awaiting_query)
+    db = await MongoManager.get()
+    u = await db.find_one_global("users", {"user_id": call.from_user.id},
+                                 {"search_history": 1}) or {}
+    rows = [[btn(f"🕘 {q[:40]}", f"sh:{i}", style="primary")]
+            for i, q in enumerate((u.get("search_history") or [])[:5])]
+    rows.append([btn("🔙 Back", "menu_request", style="danger")])
     await call.message.edit_text(
         "🔍 <b>Search the Archive</b>\n\n"
         "Send the <b>title</b> or keywords of the book/audiobook you want.\n\n"
-        "📝 Example: <code>atomic habits</code>",
-        reply_markup=kb([btn("🔙 Back", "menu_request", style="danger")]),
+        "📝 Example: <code>atomic habits</code>"
+        + ("\n\n🕘 <i>Or re-run a recent search below.</i>" if len(rows) > 1 else ""),
+        reply_markup=kb(*rows),
     )
 
 
@@ -82,7 +89,39 @@ async def on_query(message: Message, state: FSMContext) -> None:
         await state.clear()
         return
     await state.update_data(sq=query, sp=0)
+    await _record_search(message.chat.id, query)
     await _render_results(message, state, query, 0, edit=False)
+
+
+async def _record_search(uid: int, query: str) -> None:
+    """Keep the user's last 8 distinct searches (most-recent first)."""
+    q = (query or "").strip()
+    if not q:
+        return
+    db = await MongoManager.get()
+    await db.safe_update("users", {"user_id": uid}, {"$pull": {"search_history": q}}, upsert=False)
+    await db.safe_update("users", {"user_id": uid},
+                         {"$push": {"search_history": {"$each": [q], "$position": 0, "$slice": 8}}},
+                         upsert=False)
+
+
+@router.callback_query(F.data.startswith("sh:"))
+async def cb_recent(call: CallbackQuery, state: FSMContext) -> None:
+    await call.answer()
+    try:
+        i = int(call.data.split(":", 1)[1])
+    except ValueError:
+        return
+    db = await MongoManager.get()
+    u = await db.find_one_global("users", {"user_id": call.from_user.id},
+                                 {"search_history": 1}) or {}
+    hist = u.get("search_history") or []
+    if i >= len(hist):
+        await call.answer("That search is gone.", show_alert=True)
+        return
+    query = hist[i]
+    await state.update_data(sq=query, sp=0, sf="all", ss="relevance")
+    await _render_results(call.message, state, query, 0, edit=True)
 
 
 @router.callback_query(F.data.in_({"sr_next", "sr_prev"}))
