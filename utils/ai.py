@@ -141,6 +141,20 @@ def _recommend_prompt(genre: str) -> str:
     )
 
 
+def _parse_titles(text: str, minimum: int = 10) -> list[str] | None:
+    """Turn an LLM 'numbered list of Title — Author' into a clean list."""
+    titles = []
+    for line in (text or "").splitlines():
+        line = _NUM_RE.sub("", line).strip(" -•*\t").strip()
+        low = line.lower()
+        if not line or len(line) <= 2:
+            continue
+        if low.endswith(":") or any(low.startswith(p) for p in _PREAMBLE):
+            continue
+        titles.append(line)
+    return titles if len(titles) >= minimum else None
+
+
 async def recommend_titles(genre: str) -> list[str] | None:
     """~100 titles in a genre, or None if invalid/unavailable (caller refunds)."""
     genre = (genre or "").strip()
@@ -149,16 +163,36 @@ async def recommend_titles(genre: str) -> list[str] | None:
     text = await ai_complete(_recommend_prompt(genre), max_tokens=2000)
     if not text or "INVALID" in text[:20].upper():
         return None
-    titles = []
-    for line in text.splitlines():
-        line = _NUM_RE.sub("", line).strip(" -•*\t").strip()
-        low = line.lower()
-        if not line or len(line) <= 2:
-            continue
-        if low.endswith(":") or any(low.startswith(p) for p in _PREAMBLE):
-            continue
-        titles.append(line)
-    return titles if len(titles) >= 10 else None
+    return _parse_titles(text, minimum=10)
+
+
+async def similar_titles(title: str) -> list[str] | None:
+    """~30 books similar to a given title (same genre/themes/vibe)."""
+    title = (title or "").strip()
+    if not title or not await ai_enabled():
+        return None
+    prompt = (f'List exactly 30 books similar to "{title}" — same genre, themes or '
+              "vibe — excluding that book itself. Output ONLY a numbered list, one per "
+              "line, 'Title — Author'. No commentary. "
+              f'If "{title}" is not a real book, output exactly: INVALID')
+    text = await ai_complete(prompt, max_tokens=1300)
+    if not text or "INVALID" in text[:20].upper():
+        return None
+    return _parse_titles(text, minimum=5)
+
+
+async def mood_titles(mood: str) -> list[str] | None:
+    """~40 books matching a mood / vibe (e.g. 'cozy rainy-day', 'fast thriller')."""
+    mood = (mood or "").strip()
+    if not mood or not await ai_enabled():
+        return None
+    prompt = (f'List exactly 40 books that fit this mood / vibe: "{mood}". '
+              "Output ONLY a numbered list, one per line, 'Title — Author'. No "
+              f'commentary. If "{mood}" is not a usable mood/theme, output exactly: INVALID')
+    text = await ai_complete(prompt, max_tokens=1600)
+    if not text or "INVALID" in text[:20].upper():
+        return None
+    return _parse_titles(text, minimum=5)
 
 
 async def classify_genre(title: str) -> str | None:

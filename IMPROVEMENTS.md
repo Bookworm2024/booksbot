@@ -21,7 +21,6 @@ it's here, it's not done yet.
 - ⬜ Adjustable playback EQ for audiobooks · chapter markers
 
 ## 2. Book Discovery & Content
-- 🔜 "Similar to this" recommendations · mood-based picks
 - 🔜 Author spotlight · series detector & next-in-series
 - 🔜 Genre browse hub · curated collections / shelves · reading challenges
 - ⬜ Goodreads-style ratings/reviews per title

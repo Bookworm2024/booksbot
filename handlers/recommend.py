@@ -14,7 +14,8 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
-from utils.ai import ai_enabled, recommend_titles, summarize_book
+from utils.ai import (ai_enabled, mood_titles, recommend_titles, similar_titles,
+                      summarize_book)
 from utils.keyboards import btn, kb
 from utils.settings import get_float
 from utils.wallet import get_balances, refund, spend
@@ -32,6 +33,8 @@ async def _ai_cost() -> float:
 class RecFSM(StatesGroup):
     awaiting_genre = State()
     awaiting_summary_title = State()
+    awaiting_similar_title = State()
+    awaiting_mood = State()
 
 
 @router.message(Command("recommend"))
@@ -59,9 +62,13 @@ async def _intro(message: Message, uid: int) -> None:
     await message.answer(
         "✨ <b>AI Book Recommendations</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "Get 100 hand-picked titles in any genre.\n\n"
+        "🎯 <b>By Genre</b> — 100 titles in any genre\n"
+        "📚 <b>Similar to a Book</b> — more like one you loved\n"
+        "🎭 <b>By Mood</b> — match a vibe (cozy, fast, dark…)\n\n"
         f"💎 Cost: <b>{cost:g} BCN/BGM</b>\n💳 Balance: {bcn:.2f} BCN · {bgm:.2f} BGM",
-        reply_markup=kb([btn("🚀 Proceed & Pay", "rec_proceed", style="success")],
+        reply_markup=kb([btn("🎯 By Genre", "rec_proceed", style="success")],
+                        [btn("📚 Similar to a Book", "rec_similar", style="success")],
+                        [btn("🎭 By Mood", "rec_mood", style="success")],
                         [btn("🔙 Back", "menu_library", style="danger")]))
 
 
@@ -108,6 +115,77 @@ async def on_genre(message: Message, state: FSMContext) -> None:
                          {"$set": {"rec_genre": genre, "rec_titles": titles, "rec_sent": 0}})
     await notice.delete()
     await _send_batch(message, uid)
+
+
+@router.callback_query(F.data == "rec_similar")
+async def cb_similar(call: CallbackQuery, state: FSMContext) -> None:
+    uid = call.from_user.id
+    currency = await spend(uid, await _ai_cost())
+    if not currency:
+        await call.answer("Insufficient balance.", show_alert=True)
+        return
+    await call.answer()
+    await state.set_state(RecFSM.awaiting_similar_title)
+    await state.update_data(currency=currency)
+    await call.message.edit_text("📚 <b>Name a book you loved</b>\n\nI'll find similar reads. "
+                                 "/cancel to abort.")
+
+
+@router.callback_query(F.data == "rec_mood")
+async def cb_mood(call: CallbackQuery, state: FSMContext) -> None:
+    uid = call.from_user.id
+    currency = await spend(uid, await _ai_cost())
+    if not currency:
+        await call.answer("Insufficient balance.", show_alert=True)
+        return
+    await call.answer()
+    await state.set_state(RecFSM.awaiting_mood)
+    await state.update_data(currency=currency)
+    await call.message.edit_text("🎭 <b>Describe the mood / vibe</b>\n\ne.g. <i>cozy rainy-day</i>, "
+                                 "<i>fast-paced thriller</i>, <i>dark academia</i>. /cancel to abort.")
+
+
+async def _deliver_or_refund(message: Message, uid: int, currency: str, label: str,
+                             titles: list | None, notice) -> None:
+    if not titles:
+        refund_amt = round(await _ai_cost() * (0.75 if currency == "BCN" else 0.9), 3)
+        await refund(uid, refund_amt, "BGM")
+        await notice.edit_text(f"❌ Couldn't use <b>{label}</b>. Refunded <b>{refund_amt:g} BGM</b>. "
+                               "Try again with something more specific.")
+        return
+    db = await MongoManager.get()
+    await db.safe_update("users", {"user_id": uid},
+                         {"$set": {"rec_genre": label, "rec_titles": titles, "rec_sent": 0}})
+    await notice.delete()
+    await _send_batch(message, uid)
+
+
+@router.message(RecFSM.awaiting_similar_title, F.text)
+async def on_similar(message: Message, state: FSMContext) -> None:
+    q = (message.text or "").strip()
+    if q.lower() == "/cancel":
+        await state.clear(); await message.answer("❌ Cancelled."); return
+    data = await state.get_data()
+    currency = data.get("currency", "BGM")
+    await state.clear()
+    uid = message.chat.id
+    notice = await message.answer(f"📚 Finding books like <b>{q}</b>…")
+    await _deliver_or_refund(message, uid, currency, f"similar to {q}",
+                             await similar_titles(q), notice)
+
+
+@router.message(RecFSM.awaiting_mood, F.text)
+async def on_mood(message: Message, state: FSMContext) -> None:
+    q = (message.text or "").strip()
+    if q.lower() == "/cancel":
+        await state.clear(); await message.answer("❌ Cancelled."); return
+    data = await state.get_data()
+    currency = data.get("currency", "BGM")
+    await state.clear()
+    uid = message.chat.id
+    notice = await message.answer(f"🎭 Finding <b>{q}</b> books…")
+    await _deliver_or_refund(message, uid, currency, f"{q} mood",
+                             await mood_titles(q), notice)
 
 
 async def _send_batch(message: Message, uid: int) -> None:
