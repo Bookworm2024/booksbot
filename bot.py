@@ -49,6 +49,7 @@ from utils.admins import load_extra_admins
 from utils.email_monitor import run_email_monitor
 from utils.games import ensure_seed
 from utils.reminders import run_reminder_loop
+from utils.users import backfill_first_purchase_flag
 
 logging.basicConfig(
     level=logging.INFO,
@@ -167,8 +168,9 @@ async def main() -> None:
 
     # Connect Mongo up front so a bad URL fails fast & loud.
     await MongoManager.get()
-    await ensure_seed()         # seed the starter question bank if empty
-    await load_extra_admins()   # merge admins added via /admin into ADMIN_IDS
+    await ensure_seed()                  # seed the starter question bank if empty
+    await load_extra_admins()            # merge admins added via /admin into ADMIN_IDS
+    await backfill_first_purchase_flag()  # protect first-purchase bonus from existing buyers
     logger.info("MongoDB ready.")
 
     bot = _build_bot()

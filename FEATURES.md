@@ -70,9 +70,10 @@ Legend counts toward ~500 features across 14 pillars.
   BGM price; applies instantly, no redeploy
 - ✅ BGM bundles (buy more, save — bonus % on UPI & crypto purchases)
 - ✅ Gift BGM to a friend (atomic transfer)
-- 🔜 BGM price wired into Buy menus · per-item dynamic surge pricing
-- 🔜 Daily deals / flash sales / happy-hour multipliers
-- 🔜 Coupon & promo campaigns with usage caps · first-purchase bonus
+- ✅ Live BGM price wired into Buy menus (admin price edits apply to UPI + crypto)
+- ✅ First-purchase bonus (% of base BGM, once-ever, backfill-protected)
+- 🔜 Per-item dynamic surge pricing · happy-hour multipliers
+- 🔜 Coupon & promo campaigns with usage caps
 - ✅ VIP subscription tiers (Silver/Gold) — BGM-priced, 30d; perks: cheaper/free
   downloads, bigger daily claim, monthly BGM grant; badge in /balance
 - ✅ Flash sales / happy-hour (admin-fired timed bonus on all purchases;

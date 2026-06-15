@@ -13,14 +13,38 @@ Schema (collection `users`):
   bcn_claimed_at datetime|None
   referrer    int|None
 """
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from database.connection import MongoManager
 
+logger = logging.getLogger(__name__)
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+async def backfill_first_purchase_flag() -> None:
+    """One-time migration: mark users who ALREADY have a paid order as past their
+    first purchase, so the first-purchase bonus never retroactively pays existing
+    buyers. Genuine first-time buyers (incl. imported users who never purchased)
+    keep the flag absent and still earn the bonus on their real first purchase.
+    Guarded by a kv flag so it runs exactly once."""
+    db = await MongoManager.get()
+    if await db.kv_get("first_purchase_migrated", False):
+        return
+    buyer_ids = set()
+    for coll in ("payments", "crypto_orders"):
+        for r in await db.find_global(coll, {"status": "paid"}, proj={"user_id": 1}):
+            if r.get("user_id"):
+                buyer_ids.add(r["user_id"])
+    for uid in buyer_ids:
+        await db.safe_update("users", {"user_id": uid},
+                             {"$set": {"first_purchase_done": True}}, upsert=False)
+    await db.kv_set("first_purchase_migrated", True)
+    logger.info("first-purchase backfill: flagged %d existing buyer(s).", len(buyer_ids))
 
 
 async def ensure_user(user_id: int, first_name: str = "", username: str = "") -> Dict[str, Any]:

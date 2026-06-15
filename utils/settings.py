@@ -24,6 +24,7 @@ DEFAULTS: dict[str, tuple] = {
     "claim_max":       (5.0, "Daily claim max (BCN)", "float", "Rewards"),
     "referrer_bonus":  (0.5, "Referrer bonus (BGM)", "float", "Rewards"),
     "referee_bonus":   (0.25, "New-user referral bonus (BGM)", "float", "Rewards"),
+    "first_purchase_pct": (20.0, "First-purchase bonus (%)", "float", "Rewards"),
     # Economy — conversion rules
     "convert_tax_pct": (25.0, "BCN→BGM convert tax (%)", "float", "Economy"),
     "convert_min_bgm": (50.0, "Convert: min BGM required", "float", "Economy"),

@@ -39,8 +39,8 @@ it's here, it's not done yet.
 - ⬜ Boss-quiz events · seasonal themed events
 
 ## 5. Money — Admin Revenue Engine
-- 🔜 BGM price wired into Buy menus · per-item dynamic surge pricing
-- 🔜 Coupon & promo campaigns with usage caps · first-purchase bonus
+- 🔜 Per-item dynamic surge pricing · happy-hour multipliers
+- 🔜 Coupon & promo campaigns with usage caps
 - 🔜 Sell ad slots inside the bot · affiliate payouts
 - 🔜 Abandoned-cart / win-back nudges · low-balance upsell
 - ⬜ Gift cards · tipping authors/uploaders
