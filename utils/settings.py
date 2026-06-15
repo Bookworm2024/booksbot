@@ -27,6 +27,9 @@ DEFAULTS: dict[str, tuple] = {
     # Economy — conversion rules
     "convert_tax_pct": (25.0, "BCN→BGM convert tax (%)", "float", "Economy"),
     "convert_min_bgm": (50.0, "Convert: min BGM required", "float", "Economy"),
+    # Safety — anti-abuse flood limiter (set flood_max very high to disable)
+    "flood_max":        (20.0, "Flood: max actions / window", "float", "Safety"),
+    "flood_window_sec": (10.0, "Flood: window (seconds)", "float", "Safety"),
 }
 
 

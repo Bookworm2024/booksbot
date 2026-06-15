@@ -43,6 +43,7 @@ from handlers.reader_api import (
 )
 from middlewares.ban import BanMiddleware
 from middlewares.maintenance import MaintenanceMiddleware
+from middlewares.ratelimit import RateLimitMiddleware
 from utils.admins import load_extra_admins
 from utils.email_monitor import run_email_monitor
 from utils.games import ensure_seed
@@ -70,7 +71,10 @@ def _build_bot() -> Bot:
 
 def _build_dispatcher() -> Dispatcher:
     dp = Dispatcher(storage=MemoryStorage())
-    # Moderation + maintenance gates run before every handler.
+    # Gates run before every handler, in order: flood limiter → ban → maintenance.
+    # Rate limiting is first so floods are dropped before any DB work.
+    dp.message.middleware(RateLimitMiddleware())
+    dp.callback_query.middleware(RateLimitMiddleware())
     dp.message.middleware(BanMiddleware())
     dp.callback_query.middleware(BanMiddleware())
     dp.message.middleware(MaintenanceMiddleware())

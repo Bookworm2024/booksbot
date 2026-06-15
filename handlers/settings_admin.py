@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 _KEYS = list(DEFAULTS.keys())
-_CATS = ["Pricing", "Rewards", "Economy"]
+_CATS = ["Pricing", "Rewards", "Economy", "Safety"]
 
 
 class PriceFSM(StatesGroup):

@@ -142,7 +142,9 @@ Legend counts toward ~500 features across 14 pillars.
 
 ## 12. Trust, Safety & Anti-Abuse
 - ✅ Safe captcha · atomic token/payment paths · ban system
-- 🔜 Rate limiting · anti-multiaccount · device fingerprint (privacy-safe)
+- ✅ Per-user flood rate limiting (in-memory sliding window, admin-tunable via
+  ⚙️ Settings → Safety, admins exempt, non-spammy warnings)
+- 🔜 Anti-multiaccount · device fingerprint (privacy-safe)
 - 🔜 Fraud/chargeback flags · refund controls · velocity checks
 - ⬜ Content reporting · DMCA workflow · age-gating
 
