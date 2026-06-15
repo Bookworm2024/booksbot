@@ -190,8 +190,10 @@ async def _render_results(message: Message, state: FSMContext, query: str,
         rows.append([btn(("● " if v == ss else "") + lbl, f"so:{v}",
                          style="success" if v == ss else "primary") for v, lbl in _SORTS])
     for f in results:
-        label = f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:40]}"
-        rows.append([btn(label, f"dl:{f['file_unique_id']}", style="success")])
+        fuid = f["file_unique_id"]
+        label = f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:34]}"
+        rows.append([btn(label, f"dl:{fuid}", style="success"),
+                     btn("📌", f"tbr_add:{fuid}", style="primary")])
 
     nav = []
     if page > 0:
@@ -283,8 +285,12 @@ async def cb_download(call: CallbackQuery) -> None:
 
     # success bookkeeping
     db = await MongoManager.get()
+    year = datetime.now(timezone.utc).year
     await db.safe_update("users", {"user_id": uid},
-                         {"$inc": {"downloads": 1}})
+                         {"$inc": {"downloads": 1, f"reads.{year}": 1}})
+    # downloading a book clears it from the Reading List (TBR)
+    for idx in db.healthy:
+        await db.dbs[idx]["tbr"].delete_one({"user_id": uid, "file_unique_id": fuid})
     from utils.files import bump_download
     await bump_download(fuid)
     from utils.missions import mark

@@ -35,8 +35,8 @@ Legend counts toward ~500 features across 14 pillars.
 - 🔜 Author spotlight · series detector & next-in-series
 - 🔜 Genre browse hub · curated collections / shelves · reading challenges
 - ✅ Ratings &amp; reviews per title (⭐ 1–5 + written reviews, average shown)
-- ⬜ Personal reading goals & yearly wrap-up
-- ⬜ Wishlist/TBR list with reminders
+- ✅ Personal reading goal + yearly wrap-up (progress bar, days read, top genres)
+- ✅ Wishlist / Reading List (📌 save from search; downloading clears it)
 
 ## 3. Powerful Search
 - ✅ All-words archive search, paginated

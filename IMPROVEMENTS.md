@@ -23,8 +23,7 @@ it's here, it's not done yet.
 ## 2. Book Discovery & Content
 - 🔜 Author spotlight · series detector & next-in-series
 - 🔜 Genre browse hub · curated collections / shelves · reading challenges
-- ⬜ Personal reading goals & yearly wrap-up
-- ⬜ Wishlist/TBR list with reminders
+- ⬜ TBR reminders (nudge about saved-for-later books)
 
 ## 3. Powerful Search
 - 🔜 Author filter (needs author metadata)
