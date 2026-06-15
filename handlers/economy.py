@@ -20,6 +20,7 @@ from aiogram.types import CallbackQuery, Message
 from config import ADMIN_IDS, BCN_EXPIRY_SECONDS
 from database.connection import MongoManager
 from utils.keyboards import btn, kb
+from utils.settings import get_float
 from utils.wallet import add_bgm, get_balances, seconds_until_claim, set_daily_bcn
 
 logger = logging.getLogger(__name__)
@@ -196,14 +197,20 @@ async def on_code(message: Message, state: FSMContext) -> None:
 
 
 # ── BCN → BGM converter ────────────────────────────────────────────────────────
-_CONVERT_TAX = 0.25            # 25% tax → 75% credited
-_CONVERT_MIN_BGM = 50.0        # must already hold ≥50 BGM
+# Tax % and min-BGM are admin-editable (utils.settings: convert_tax_pct,
+# convert_min_bgm); defaults preserve the spec (25% tax, ≥50 BGM).
 _CONVERT_MONTHLY_CAP = 10      # uses per calendar month
 
 
 def _month_key() -> str:
     n = datetime.now(timezone.utc)
     return f"{n.year}-{n.month:02d}"
+
+
+async def _convert_params() -> tuple[float, float]:
+    """Return (tax_fraction, min_bgm) from live settings, tax clamped to [0, .95]."""
+    tax = min(0.95, max(0.0, await get_float("convert_tax_pct") / 100.0))
+    return tax, await get_float("convert_min_bgm")
 
 
 @router.callback_query(F.data == "convert_bcn")
@@ -215,14 +222,15 @@ async def cb_convert(call: CallbackQuery) -> None:
     udoc = await db.find_one_global("users", {"user_id": uid},
                                     {"convert_month": 1, "convert_count": 1}) or {}
     used = udoc.get("convert_count", 0) if udoc.get("convert_month") == _month_key() else 0
+    tax, min_bgm = await _convert_params()
 
     if bcn <= 0:
         await call.message.edit_text("You have no BCN to convert.",
                                      reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
         return
-    if bgm < _CONVERT_MIN_BGM:
+    if bgm < min_bgm:
         await call.message.edit_text(
-            f"🔒 <b>Converter Locked</b>\n\nYou must hold at least <b>{_CONVERT_MIN_BGM:.0f} BGM</b> "
+            f"🔒 <b>Converter Locked</b>\n\nYou must hold at least <b>{min_bgm:.0f} BGM</b> "
             f"to use the converter.\nYou have {bgm:.2f} BGM.",
             reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
         return
@@ -232,11 +240,11 @@ async def cb_convert(call: CallbackQuery) -> None:
             reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
         return
 
-    credited = round(bcn * (1 - _CONVERT_TAX), 3)
+    credited = round(bcn * (1 - tax), 3)
     await call.message.edit_text(
         "<b>🔄 Convert BCN → BGM</b>\n"
         f"🪙 Converting: <code>{bcn:.3f} BCN</code>\n"
-        f"🧾 Tax (25%): <code>{bcn * _CONVERT_TAX:.3f}</code>\n"
+        f"🧾 Tax ({tax * 100:g}%): <code>{bcn * tax:.3f}</code>\n"
         f"💎 You receive: <code>{credited:.3f} BGM</code>\n\n"
         f"Uses this month: {used}/{_CONVERT_MONTHLY_CAP}",
         reply_markup=kb([btn("✅ Confirm Convert", "convert_do", style="success")],
@@ -251,7 +259,8 @@ async def cb_convert_do(call: CallbackQuery) -> None:
     udoc = await db.find_one_global("users", {"user_id": uid},
                                     {"convert_month": 1, "convert_count": 1}) or {}
     used = udoc.get("convert_count", 0) if udoc.get("convert_month") == _month_key() else 0
-    if bcn <= 0 or bgm < _CONVERT_MIN_BGM or used >= _CONVERT_MONTHLY_CAP:
+    tax, min_bgm = await _convert_params()
+    if bcn <= 0 or bgm < min_bgm or used >= _CONVERT_MONTHLY_CAP:
         await call.answer("Conditions no longer met.", show_alert=True)
         return
     await call.answer()
@@ -267,7 +276,7 @@ async def cb_convert_do(call: CallbackQuery) -> None:
         await call.message.edit_text("Nothing to convert.",
                                      reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
         return
-    credited = round(float(old.get("bookcoin") or 0) * (1 - _CONVERT_TAX), 3)
+    credited = round(float(old.get("bookcoin") or 0) * (1 - tax), 3)
     await add_bgm(uid, credited)
     text, markup = await _balance_view(uid)
     await call.message.edit_text(f"✅ Converted to <b>{credited:.3f} BGM</b>.\n\n" + text,

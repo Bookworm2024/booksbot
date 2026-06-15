@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 _KEYS = list(DEFAULTS.keys())
+_CATS = ["Pricing", "Rewards", "Economy"]
 
 
 class PriceFSM(StatesGroup):
@@ -31,12 +32,17 @@ class PriceFSM(StatesGroup):
 
 async def _panel():
     vals = await all_settings()
-    lines = ["<b>⚙️ Pricing &amp; Economy</b>\n━━━━━━━━━━━━━━━━━━"]
+    lines = ["<b>⚙️ Settings &amp; Economy</b>\n━━━━━━━━━━━━━━━━━━"]
     rows = []
-    for k in _KEYS:
-        _, label, _kind = DEFAULTS[k]
-        lines.append(f"• {label}: <b>{vals[k]:g}</b>")
-        rows.append([btn(f"✏️ {label}", f"price_edit:{k}", style="primary")])
+    for cat in _CATS:
+        cat_keys = [k for k in _KEYS if DEFAULTS[k][3] == cat]
+        if not cat_keys:
+            continue
+        lines.append(f"\n<b>{cat}</b>")
+        for k in cat_keys:
+            label = DEFAULTS[k][1]
+            lines.append(f"• {label}: <b>{vals[k]:g}</b>")
+            rows.append([btn(f"✏️ {label}", f"price_edit:{k}", style="primary")])
     rows.append([btn("🔙 Back", "admin_open", style="danger")])
     return "\n".join(lines), kb(*rows)
 

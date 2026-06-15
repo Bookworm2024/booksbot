@@ -10,14 +10,23 @@ from typing import Any
 from config import BGM_PRICE_INR, BGM_PRICE_USD
 from database.connection import MongoManager
 
-# key → (default, label, kind) — kind drives the admin editor's validation
+# key → (default, label, kind, category) — kind drives the editor's validation,
+# category groups the levers in the admin panel.
 DEFAULTS: dict[str, tuple] = {
-    "download_cost":   (1.0, "Download cost (tokens)", "float"),
-    "request_cost":    (2.0, "Manual request cost (tokens)", "float"),
-    "claim_min":       (3.0, "Daily claim min (BCN)", "float"),
-    "claim_max":       (5.0, "Daily claim max (BCN)", "float"),
-    "bgm_price_inr":   (BGM_PRICE_INR, "BGM price (₹)", "float"),
-    "bgm_price_usd":   (BGM_PRICE_USD, "BGM price ($)", "float"),
+    # Pricing — what things cost
+    "download_cost":   (1.0, "Download cost (tokens)", "float", "Pricing"),
+    "request_cost":    (2.0, "Manual request cost (tokens)", "float", "Pricing"),
+    "ai_cost":         (1.0, "AI feature cost (tokens)", "float", "Pricing"),
+    "bgm_price_inr":   (BGM_PRICE_INR, "BGM price (₹)", "float", "Pricing"),
+    "bgm_price_usd":   (BGM_PRICE_USD, "BGM price ($)", "float", "Pricing"),
+    # Rewards — what users earn
+    "claim_min":       (3.0, "Daily claim min (BCN)", "float", "Rewards"),
+    "claim_max":       (5.0, "Daily claim max (BCN)", "float", "Rewards"),
+    "referrer_bonus":  (0.5, "Referrer bonus (BGM)", "float", "Rewards"),
+    "referee_bonus":   (0.25, "New-user referral bonus (BGM)", "float", "Rewards"),
+    # Economy — conversion rules
+    "convert_tax_pct": (25.0, "BCN→BGM convert tax (%)", "float", "Economy"),
+    "convert_min_bgm": (50.0, "Convert: min BGM required", "float", "Economy"),
 }
 
 

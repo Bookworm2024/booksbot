@@ -11,12 +11,13 @@ the reward is granted later, the first time the user clears the join-gate.
 import logging
 
 from database.connection import MongoManager
+from utils.settings import get_float
 from utils.wallet import add_bgm
 
 logger = logging.getLogger(__name__)
 
-_REF_BONUS = 0.5
-_NEW_BONUS = 0.25
+# Defaults live in utils.settings (admin-editable, no redeploy):
+#   referrer_bonus (0.5) · referee_bonus (0.25)
 # extra one-time bonus when the referrer's count reaches a milestone
 _MILESTONES = {5: 2.0, 10: 5.0, 25: 15.0, 50: 40.0, 100: 100.0}
 
@@ -46,19 +47,21 @@ async def grant_referral(bot, uid: int) -> None:
     if not doc or doc.get("referral_rewarded") or not doc.get("referrer"):
         return
     ref = int(doc["referrer"])
+    ref_bonus = await get_float("referrer_bonus")
+    new_bonus = await get_float("referee_bonus")
     await db.safe_update("users", {"user_id": uid}, {"$set": {"referral_rewarded": True}})
-    await add_bgm(uid, _NEW_BONUS)
-    await add_bgm(ref, _REF_BONUS)
+    await add_bgm(uid, new_bonus)
+    await add_bgm(ref, ref_bonus)
     # atomic increment returns the new count → check milestone exactly once
     updated = await db.find_one_and_update_global(
         "users", {"user_id": ref}, {"$inc": {"ref_count": 1}})
     new_count = int((updated or {}).get("ref_count") or 0)
     try:
-        await bot.send_message(uid, f"🎁 <b>Referral Bonus!</b> +{_NEW_BONUS} BGM added.")
+        await bot.send_message(uid, f"🎁 <b>Referral Bonus!</b> +{new_bonus:g} BGM added.")
     except Exception:  # noqa: BLE001
         pass
     try:
-        await bot.send_message(ref, f"🎉 <b>New Referral!</b> You earned +{_REF_BONUS} BGM "
+        await bot.send_message(ref, f"🎉 <b>New Referral!</b> You earned +{ref_bonus:g} BGM "
                                     f"(total {new_count}).")
     except Exception:  # noqa: BLE001
         pass

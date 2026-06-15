@@ -16,13 +16,17 @@ from aiogram.types import CallbackQuery, Message
 from database.connection import MongoManager
 from utils.ai import ai_enabled, recommend_titles, summarize_book
 from utils.keyboards import btn, kb
+from utils.settings import get_float
 from utils.wallet import get_balances, refund, spend
 
 logger = logging.getLogger(__name__)
 router = Router()
 
-_COST = 1.0
 _BATCH = 20
+
+
+async def _ai_cost() -> float:
+    return await get_float("ai_cost")
 
 
 class RecFSM(StatesGroup):
@@ -47,14 +51,15 @@ async def _intro(message: Message, uid: int) -> None:
                              "(admin: enable AI in /admin).")
         return
     bgm, bcn = await get_balances(uid)
-    if bgm + bcn < _COST:
-        await message.answer("❌ <b>Insufficient balance.</b> AI recs cost 1 BCN/BGM.")
+    cost = await _ai_cost()
+    if bgm + bcn < cost:
+        await message.answer(f"❌ <b>Insufficient balance.</b> AI recs cost {cost:g} BCN/BGM.")
         return
     await message.answer(
         "✨ <b>AI Book Recommendations</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
         "Get 100 hand-picked titles in any genre.\n\n"
-        f"💎 Cost: <b>1 BCN/BGM</b>\n💳 Balance: {bcn:.2f} BCN · {bgm:.2f} BGM",
+        f"💎 Cost: <b>{cost:g} BCN/BGM</b>\n💳 Balance: {bcn:.2f} BCN · {bgm:.2f} BGM",
         reply_markup=kb([btn("🚀 Proceed & Pay", "rec_proceed", style="success")],
                         [btn("🔙 Back", "menu_library", style="danger")]))
 
@@ -62,7 +67,7 @@ async def _intro(message: Message, uid: int) -> None:
 @router.callback_query(F.data == "rec_proceed")
 async def cb_proceed(call: CallbackQuery, state: FSMContext) -> None:
     uid = call.from_user.id
-    currency = await spend(uid, _COST)
+    currency = await spend(uid, await _ai_cost())
     if not currency:
         await call.answer("Insufficient balance.", show_alert=True)
         return
@@ -90,11 +95,11 @@ async def on_genre(message: Message, state: FSMContext) -> None:
     titles = await recommend_titles(genre)
 
     if not titles:
-        refund_amt = 0.75 if currency == "BCN" else 0.9
+        refund_amt = round(await _ai_cost() * (0.75 if currency == "BCN" else 0.9), 3)
         await refund(uid, refund_amt, "BGM")
         await notice.edit_text(
             f"❌ <b>{genre}</b> isn't a genre I could use.\n"
-            f"💸 Refunded <b>{refund_amt} BGM</b>. Try another genre via 🤖 AI Recommendations.")
+            f"💸 Refunded <b>{refund_amt:g} BGM</b>. Try another genre via 🤖 AI Recommendations.")
         return
 
     db = await MongoManager.get()
@@ -165,14 +170,15 @@ async def _summary_intro(message: Message, uid: int) -> None:
         await message.answer("📝 AI summaries are turned off right now (admin: enable AI in /admin).")
         return
     bgm, bcn = await get_balances(uid)
-    if bgm + bcn < _COST:
-        await message.answer("❌ <b>Insufficient balance.</b> A summary costs 1 BCN/BGM.")
+    cost = await _ai_cost()
+    if bgm + bcn < cost:
+        await message.answer(f"❌ <b>Insufficient balance.</b> A summary costs {cost:g} BCN/BGM.")
         return
     await message.answer(
         "📝 <b>AI Book Summary</b>\n━━━━━━━━━━━━━━━━━━\n"
         "Get a crisp, spoiler-light summary of any book — overview, themes, "
         "who it's for, and key takeaways.\n\n"
-        f"💎 Cost: <b>1 BCN/BGM</b> · Balance: {bcn:.2f} BCN · {bgm:.2f} BGM",
+        f"💎 Cost: <b>{cost:g} BCN/BGM</b> · Balance: {bcn:.2f} BCN · {bgm:.2f} BGM",
         reply_markup=kb([btn("🚀 Proceed & Pay", "sum_proceed", style="success")],
                         [btn("🔙 Back", "menu_library", style="danger")]))
 
@@ -180,7 +186,7 @@ async def _summary_intro(message: Message, uid: int) -> None:
 @router.callback_query(F.data == "sum_proceed")
 async def cb_sum_proceed(call: CallbackQuery, state: FSMContext) -> None:
     uid = call.from_user.id
-    currency = await spend(uid, _COST)
+    currency = await spend(uid, await _ai_cost())
     if not currency:
         await call.answer("Insufficient balance.", show_alert=True)
         return
@@ -205,10 +211,10 @@ async def on_summary_title(message: Message, state: FSMContext) -> None:
     notice = await message.answer(f"📝 Summarizing <b>{title}</b>…")
     summary = await summarize_book(title)
     if not summary:
-        refund_amt = 0.75 if currency == "BCN" else 0.9
+        refund_amt = round(await _ai_cost() * (0.75 if currency == "BCN" else 0.9), 3)
         await refund(uid, refund_amt, "BGM")
         await notice.edit_text(
-            f"❌ I couldn't find <b>{title}</b>. Refunded <b>{refund_amt} BGM</b>. "
+            f"❌ I couldn't find <b>{title}</b>. Refunded <b>{refund_amt:g} BGM</b>. "
             "Try the exact title + author.")
         return
     await notice.edit_text(
