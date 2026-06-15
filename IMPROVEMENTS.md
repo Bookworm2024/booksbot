@@ -34,7 +34,7 @@ it's here, it's not done yet.
 ## 4. Games & Brain
 - 🔜 Cover-Guess · Title Anagram/Word-Builder · Speed-Reading WPM · Memory match
 - 🔜 Literary Hangman · Crossword · daily challenge · weekly tournament
-- 🔜 Game streak bonuses · achievements/badges · global XP & levels
+- 🔜 Game streak bonuses · global XP & levels
 - ⬜ Trivia battles (1v1) · clan/guild competitions
 - ⬜ Boss-quiz events · seasonal themed events
 
@@ -64,7 +64,6 @@ it's here, it's not done yet.
 
 ## 8. Engagement & Retention
 - 🔜 Personalized weekly digest · "for you" feed
-- ⬜ Streak insurance · comeback bonuses · anniversary gifts
 
 ## 9. Personalization & Profiles
 - 🔜 Avatar/frame cosmetics (buy with BGM) · vanity handle

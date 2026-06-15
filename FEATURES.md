@@ -57,7 +57,8 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Games leaderboard (top earners across all games)
 - 🔜 Cover-Guess · Title Anagram/Word-Builder · Speed-Reading WPM · Memory match
 - 🔜 Literary Hangman · Crossword · daily challenge · weekly tournament
-- 🔜 Streak bonuses · achievements/badges · XP & levels
+- ✅ Achievements (🏅 board with progress + unlock notifications)
+- 🔜 Streak bonuses · global XP & levels
 - ⬜ Trivia battles (1v1) · clan/guild competitions
 - ⬜ Boss-quiz events · seasonal themed events
 
@@ -125,8 +126,8 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Daily BCN claim · ratings · support inbox
 - ✅ Comeback push reminders (hourly loop, nudges inactive users once/day)
 - ✅ Notification preferences (🔔 toggle, default ON)
+- ✅ Streak insurance (auto-saves a missed day) · comeback bonus · anniversary gift
 - 🔜 Personalized weekly digest · "for you" feed
-- ⬜ Streak insurance · comeback bonuses · anniversary gifts
 
 ## 9. Personalization & Profiles
 - ✅ Player profile — level + XP progress, earned badges, lifetime stats, share

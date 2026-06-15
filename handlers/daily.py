@@ -4,6 +4,7 @@ handlers/daily.py — daily login-streak reward (retention).
 Claim once/day; the reward grows with your consecutive-day streak (resets if you
 miss a day), capping at day 7. Atomic claim so it can't be double-collected.
 """
+import calendar
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -13,7 +14,6 @@ from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
 from utils.keyboards import btn, kb
-from utils.wallet import add_bgm
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -37,30 +37,102 @@ async def cb_daily(call: CallbackQuery) -> None:
     await _claim(call.message, call.from_user.id)
 
 
+def _gap_days(prev_daily: str) -> int:
+    """Whole days since the previous claim date (0 if unknown)."""
+    if not prev_daily:
+        return 0
+    try:
+        prev = datetime.strptime(prev_daily, "%Y-%m-%d").date()
+        return (datetime.now(timezone.utc).date() - prev).days
+    except (ValueError, TypeError):
+        return 0
+
+
 async def _claim(message: Message, uid: int) -> None:
     db = await MongoManager.get()
-    today, yesterday = _d(0), _d(-1)
+    today, yesterday, day_before = _d(0), _d(-1), _d(-2)
     # atomic: only the first claim today flips last_daily
     before = await db.find_one_and_update_global(
         "users", {"user_id": uid, "last_daily": {"$ne": today}},
         {"$set": {"last_daily": today}}, return_before=True)
     if before is None:
-        doc = await db.find_one_global("users", {"user_id": uid}, {"login_streak": 1}) or {}
+        doc = await db.find_one_global("users", {"user_id": uid},
+                                       {"login_streak": 1, "streak_freezes": 1}) or {}
+        frz = int(doc.get("streak_freezes") or 0)
         await message.answer(
             "🎁 <b>Already claimed today!</b>\n"
-            f"🔥 Current streak: <b>{int(doc.get('login_streak') or 0)} day(s)</b>\n"
+            f"🔥 Current streak: <b>{int(doc.get('login_streak') or 0)} day(s)</b>"
+            + (f" · 🛡 {frz} freeze(s)" if frz else "") + "\n"
             "Come back tomorrow to keep it going.",
             reply_markup=kb([btn("💼 Balance", "acc_balance", style="primary")]))
         return
+
     prev_streak = int(before.get("login_streak") or 0)
-    streak = prev_streak + 1 if before.get("last_daily") == yesterday else 1
+    freezes = int(before.get("streak_freezes") or 0)
+    prev_daily = before.get("last_daily")
+
+    # ── streak + insurance ──────────────────────────────────────────────────
+    insured = False
+    if prev_daily == yesterday:
+        streak = prev_streak + 1
+    elif prev_daily == day_before and prev_streak >= 2 and freezes > 0:
+        streak = prev_streak + 1     # missed exactly one day → a freeze saves it
+        freezes -= 1
+        insured = True
+    else:
+        streak = 1                   # missed 2+ days (or first ever) → reset
+    # earn a freeze each time the streak hits a multiple of 7 (cap 2)
+    earned_freeze = False
+    if streak % 7 == 0 and freezes < 2:
+        freezes += 1
+        earned_freeze = True
+
+    set_fields = {"login_streak": streak, "streak_freezes": freezes}
+    extras = []
+
+    # ── comeback bonus (returning after a long lapse) ─────────────────────────
+    comeback = 1.0 if _gap_days(prev_daily) >= 7 else 0.0
+    if comeback:
+        extras.append(f"👋 Welcome back! <b>+{comeback:g} BGM</b> comeback bonus")
+
+    # ── anniversary gift (yearly, on the join month-day) ──────────────────────
+    anniv = 0.0
+    joined = before.get("joined_at")
+    now = datetime.now(timezone.utc)
+    if hasattr(joined, "month"):
+        # Feb-29 joiners celebrate on Feb-28 in non-leap years (else they'd only
+        # get it every 4th year).
+        anniv_day = (28 if joined.month == 2 and joined.day == 29
+                     and not calendar.isleap(now.year) else joined.day)
+        if (joined.month == now.month and now.day == anniv_day
+                and now.year > joined.year and int(before.get("anniv_year") or 0) != now.year):
+            anniv = 2.0
+            set_fields["anniv_year"] = now.year
+            extras.append(f"🎂 Happy bot-anniversary! <b>+{anniv:g} BGM</b> gift")
+
     reward = _REWARDS[min(streak, 7) - 1]
-    await db.safe_update("users", {"user_id": uid}, {"$set": {"login_streak": streak}})
-    await add_bgm(uid, reward)
+    total = round(reward + comeback + anniv, 3)
+    # Credit + bookkeeping in ONE write so the reward and streak/freeze state
+    # commit together (the atomic last_daily gate above already prevents a
+    # double-claim).
+    await db.safe_update("users", {"user_id": uid},
+                         {"$set": set_fields, "$inc": {"bookgem": total}})
+
+    if insured:
+        extras.insert(0, "🛡 <b>Streak Insurance</b> saved your streak!")
+    if earned_freeze:
+        extras.append("🛡 Earned a <b>streak freeze</b> (saves a missed day later)")
+
     dots = "".join("🟢" if i < min(streak, 7) else "⚪" for i in range(7))
+    extra_block = ("\n" + "\n".join(extras) + "\n") if extras else ""
     await message.answer(
         "🎁 <b>Daily Reward Claimed!</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"🔥 <b>Day {streak}</b> streak\n{dots}\n\n"
-        f"💎 <b>+{reward:g} BGM</b>\n<i>Keep the streak — day 7 pays the most!</i>",
+        f"🔥 <b>Day {streak}</b> streak\n{dots}\n"
+        f"{extra_block}\n"
+        f"💎 <b>+{total:g} BGM</b>\n<i>Keep the streak — day 7 pays the most!</i>",
         reply_markup=kb([btn("💼 Balance", "acc_balance", style="primary"),
                          btn("🎡 Daily Spin", "daily_spin", style="success")]))
+
+    # surface any freshly-earned achievements (e.g. streak milestones)
+    from utils.achievements import check_unlocks
+    await check_unlocks(message.bot, uid)

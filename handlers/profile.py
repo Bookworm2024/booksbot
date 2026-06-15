@@ -70,6 +70,7 @@ async def _view(uid: int, name: str):
              f"games. Join me!")
     share_url = f"https://t.me/share/url?url=https://t.me/{BOT_USERNAME}&text={quote(share)}"
     return text, kb([url_btn("📤 Share Profile", share_url, style="success")],
+                    [btn("🏅 Achievements", "acc_achievements", style="primary")],
                     [btn("🔙 Back", "menu_account", style="danger")])
 
 
@@ -84,3 +85,12 @@ async def cb_profile(call: CallbackQuery) -> None:
     await call.answer()
     text, markup = await _view(call.from_user.id, call.from_user.first_name or "Reader")
     await call.message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)
+
+
+@router.callback_query(F.data == "acc_achievements")
+async def cb_achievements(call: CallbackQuery) -> None:
+    await call.answer()
+    from utils.achievements import board
+    text = await board(call.from_user.id)
+    await call.message.edit_text(
+        text, reply_markup=kb([btn("🔙 Back", "acc_profile", style="primary")]))
