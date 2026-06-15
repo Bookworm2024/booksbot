@@ -23,7 +23,6 @@ it's here, it's not done yet.
 ## 2. Book Discovery & Content
 - 🔜 Author spotlight · series detector & next-in-series
 - 🔜 Genre browse hub · curated collections / shelves · reading challenges
-- ⬜ Goodreads-style ratings/reviews per title
 - ⬜ Personal reading goals & yearly wrap-up
 - ⬜ Wishlist/TBR list with reminders
 

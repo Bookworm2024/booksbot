@@ -90,6 +90,7 @@ async def _render(call: CallbackQuery, page: int) -> None:
             style="success", fallback_cb=f"fav_get:{fuid}")
         rows.append([open_btn,
                      btn("📥 Chat", f"fav_get:{fuid}", style="primary"),
+                     btn("⭐ Rate", f"rate:{fuid}", style="primary"),
                      btn("🗑", f"fav_del:{fuid}", style="danger")])
     nav = []
     if page > 0:
