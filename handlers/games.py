@@ -56,6 +56,7 @@ async def cb_games(call: CallbackQuery) -> None:
              btn("🔀 Anagram", "menu_anagram", style="success")],
             [btn("🎯 Daily Missions", "menu_missions", style="primary"),
              btn("🏆 Leaderboard", "game_leaderboard", style="primary")],
+            [btn("🏆 Weekly Tournament", "game_tournament", style="success")],
             [btn("🔙 Back", "menu_home", style="danger")],
         ))
 
@@ -78,4 +79,38 @@ async def cb_leaderboard(call: CallbackQuery) -> None:
             for i, t in enumerate(top))
     await call.message.edit_text(
         "<b>🏆 Games Leaderboard</b>\n━━━━━━━━━━━━━━━━━━\n" + body,
-        reply_markup=kb([btn("🔙 Back", "menu_games", style="danger")]))
+        reply_markup=kb([btn("🏆 Weekly Tournament", "game_tournament", style="primary")],
+                        [btn("🔙 Back", "menu_games", style="danger")]))
+
+
+@router.callback_query(F.data == "game_tournament")
+async def cb_tournament(call: CallbackQuery) -> None:
+    from datetime import datetime, timezone
+    from database.connection import MongoManager
+    await call.answer()
+    db = await MongoManager.get()
+    wk = datetime.now(timezone.utc).strftime("%G-W%V")
+    top = await db.find_global("users", {"tour_week": wk, "tour_games": {"$gt": 0}},
+                               sort=[("tour_games", -1)], limit=10,
+                               proj={"first_name": 1, "tour_games": 1})
+    me = await db.find_one_global("users", {"user_id": call.from_user.id},
+                                  {"tour_week": 1, "tour_games": 1}) or {}
+    my = int(me.get("tour_games") or 0) if me.get("tour_week") == wk else 0
+    if not top:
+        body = "No games played this week yet — be the first! 🎮"
+    else:
+        medals = ["🥇", "🥈", "🥉"] + ["🏅"] * 7
+        body = "\n".join(
+            f"{medals[i]} {(t.get('first_name') or 'Player')[:18]} — "
+            f"<b>{int(t.get('tour_games') or 0)}</b> games"
+            for i, t in enumerate(top))
+    mine = ""
+    if my:
+        rank = await db.count_global("users",
+                                     {"tour_week": wk, "tour_games": {"$gt": my}}) + 1
+        mine = f"\n\n👤 You: <b>{my}</b> games this week · rank <b>#{rank}</b>"
+    await call.message.edit_text(
+        f"🏆 <b>Weekly Tournament</b> · {wk}\n<i>Most games played this week wins!</i>\n"
+        "━━━━━━━━━━━━━━━━━━\n" + body + mine,
+        reply_markup=kb([btn("🔄 Refresh", "game_tournament", style="primary")],
+                        [btn("🔙 Games", "menu_games", style="danger")]))

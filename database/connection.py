@@ -119,6 +119,7 @@ class MongoManager:
                 await db.users.create_index([("downloads", DESCENDING)])
                 await db.users.create_index([("ref_count", DESCENDING)])
                 await db.users.create_index([("login_streak", DESCENDING)])
+                await db.users.create_index([("tour_week", ASCENDING), ("tour_games", DESCENDING)])
                 # Question bank: fast pool lookup per game/level + dedupe by hash.
                 await db.questions.create_index([("game", ASCENDING), ("level", ASCENDING)])
                 await db.questions.create_index([("qhash", ASCENDING)], unique=True, sparse=True)

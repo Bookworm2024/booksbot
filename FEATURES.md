@@ -59,7 +59,8 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Word Anagram / Word-Builder (chat-based, 3 tries, free hint, BGM reward, 5/day)
 - 🔜 Cover-Guess · Speed-Reading WPM · Memory match
 - ✅ Daily game-streak bonus (play any game daily → escalating BGM; the "daily challenge")
-- 🔜 Crossword · weekly tournament
+- ✅ Weekly tournament (🏆 ranks most games played this ISO week + your rank)
+- 🔜 Crossword
 - ✅ Achievements (🏅 board with progress + unlock notifications)
 - 🔜 Global XP &amp; levels
 - ⬜ Trivia battles (1v1) · clan/guild competitions

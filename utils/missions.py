@@ -43,6 +43,14 @@ async def mark(uid: int, key: str) -> None:
             # daily game-play streak bonus (the "daily challenge"), once/day
             from utils.game_streak import on_game_played
             await on_game_played(uid)
+            # weekly tournament: games played this ISO week (resets each week)
+            wk = datetime.now(timezone.utc).strftime("%G-W%V")
+            tdoc = await db.find_one_global("users", {"user_id": uid}, {"tour_week": 1})
+            if not tdoc or tdoc.get("tour_week") != wk:
+                await db.safe_update("users", {"user_id": uid},
+                                     {"$set": {"tour_week": wk, "tour_games": 1}})
+            else:
+                await db.safe_update("users", {"user_id": uid}, {"$inc": {"tour_games": 1}})
     except Exception:  # noqa: BLE001 — missions must never break the host action
         pass
 
