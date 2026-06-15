@@ -31,7 +31,12 @@ async def _sum(field: str) -> float:
 
 async def _build() -> str:
     db = await MongoManager.get()
+    # Total real users the bot knows about — every row in `users`, whether they
+    # joined through this bot or were imported from the legacy bot. This is the
+    # same audience the broadcast/reminder workers target.
     users = await db.count_global("users")
+    imported = await db.count_global("users", {"imported": True})
+    organic = users - imported
     files = await db.count_global("files")
     pend = await db.count_global("requests", {"status": "pending"})
     done = await db.count_global("requests", {"status": "fulfilled"})
@@ -39,10 +44,15 @@ async def _build() -> str:
     downloads = await _sum("downloads")
     bgm = await _sum("bookgem")
     bcn = await _sum("bookcoin")
+    # Only show the organic/imported split once a legacy import has happened.
+    users_block = f"👥 <b>Users:</b> <code>{users:,}</code>\n"
+    if imported:
+        users_block += (f"   └ 🌱 Organic: <code>{organic:,}</code> · "
+                        f"📦 Imported: <code>{imported:,}</code>\n")
     return (
         "<b>📊 Bot Analytics</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        f"👥 <b>Users:</b> <code>{users:,}</code>\n"
+        + users_block +
         f"📚 <b>Archive files:</b> <code>{files:,}</code>\n"
         f"📥 <b>Downloads:</b> <code>{int(downloads):,}</code>\n\n"
         "<b>📨 Requests</b>\n"
