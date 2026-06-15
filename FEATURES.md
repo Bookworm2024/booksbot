@@ -150,15 +150,17 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Safe captcha · atomic token/payment paths · ban system
 - ✅ Per-user flood rate limiting (in-memory sliding window, admin-tunable via
   ⚙️ Settings → Safety, admins exempt, non-spammy warnings)
+- ✅ Content reporting (/report → admin 🚩 Reports queue with resolve)
 - 🔜 Anti-multiaccount · device fingerprint (privacy-safe)
 - 🔜 Fraud/chargeback flags · refund controls · velocity checks
-- ⬜ Content reporting · DMCA workflow · age-gating
+- ⬜ DMCA workflow · age-gating
 
 ## 13. Platform & Reliability
 - ✅ Mongo multi-cluster failover · health endpoint · Dockerized
 - 🔜 Redis cache layer · rate-limit store · job queue
 - 🔜 Structured logging & metrics · Sentry-style error capture
-- 🔜 Backups · data export (GDPR) · per-user data delete
+- ✅ Per-user data export (JSON) + erase — GDPR (🧹 GDPR Tools, super admin)
+- 🔜 Automated backups
 - ⬜ Horizontal scaling · webhook mode · CDN for media
 
 ## 14. Localization & Accessibility

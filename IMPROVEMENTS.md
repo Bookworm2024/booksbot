@@ -85,12 +85,12 @@ it's here, it's not done yet.
 ## 12. Trust, Safety & Anti-Abuse
 - 🔜 Anti-multiaccount · device fingerprint (privacy-safe)
 - 🔜 Fraud/chargeback flags · refund controls · velocity checks
-- ⬜ Content reporting · DMCA workflow · age-gating
+- ⬜ DMCA workflow · age-gating
 
 ## 13. Platform & Reliability
 - 🔜 Redis cache layer · rate-limit store · job queue
 - 🔜 Structured logging & metrics · Sentry-style error capture
-- 🔜 Backups · data export (GDPR) · per-user data delete
+- 🔜 Automated backups
 - ⬜ Horizontal scaling · webhook mode · CDN for media
 
 ## 14. Localization & Accessibility

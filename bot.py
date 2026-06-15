@@ -31,8 +31,8 @@ from handlers import (
     admin, admin_extra, admin_tools, ai_admin, broadcast, captcha, daily, discover,
     economy, favorites, featured_admin, games, gift, indexer, inline, invite,
     payments, qadmin, leaderboards, missions, notifs, profile, rate, recommend,
-    referral, request, requests_manual, revenue, settings_admin, spin, start,
-    stats, support, tagger, track, vip,
+    referral, report, request, requests_manual, revenue, settings_admin, spin,
+    start, stats, support, tagger, track, vip,
 )
 from handlers.payments import heleket_webhook
 from handlers.admin_api import api_admin_overview, api_admin_ai, api_admin_ai_test
@@ -101,6 +101,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(leaderboards.router)
     dp.include_router(referral.router)
     dp.include_router(support.router)
+    dp.include_router(report.router)
     dp.include_router(notifs.router)
     dp.include_router(rate.router)
     dp.include_router(stats.router)
