@@ -20,7 +20,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import FILE_CHANNEL_ID, LOG_CHANNEL_ID
 from database.connection import MongoManager
-from utils.files import get_file, icon_for, search
+from utils.files import fuzzy_search, get_file, icon_for, search
 from utils.keyboards import btn, kb
 from utils.wallet import get_balances, refund, spend
 
@@ -91,6 +91,7 @@ async def cb_page(call: CallbackQuery, state: FSMContext) -> None:
 
 
 _FILTERS = [("all", "All"), ("pdf", "📄 PDF"), ("epub", "📘 EPUB"), ("audio", "🎧 Audio")]
+_SORTS = [("relevance", "🎯 Best"), ("new", "🆕 New"), ("popular", "🔥 Popular")]
 
 
 @router.callback_query(F.data.startswith("sf:"))
@@ -101,16 +102,33 @@ async def cb_filter(call: CallbackQuery, state: FSMContext) -> None:
     await _render_results(call.message, state, data.get("sq", ""), 0, edit=True)
 
 
+@router.callback_query(F.data.startswith("so:"))
+async def cb_sort(call: CallbackQuery, state: FSMContext) -> None:
+    await call.answer()
+    data = await state.get_data()
+    await state.update_data(ss=call.data.split(":", 1)[1], sp=0)
+    await _render_results(call.message, state, data.get("sq", ""), 0, edit=True)
+
+
 async def _render_results(message: Message, state: FSMContext, query: str,
                           page: int, *, edit: bool) -> None:
     data = await state.get_data()
     sf = data.get("sf", "all")
+    ss = data.get("ss", "relevance")
     ftype = None if sf == "all" else sf
-    results, total = await search(query, skip=page * _PER_PAGE, limit=_PER_PAGE, ftype=ftype)
+    results, total = await search(query, skip=page * _PER_PAGE, limit=_PER_PAGE,
+                                  ftype=ftype, sort=ss)
+
+    # No exact hits → fall back to a typo-tolerant fuzzy search before giving up.
+    fuzzy = False
+    if total == 0:
+        results, total = await fuzzy_search(query, skip=page * _PER_PAGE,
+                                            limit=_PER_PAGE, ftype=ftype)
+        fuzzy = total > 0
 
     if total == 0 and sf == "all":
         await _add_watchlist(message.chat.id, query)
-        text = ("❌ <b>No matches found.</b>\n\n"
+        text = ("❌ <b>No matches found</b> (even fuzzy).\n\n"
                 f"✨ Added <code>{query}</code> to your <b>Watchlist</b> — I'll DM you "
                 "the moment it's uploaded.\n\nOr request it from an admin for priority:")
         markup = kb([btn("👤 Request from Admin", "req_manual", style="primary")],
@@ -122,6 +140,10 @@ async def _render_results(message: Message, state: FSMContext, query: str,
     # filter row (active filter highlighted)
     rows.append([btn(("● " if v == sf else "") + lbl, f"sf:{v}",
                      style="success" if v == sf else "primary") for v, lbl in _FILTERS])
+    # sort row (exact search only — fuzzy results are similarity-ranked)
+    if not fuzzy:
+        rows.append([btn(("● " if v == ss else "") + lbl, f"so:{v}",
+                         style="success" if v == ss else "primary") for v, lbl in _SORTS])
     for f in results:
         label = f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:40]}"
         rows.append([btn(label, f"dl:{f['file_unique_id']}", style="success")])
@@ -137,9 +159,10 @@ async def _render_results(message: Message, state: FSMContext, query: str,
                  btn("🔙 Menu", "menu_home", style="danger")])
 
     pages = max(1, (total + _PER_PAGE - 1) // _PER_PAGE)
-    note = "" if total else "\n\n<i>No matches with this filter.</i>"
-    text = (f"🔍 <b>Results for</b> <code>{query}</code>\n"
-            f"📊 {total} match(es) · page {page + 1}/{pages}{note}\n\n"
+    head = (f"🔎 <b>Closest matches for</b> <code>{query}</code>" if fuzzy
+            else f"🔍 <b>Results for</b> <code>{query}</code>")
+    hint = "\n<i>No exact hits — showing nearest titles.</i>" if fuzzy else ""
+    text = (f"{head}\n📊 {total} match(es) · page {page + 1}/{pages}{hint}\n\n"
             f"💸 Cost: <b>1 BCN/BGM</b> per download.")
     await (message.edit_text if edit else message.answer)(text, reply_markup=kb(*rows))
 

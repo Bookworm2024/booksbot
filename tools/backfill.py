@@ -30,6 +30,7 @@ from telethon.sessions import StringSession
 
 from config import API_HASH, API_ID, FILE_CHANNEL_ID, TELETHON_SESSION
 from database.connection import MongoManager
+from utils.files import index_file
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("backfill")
@@ -86,7 +87,8 @@ async def run() -> None:
     async for msg in client.iter_messages(FILE_CHANNEL_ID, reverse=True, min_id=resume_id):
         item = extract(msg)
         if item:
-            created = await db.safe_insert("files", item)
+            # index_file stamps indexed_at + the trigram index (for fuzzy search)
+            created = await index_file(item)
             if created:
                 indexed += 1
         if msg.id > resume_id:
