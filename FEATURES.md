@@ -131,8 +131,8 @@ Legend counts toward ~500 features across 14 pillars.
 
 ## 9. Personalization & Profiles
 - ✅ Player profile — level + XP progress, earned badges, lifetime stats, share
-- 🔜 Avatar/frame cosmetics (buy with BGM) · vanity handle
-- 🔜 Reading DNA (genre breakdown)
+- ✅ Profile flair shop (buy with BGM) + vanity handle (🎨 Customize)
+- ✅ Reading DNA — genre breakdown from your favorites
 - ⬜ Shareable profile cards · friends/following
 
 ## 10. Social & Community

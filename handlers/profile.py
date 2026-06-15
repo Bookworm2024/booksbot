@@ -5,6 +5,7 @@ Account → 👤 Profile → a gamified card: level + XP progress, earned badges
 and lifetime stats. Shareable to pull friends in.
 """
 import logging
+from html import escape
 from urllib.parse import quote
 
 from aiogram import F, Router
@@ -56,8 +57,10 @@ async def _view(uid: int, name: str):
     into = xp % 100
     bar = "🟩" * (into // 10) + "⬜" * (10 - into // 10)
     badges = _badges(d, favs, vip)
+    flair = d.get("equipped_flair") or ""
+    display = escape(d.get("vanity") or name)   # name is the raw Telegram first_name
     text = (
-        f"<b>👤 {name}'s Profile</b>\n"
+        f"<b>👤 {(flair + ' ') if flair else ''}{display}'s Profile</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
         f"🏆 <b>Level {level}</b> · {xp} XP\n{bar} <i>{into}/100 to next</i>\n\n"
         f"<b>Badges</b>\n{'  '.join(badges)}\n\n"
@@ -70,7 +73,8 @@ async def _view(uid: int, name: str):
              f"games. Join me!")
     share_url = f"https://t.me/share/url?url=https://t.me/{BOT_USERNAME}&text={quote(share)}"
     return text, kb([url_btn("📤 Share Profile", share_url, style="success")],
-                    [btn("🏅 Achievements", "acc_achievements", style="primary")],
+                    [btn("🏅 Achievements", "acc_achievements", style="primary"),
+                     btn("🎨 Customize", "acc_customize", style="primary")],
                     [btn("🔙 Back", "menu_account", style="danger")])
 
 

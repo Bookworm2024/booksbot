@@ -66,8 +66,6 @@ it's here, it's not done yet.
 - 🔜 Personalized weekly digest · "for you" feed
 
 ## 9. Personalization & Profiles
-- 🔜 Avatar/frame cosmetics (buy with BGM) · vanity handle
-- 🔜 Reading DNA (genre breakdown)
 - ⬜ Shareable profile cards · friends/following
 
 ## 10. Social & Community
@@ -97,6 +95,14 @@ it's here, it's not done yet.
 - ⬜ Dyslexia font · high-contrast · screen-reader friendly captions
 
 ---
+
+### Tech debt / hardening (surfaced by review workflows)
+- ⬜ Per-user balance writes (wallet.spend, cosmetics buy, vanity) assume one user
+  doc per cluster. On a true multi-cluster deploy, a cross-cluster duplicate +
+  concurrency could split-charge / double-grant. Fix: route balance writes to a
+  deterministic home cluster `hash(uid) % n`. (Not reachable on today's single-cluster deploy.)
+- ⬜ BGM is stored as a float → IEEE drift over many transactions. Move the economy
+  to integer minor units (the inflowads "wallet integer cents" invariant).
 
 ### Operational (not a feature, but pending)
 - Deploy the latest `main` to Koyeb (each batch needs a redeploy to go live).
