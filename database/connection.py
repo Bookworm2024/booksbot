@@ -112,6 +112,8 @@ class MongoManager:
                 await db.ratings.create_index([("user_id", ASCENDING), ("file_unique_id", ASCENDING)], unique=True)
                 await db.ratings.create_index([("file_unique_id", ASCENDING)])
                 await db.tbr.create_index([("user_id", ASCENDING), ("file_unique_id", ASCENDING)], unique=True)
+                await db.coupons.create_index([("code", ASCENDING)], unique=True)
+                await db.coupon_uses.create_index([("code", ASCENDING), ("user_id", ASCENDING)], unique=True)
                 await db.users.create_index([("game_bgm", DESCENDING)])
                 await db.users.create_index([("last_active", ASCENDING)])
                 await db.users.create_index([("downloads", DESCENDING)])

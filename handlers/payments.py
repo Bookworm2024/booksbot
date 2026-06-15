@@ -60,6 +60,16 @@ router = Router()
 class PayFSM(StatesGroup):
     awaiting_amount = State()   # UPI: how many BGM
     awaiting_utr = State()      # UPI: the transaction reference
+    awaiting_coupon = State()   # apply a promo coupon
+
+
+async def _pop_active_coupon(db, uid: int) -> str:
+    """Read & clear the user's applied coupon (one application per order)."""
+    u = await db.find_one_global("users", {"user_id": uid}, {"active_coupon": 1}) or {}
+    code = u.get("active_coupon") or ""
+    if code:
+        await db.safe_update("users", {"user_id": uid}, {"$set": {"active_coupon": ""}})
+    return code
 
 
 def _now():
@@ -112,8 +122,41 @@ async def _buy_view():
     return text, kb(
         [btn("💳 Pay via UPI (INR)", "pay_upi", style="success")],
         [btn("🌐 Pay via Crypto", "pay_crypto", style="primary")],
+        [btn("🎟️ Apply Coupon", "pay_coupon", style="primary")],
         [btn("🔙 Back", "menu_account", style="danger")],
     )
+
+
+@router.callback_query(F.data == "pay_coupon")
+async def cb_coupon(call: CallbackQuery, state: FSMContext) -> None:
+    await call.answer()
+    await state.set_state(PayFSM.awaiting_coupon)
+    await call.message.edit_text("🎟️ <b>Apply a Coupon</b>\n\nSend your coupon code "
+                                 "to add a bonus to your next purchase. /cancel to abort.")
+
+
+@router.message(PayFSM.awaiting_coupon, F.text)
+async def on_coupon(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if raw.lower() == "/cancel":
+        await state.clear(); await message.answer("❌ Cancelled."); return
+    await state.clear()
+    from utils.coupons import validate
+    ok, res = await validate(raw, message.chat.id)
+    if not ok:
+        msg = {"unknown": "That coupon isn't valid.", "expired": "That coupon has expired.",
+               "exhausted": "That coupon is fully claimed.", "used": "You've already used that coupon."}
+        await message.answer(f"❌ {msg.get(res, 'Coupon not accepted.')}")
+        return
+    db = await MongoManager.get()
+    await db.safe_update("users", {"user_id": message.chat.id},
+                         {"$set": {"active_coupon": raw.strip().upper()}})
+    kind = res.get("kind")
+    val = res.get("value")
+    desc = f"+{val:g}% bonus" if kind == "pct" else f"+{val:g} BGM bonus"
+    await message.answer(f"✅ <b>Coupon applied!</b> ({desc})\nIt'll be added to your next "
+                         "purchase. Open 💎 Buy BGM to pay.",
+                         reply_markup=kb([btn("💎 Buy BGM", "acc_buy", style="success")]))
 
 
 # ── UPI (email auto-verified, like inflowads) ───────────────────────────────────
@@ -155,6 +198,7 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     await db.safe_insert("payments", {
         "order_id": order_id, "user_id": uid, "username": message.from_user.username or "",
         "method": "upi", "bgm": bgm, "bonus": bonus, "total_due_inr": inr,
+        "coupon": await _pop_active_coupon(db, uid),
         "status": "waiting", "submitted_utr": None, "created_at": _now(),
     })
     await state.update_data(order_id=order_id, total=inr)
@@ -228,17 +272,20 @@ async def _confirm_payment(doc: dict, bot, *, email_txn_id: str = "",
                   "email_txn_id": email_txn_id, "email_amount_inr": email_amount_inr}})
     if not flipped:
         return  # already credited
+    from utils.coupons import redeem as _redeem_coupon
     base = float(flipped.get("bgm") or 0)
     bonus = float(flipped.get("bonus") or 0)
     fp = await _first_purchase_bonus(flipped["user_id"], base)
-    total = base + bonus + fp
+    cpn = await _redeem_coupon(flipped.get("coupon", ""), flipped["user_id"], base)
+    total = base + bonus + fp + cpn
     await add_bgm(flipped["user_id"], total)
     bonus_line = f" (incl. +{bonus:g} bonus)" if bonus else ""
     fp_line = f"\n🥳 First-purchase bonus: <b>+{fp:g} BGM</b>!" if fp else ""
+    cpn_line = f"\n🎟️ Coupon bonus: <b>+{cpn:g} BGM</b>!" if cpn else ""
     try:
         await bot.send_message(
             flipped["user_id"],
-            f"🎉 <b>Payment confirmed!</b>\n💎 <b>+{total:g} BGM</b>{bonus_line} added.{fp_line}\n"
+            f"🎉 <b>Payment confirmed!</b>\n💎 <b>+{total:g} BGM</b>{bonus_line} added.{fp_line}{cpn_line}\n"
             f"🧾 Ref: <code>{email_txn_id or flipped.get('submitted_utr','')}</code>")
     except Exception:  # noqa: BLE001
         pass
@@ -319,6 +366,7 @@ async def cb_hk_buy(call: CallbackQuery) -> None:
     await db.safe_insert("crypto_orders", {
         "order_id": order_id, "user_id": uid, "bgm": bgm, "bonus": bonus,
         "amount_usd": usd, "crypto": crypto, "network": network,
+        "coupon": await _pop_active_coupon(db, uid),
         "heleket_uuid": result.get("uuid"), "status": "waiting", "created_at": _now(),
     })
     pay_url = result.get("url")
@@ -361,16 +409,19 @@ async def heleket_webhook(request: web.Request) -> web.Response:
         {"$set": {"status": "paid", "paid_at": _now()}})
     if not order:
         return web.Response(text="ok")  # unknown / already credited (idempotent)
+    from utils.coupons import redeem as _redeem_coupon
     base = float(order.get("bgm") or 0)
     fp = await _first_purchase_bonus(order["user_id"], base)
-    total = base + float(order.get("bonus") or 0) + fp
+    cpn = await _redeem_coupon(order.get("coupon", ""), order["user_id"], base)
+    total = base + float(order.get("bonus") or 0) + fp + cpn
     await add_bgm(order["user_id"], total)
     fp_line = f"\n🥳 First-purchase bonus: +{fp:g} BGM!" if fp else ""
+    cpn_line = f"\n🎟️ Coupon bonus: +{cpn:g} BGM!" if cpn else ""
     bot = request.app["bot"]
     try:
         await bot.send_message(order["user_id"],
                                f"🎉 <b>Crypto payment confirmed!</b>\n"
-                               f"💎 +{total:g} BGM added to your wallet.{fp_line}")
+                               f"💎 +{total:g} BGM added to your wallet.{fp_line}{cpn_line}")
     except Exception:  # noqa: BLE001
         pass
     return web.Response(text="ok")

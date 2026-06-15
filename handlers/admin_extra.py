@@ -19,6 +19,7 @@ from pymongo import DESCENDING
 from config import ADMIN_IDS, SUPER_ADMIN_ID
 from database.connection import MongoManager
 from utils.audit import log_action, recent
+from utils.coupons import active_coupons, create_coupon
 from utils.flags import FLAGS, all_flags, is_on, set_flag
 from utils.keyboards import btn, kb
 from utils.users import set_ban
@@ -37,6 +38,9 @@ _USER_COLLECTIONS = [
 class ExtraFSM(StatesGroup):
     bulk_ban = State()
     gdpr_uid = State()
+    cpn_value = State()
+    cpn_uses = State()
+    cpn_days = State()
 
 
 def _is_admin(uid: int) -> bool:
@@ -56,7 +60,8 @@ async def cb_more(call: CallbackQuery) -> None:
              btn("🚩 Reports", "admin_reports", style="primary")],
             [btn("📜 Audit Log", "admin_audit", style="primary"),
              btn("🚩 Feature Flags", "admin_flags", style="primary")],
-            [btn("🧹 GDPR Tools", "admin_gdpr", style="danger")],
+            [btn("🎟️ Coupons", "admin_coupons", style="success"),
+             btn("🧹 GDPR Tools", "admin_gdpr", style="danger")],
             [btn("🔙 Back", "admin_open", style="primary")]))
 
 
@@ -277,3 +282,103 @@ async def cb_gdpr_delc(call: CallbackQuery) -> None:
     await call.message.edit_text(
         f"🗑 Erased <b>{removed}</b> document(s) for <code>{uid}</code>.",
         reply_markup=kb([btn("🔙 Back", "admin_more", style="primary")]))
+
+
+# ── promo coupons (super admin) ──────────────────────────────────────────────
+@router.callback_query(F.data == "admin_coupons")
+async def cb_coupons(call: CallbackQuery) -> None:
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("Super admin only", show_alert=True)
+        return
+    await call.answer()
+    coupons = await active_coupons(15)
+    lines = ["🎟️ <b>Promo Coupons</b>\n━━━━━━━━━━━━━━━━━━"]
+    if not coupons:
+        lines.append("<i>No active coupons.</i>")
+    for c in coupons:
+        val = f"{c.get('value'):g}%" if c.get("kind") == "pct" else f"{c.get('value'):g} BGM"
+        exp = c.get("expires_at")
+        exp_s = exp.strftime("%d %b") if hasattr(exp, "strftime") else "—"
+        lines.append(f"<code>{c.get('code')}</code> · {val} · "
+                     f"{int(c.get('uses') or 0)}/{int(c.get('max_uses') or 0)} used · exp {exp_s}")
+    await call.message.edit_text(
+        "\n".join(lines),
+        reply_markup=kb([btn("➕ New Coupon", "cpn_new", style="success")],
+                        [btn("🔙 Back", "admin_more", style="primary")]))
+
+
+@router.callback_query(F.data == "cpn_new")
+async def cb_cpn_new(call: CallbackQuery) -> None:
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("Super admin only", show_alert=True)
+        return
+    await call.answer()
+    await call.message.edit_text(
+        "🎟️ <b>New Coupon</b>\n\nWhat kind of bonus?",
+        reply_markup=kb([btn("％ Percent of purchase", "cpn_kind:pct", style="primary")],
+                        [btn("➕ Flat BGM", "cpn_kind:flat", style="primary")],
+                        [btn("🔙 Back", "admin_coupons", style="danger")]))
+
+
+@router.callback_query(F.data.startswith("cpn_kind:"))
+async def cb_cpn_kind(call: CallbackQuery, state: FSMContext) -> None:
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("Super admin only", show_alert=True)
+        return
+    kind = call.data.split(":", 1)[1]
+    await state.update_data(cpn_kind=kind)
+    await state.set_state(ExtraFSM.cpn_value)
+    await call.answer()
+    unit = "percent bonus (e.g. 20)" if kind == "pct" else "flat BGM bonus (e.g. 5)"
+    await call.message.answer(f"Enter the <b>{unit}</b>. /cancel to abort.")
+
+
+@router.message(ExtraFSM.cpn_value, F.text)
+async def on_cpn_value(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if raw.lower() == "/cancel":
+        await state.clear(); await message.answer("❌ Cancelled."); return
+    try:
+        val = float(raw)
+        if val <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("⚠️ Enter a positive number."); return
+    if (await state.get_data()).get("cpn_kind") == "pct" and val > 100:
+        await message.answer("⚠️ Percent bonus can't exceed 100%. Enter 1–100.")
+        return
+    await state.update_data(cpn_value=val)
+    await state.set_state(ExtraFSM.cpn_uses)
+    await message.answer("How many <b>total uses</b> (cap)? e.g. <code>100</code>")
+
+
+@router.message(ExtraFSM.cpn_uses, F.text)
+async def on_cpn_uses(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if raw.lower() == "/cancel":
+        await state.clear(); await message.answer("❌ Cancelled."); return
+    if not raw.isdigit() or int(raw) <= 0:
+        await message.answer("⚠️ Enter a whole number > 0."); return
+    await state.update_data(cpn_uses=int(raw))
+    await state.set_state(ExtraFSM.cpn_days)
+    await message.answer("Valid for how many <b>days</b>? e.g. <code>30</code>")
+
+
+@router.message(ExtraFSM.cpn_days, F.text)
+async def on_cpn_days(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if raw.lower() == "/cancel":
+        await state.clear(); await message.answer("❌ Cancelled."); return
+    if not raw.isdigit() or int(raw) <= 0:
+        await message.answer("⚠️ Enter a whole number of days > 0."); return
+    data = await state.get_data()
+    await state.clear()
+    code = await create_coupon(data["cpn_kind"], data["cpn_value"], data["cpn_uses"],
+                               int(raw), message.chat.id)
+    await log_action(message.chat.id, "coupon_create",
+                     f"{code} {data['cpn_kind']}={data['cpn_value']:g}")
+    val = f"{data['cpn_value']:g}%" if data["cpn_kind"] == "pct" else f"{data['cpn_value']:g} BGM"
+    await message.answer(
+        f"✅ <b>Coupon created</b>\n\n🎟️ <code>{code}</code>\n💸 Bonus: {val}\n"
+        f"🧮 Uses: {data['cpn_uses']} · ⏳ {raw} day(s)\n\nShare it — users apply it under 💎 Buy BGM.",
+        reply_markup=kb([btn("🎟️ Coupons", "admin_coupons", style="primary")]))
