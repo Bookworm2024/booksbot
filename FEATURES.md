@@ -99,8 +99,9 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Scheduled broadcasts (send in +1/+6/+24h, background worker fires them) +
   audience segments (👥 all / 👑 VIP / 🟢 active 7d / 😴 inactive / 📦 legacy)
   with live recipient counts
-- 🔜 Bulk ban · A/B broadcast · feature flags
-- 🔜 Role-based admin permissions (granular) · audit log
+- ✅ Bulk ban (paste many IDs at once) · 🚩 feature flags (live on/off per feature)
+  · 📜 audit log (admin action trail)
+- 🔜 A/B broadcast · role-based admin permissions (granular)
 - 🔜 Auto-moderation rules · spam/abuse detection
 - ⬜ Canned replies · macro buttons · staff shifts
 - ⬜ Impersonate-view (see the bot as a user) · sandbox test mode

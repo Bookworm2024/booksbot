@@ -20,6 +20,12 @@ router = Router()
 @router.callback_query(F.data == "menu_games")
 async def cb_games(call: CallbackQuery) -> None:
     await call.answer()
+    from utils.flags import is_on
+    if not await is_on("games"):
+        await call.message.edit_text(
+            "🎮 <b>Games are paused</b> right now — check back soon!",
+            reply_markup=kb([btn("🔙 Back", "menu_home", style="danger")]))
+        return
     if not BOT_PUBLIC_URL:
         await call.message.edit_text(
             "🎮 <b>Games</b>\n\n⚠️ Mini-App games need the bot's public URL set "

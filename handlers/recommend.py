@@ -46,7 +46,8 @@ async def cb_recommend(call: CallbackQuery) -> None:
 
 
 async def _intro(message: Message, uid: int) -> None:
-    if not await ai_enabled():
+    from utils.flags import is_on
+    if not await is_on("recommend") or not await ai_enabled():
         await message.answer("🤖 AI recommendations are turned off right now "
                              "(admin: enable AI in /admin).")
         return
@@ -166,7 +167,8 @@ async def cb_summary(call: CallbackQuery) -> None:
 
 
 async def _summary_intro(message: Message, uid: int) -> None:
-    if not await ai_enabled():
+    from utils.flags import is_on
+    if not await is_on("summaries") or not await ai_enabled():
         await message.answer("📝 AI summaries are turned off right now (admin: enable AI in /admin).")
         return
     bgm, bcn = await get_balances(uid)

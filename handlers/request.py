@@ -60,6 +60,12 @@ async def cb_request_center(call: CallbackQuery) -> None:
 @router.callback_query(F.data == "req_auto")
 async def cb_req_auto(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
+    from utils.flags import is_on
+    if not await is_on("search"):
+        await call.message.edit_text(
+            "🔎 <b>Search is paused</b> right now — check back soon!",
+            reply_markup=kb([btn("🔙 Back", "menu_request", style="danger")]))
+        return
     await state.set_state(RequestFSM.awaiting_query)
     await call.message.edit_text(
         "🔍 <b>Search the Archive</b>\n\n"

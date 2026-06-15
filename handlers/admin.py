@@ -20,6 +20,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS, SUPER_ADMIN_ID
 from utils.admins import add_admin, get_extra_admins, remove_admin
+from utils.audit import log_action
 from utils.keyboards import btn, kb, webapp_btn
 from utils.users import set_ban
 
@@ -59,7 +60,8 @@ def _panel_kb(is_super: bool):
                      btn("🎁 Bulk Grant", "admin_bulk", style="success")])
         rows.append([btn("🏷 Tag Genres", "admin_tag", style="primary"),
                      btn("🛡 Manage Admins", "admin_manage", style="primary")])
-        rows.append([btn("🤖 AI Settings", "admin_ai", style="primary")])
+        rows.append([btn("🤖 AI Settings", "admin_ai", style="primary"),
+                     btn("🧰 More Tools", "admin_more", style="primary")])
     return kb(*rows)
 
 
@@ -115,6 +117,7 @@ async def do_ban(message: Message, state: FSMContext) -> None:
         await message.answer("❌ Invalid numeric User ID.")
         return
     await set_ban(int(target), True)
+    await log_action(message.chat.id, "ban", target)
     await message.answer(f"✅ User <code>{target}</code> banned.")
     try:
         await message.bot.send_message(int(target), "🚫 <b>Access Revoked</b>\nYou have been banned.")
@@ -130,6 +133,7 @@ async def do_unban(message: Message, state: FSMContext) -> None:
         await message.answer("❌ Invalid numeric User ID.")
         return
     await set_ban(int(target), False)
+    await log_action(message.chat.id, "unban", target)
     await message.answer(f"✅ User <code>{target}</code> unbanned.")
     try:
         await message.bot.send_message(int(target), "✅ <b>Access Restored</b>")
@@ -193,6 +197,8 @@ async def do_add_admin(message: Message, state: FSMContext) -> None:
     if not target.isdigit():
         await message.answer("❌ Invalid numeric User ID."); return
     added = await add_admin(int(target))
+    if added:
+        await log_action(message.chat.id, "add_admin", target)
     await message.answer(
         f"✅ <code>{target}</code> is now an admin." if added
         else f"ℹ️ <code>{target}</code> was already an admin.",
@@ -214,6 +220,8 @@ async def do_remove_admin(message: Message, state: FSMContext) -> None:
     if not target.isdigit():
         await message.answer("❌ Invalid numeric User ID."); return
     ok = await remove_admin(int(target))
+    if ok:
+        await log_action(message.chat.id, "remove_admin", target)
     await message.answer(
         f"✅ <code>{target}</code> removed from admins." if ok else
         f"⚠️ <code>{target}</code> isn't a removable admin "

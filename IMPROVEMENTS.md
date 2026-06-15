@@ -50,8 +50,7 @@ it's here, it's not done yet.
 - ⬜ Tax / INR↔USD reporting · CSV/Sheet export
 
 ## 6. Admin Power Tools
-- 🔜 Bulk ban · A/B broadcast · feature flags
-- 🔜 Role-based admin permissions (granular) · audit log
+- 🔜 A/B broadcast · role-based admin permissions (granular)
 - 🔜 Auto-moderation rules · spam/abuse detection
 - ⬜ Canned replies · macro buttons · staff shifts
 - ⬜ Impersonate-view (see the bot as a user) · sandbox test mode
