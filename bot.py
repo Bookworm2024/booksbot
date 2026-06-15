@@ -29,7 +29,7 @@ from config import (
 from database.connection import MongoManager
 from handlers import (
     admin, admin_extra, admin_tools, ai_admin, broadcast, captcha, cosmetics, daily,
-    discover, economy, favorites, featured_admin, games, gift, goals, indexer,
+    discover, economy, favorites, featured_admin, feed, games, gift, goals, indexer,
     inline, invite, hangman, payments, qadmin, leaderboards, missions, notifs,
     profile, rate, ratings, recommend, referral, report, request, requests_manual,
     revenue, settings_admin, spin, start, stats, support, tbr, tagger, track, vip,
@@ -48,6 +48,7 @@ from middlewares.ratelimit import RateLimitMiddleware
 from utils.admins import load_extra_admins
 from utils.email_monitor import run_email_monitor
 from utils.games import ensure_seed
+from utils.digest import run_weekly_digest
 from utils.reminders import run_reminder_loop
 from utils.users import backfill_first_purchase_flag
 
@@ -95,6 +96,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(favorites.router)
     dp.include_router(tbr.router)
     dp.include_router(goals.router)
+    dp.include_router(feed.router)
     dp.include_router(discover.router)
     dp.include_router(games.router)
     dp.include_router(hangman.router)
@@ -184,6 +186,7 @@ async def main() -> None:
     monitor_task = asyncio.create_task(run_email_monitor(bot))
     reminder_task = asyncio.create_task(run_reminder_loop(bot))
     sched_bc_task = asyncio.create_task(run_scheduled_broadcasts(bot))
+    digest_task = asyncio.create_task(run_weekly_digest(bot))
 
     try:
         me = await bot.get_me()
@@ -194,6 +197,7 @@ async def main() -> None:
         monitor_task.cancel()
         reminder_task.cancel()
         sched_bc_task.cancel()
+        digest_task.cancel()
         await runner.cleanup()
         await bot.session.close()
 

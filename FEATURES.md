@@ -129,7 +129,7 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Comeback push reminders (hourly loop, nudges inactive users once/day)
 - ✅ Notification preferences (🔔 toggle, default ON)
 - ✅ Streak insurance (auto-saves a missed day) · comeback bonus · anniversary gift
-- 🔜 Personalized weekly digest · "for you" feed
+- ✅ Personalized weekly digest (background loop) + 🎯 "For You" feed
 
 ## 9. Personalization & Profiles
 - ✅ Player profile — level + XP progress, earned badges, lifetime stats, share

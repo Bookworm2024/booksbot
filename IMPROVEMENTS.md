@@ -61,7 +61,7 @@ it's here, it's not done yet.
 - ⬜ Channel cross-promo swaps · partner programs
 
 ## 8. Engagement & Retention
-- 🔜 Personalized weekly digest · "for you" feed
+- ✅ (all current items shipped — see FEATURES.md)
 
 ## 9. Personalization & Profiles
 - ⬜ Shareable profile cards · friends/following

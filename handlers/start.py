@@ -188,7 +188,8 @@ async def cb_library(call: CallbackQuery) -> None:
         "<b>📖 My Library</b>\n\nYour personal reading hub.",
         reply_markup=kb(
             [btn("🔭 Discover", "lib_discover", style="success"),
-             btn("🤖 AI Recommendations", "lib_recommend", style="success")],
+             btn("🎯 For You", "lib_foryou", style="success")],
+            [btn("🤖 AI Recommendations", "lib_recommend", style="success")],
             [btn("📝 Book Summary", "lib_summary", style="success"),
              btn("📖 Continue Reading", "lib_continue", style="primary")],
             [btn("⭐ Favorites", "lib_favorites", style="primary"),
