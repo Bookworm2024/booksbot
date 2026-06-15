@@ -8,7 +8,7 @@ import logging
 
 from aiohttp import web
 
-from utils.games import new_session, submit
+from utils.games import VALID_GAMES, new_session, submit
 from utils.webapp_auth import user_id_from
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ async def api_game_new(request: web.Request) -> web.Response:
     if not uid:
         return web.json_response({"error": "auth_failed"}, status=401)
     game = body.get("game")
-    if game not in ("quiz", "tf", "guess", "firstline", "author"):
+    if game not in VALID_GAMES:
         return web.json_response({"error": "bad_game"}, status=400)
     level = body.get("level", "beginner")
     if level not in ("beginner", "moderate", "advanced"):

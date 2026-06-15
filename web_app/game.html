@@ -2,156 +2,399 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>BooksBot Games</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>BooksBot Arcade</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: light dark; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    background: var(--tg-theme-bg-color, #0f1115);
-    color: var(--tg-theme-text-color, #e8e8e8);
-    padding: 16px; -webkit-tap-highlight-color: transparent;
+  :root{
+    color-scheme: dark;
+    --acc:#b14bff; --acc2:#ff4bd8; --glow:rgba(177,75,255,.55);
+    --bg0:#080611; --bg1:#0f0a1e; --ink:#f3eeff; --mut:#9b8fc0;
+    --card:#160f29; --card2:#1d1436; --line:rgba(255,255,255,.08);
+    --good:#43e08a; --bad:#ff5d73; --warn:#ffc24b; --info:#4bc9ff;
+    --r:18px;
   }
-  .hint { color: var(--tg-theme-hint-color, #8a8f98); font-size: .9rem; }
-  .bar { height: 6px; border-radius: 6px; background: rgba(127,127,127,.25); overflow: hidden; margin: 10px 0 18px; }
-  .bar > i { display: block; height: 100%; width: 0; background: var(--tg-theme-button-color, #3390ec); transition: width .3s; }
-  h1 { font-size: 1.25rem; margin: .2rem 0 1rem; }
-  .q { font-size: 1.1rem; font-weight: 600; margin: 14px 0 18px; line-height: 1.45; }
-  button.opt, button.big {
-    display: block; width: 100%; margin: 8px 0; padding: 14px 16px; border: 0;
-    border-radius: 14px; font-size: 1rem; font-weight: 600; cursor: pointer;
-    background: var(--tg-theme-secondary-bg-color, #1c2027);
-    color: var(--tg-theme-text-color, #e8e8e8); text-align: left;
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{
+    font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    color:var(--ink); overflow-x:hidden;
+    background:
+      radial-gradient(1200px 600px at 12% -8%, rgba(177,75,255,.20), transparent 60%),
+      radial-gradient(1000px 520px at 110% 8%, rgba(75,201,255,.16), transparent 55%),
+      linear-gradient(180deg,var(--bg1),var(--bg0));
+    background-attachment:fixed;
   }
-  button.big { text-align: center; }
-  .row { display: flex; gap: 10px; }
-  .row > button { flex: 1; }
-  .primary { background: var(--tg-theme-button-color, #3390ec); color: var(--tg-theme-button-text-color, #fff); }
-  .skip { background: transparent; color: var(--tg-theme-hint-color, #8a8f98); }
-  .center { text-align: center; }
-  .timer { float: right; font-variant-numeric: tabular-nums; font-weight: 700; }
-  .res { font-size: 1rem; margin: 6px 0; }
-  .big-num { font-size: 2rem; font-weight: 800; margin: 8px 0; }
-  .pos { color: #2ecc71; } .neg { color: #e74c3c; }
+  /* floating particles */
+  #fx{ position:fixed; inset:0; pointer-events:none; z-index:0; }
+  .wrap{ position:relative; z-index:1; max-width:560px; margin:0 auto; padding:14px 14px 40px; min-height:100%; }
+  .mono{ font-family:"Orbitron",sans-serif; }
+  .mut{ color:var(--mut); }
+  .center{ text-align:center; }
+
+  /* ── top HUD ── */
+  .hud{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .hud .pill{ flex:1; display:flex; flex-direction:column; gap:2px; background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,0)); border:1px solid var(--line); border-radius:14px; padding:8px 12px; }
+  .hud .lab{ font-size:.62rem; letter-spacing:.14em; text-transform:uppercase; color:var(--mut); }
+  .hud .val{ font-family:"Orbitron",sans-serif; font-weight:700; font-size:1.05rem; font-variant-numeric:tabular-nums; }
+  #timer.warn .val{ color:var(--warn); }
+  #timer.danger .val{ color:var(--bad); animation:pulse .9s infinite; }
+  @keyframes pulse{ 50%{ opacity:.45 } }
+
+  /* ── progress + palette ── */
+  .pbar{ height:8px; border-radius:8px; background:rgba(255,255,255,.07); overflow:hidden; margin:2px 0 14px; }
+  .pbar>i{ display:block; height:100%; width:0; border-radius:8px; background:linear-gradient(90deg,var(--acc),var(--acc2)); box-shadow:0 0 14px var(--glow); transition:width .35s cubic-bezier(.2,.8,.2,1); }
+  .palette{ display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px; }
+  .palette b{ width:30px; height:30px; border-radius:9px; display:grid; place-items:center; font-size:.78rem; font-weight:700; cursor:pointer;
+    background:var(--card); border:1px solid var(--line); color:var(--mut); transition:transform .12s, background .2s, color .2s, box-shadow .2s; }
+  .palette b:active{ transform:scale(.9); }
+  .palette b.done{ background:linear-gradient(160deg,var(--acc),var(--acc2)); color:#fff; border-color:transparent; box-shadow:0 0 12px var(--glow); }
+  .palette b.cur{ outline:2px solid var(--acc); outline-offset:2px; color:var(--ink); }
+
+  /* ── cards / question ── */
+  .card{ background:linear-gradient(165deg,var(--card2),var(--card)); border:1px solid var(--line); border-radius:var(--r); padding:18px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
+  .qnum{ font-size:.66rem; letter-spacing:.18em; text-transform:uppercase; color:var(--acc2); font-weight:700; }
+  .q{ font-size:1.22rem; line-height:1.45; font-weight:700; margin:8px 0 2px; }
+  .opts{ margin-top:16px; display:flex; flex-direction:column; gap:10px; }
+  .opt{ display:flex; align-items:center; gap:12px; width:100%; text-align:left; cursor:pointer;
+    background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:14px 14px; color:var(--ink);
+    font-size:1rem; font-weight:600; transition:transform .1s, border-color .2s, background .2s; }
+  .opt:active{ transform:scale(.985); }
+  .opt .key{ flex:none; width:30px; height:30px; border-radius:9px; display:grid; place-items:center; font-family:"Orbitron",sans-serif; font-weight:700; font-size:.85rem;
+    background:rgba(255,255,255,.06); border:1px solid var(--line); color:var(--mut); transition:.2s; }
+  .opt.sel{ border-color:var(--acc); background:linear-gradient(160deg,rgba(177,75,255,.18),rgba(255,75,216,.08)); box-shadow:0 0 0 1px var(--acc) inset, 0 8px 24px var(--glow); }
+  .opt.sel .key{ background:linear-gradient(160deg,var(--acc),var(--acc2)); color:#fff; border-color:transparent; }
+  .tfrow{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
+  .tf{ cursor:pointer; border:1.5px solid var(--line); border-radius:16px; padding:22px 10px; text-align:center; font-weight:800; font-size:1.1rem; background:var(--card); transition:transform .1s,border-color .2s,background .2s; }
+  .tf .ic{ font-size:1.7rem; display:block; margin-bottom:6px; }
+  .tf:active{ transform:scale(.97); }
+  .tf.t.sel{ border-color:var(--good); background:rgba(67,224,138,.16); box-shadow:0 8px 24px rgba(67,224,138,.25); }
+  .tf.f.sel{ border-color:var(--bad); background:rgba(255,93,115,.16); box-shadow:0 8px 24px rgba(255,93,115,.25); }
+
+  /* ── buttons ── */
+  .btn{ border:0; border-radius:14px; padding:15px 18px; font-size:1rem; font-weight:800; cursor:pointer; color:#fff;
+    background:linear-gradient(135deg,var(--acc),var(--acc2)); box-shadow:0 10px 26px var(--glow); transition:transform .1s, filter .2s; font-family:inherit; }
+  .btn:active{ transform:translateY(1px) scale(.99); filter:brightness(1.05); }
+  .btn.ghost{ background:rgba(255,255,255,.06); color:var(--ink); border:1px solid var(--line); box-shadow:none; }
+  .btn.block{ width:100%; }
+  .btn[disabled]{ opacity:.45; cursor:not-allowed; }
+  .navrow{ display:flex; gap:10px; margin-top:16px; }
+  .navrow .btn{ flex:1; }
+
+  /* ── chips (rules) ── */
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:16px 0 6px; }
+  .chip{ font-size:.78rem; font-weight:600; padding:7px 12px; border-radius:999px; background:rgba(255,255,255,.05); border:1px solid var(--line); color:var(--mut); }
+  .chip b{ color:var(--ink); }
+
+  /* ── intro / hero ── */
+  .hero{ text-align:center; padding:12px 6px 4px; }
+  .hero .emoji{ font-size:3.4rem; filter:drop-shadow(0 6px 18px var(--glow)); animation:bob 3.4s ease-in-out infinite; }
+  @keyframes bob{ 50%{ transform:translateY(-8px) } }
+  .hero h1{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:1.7rem; margin:10px 0 4px; letter-spacing:.02em;
+    background:linear-gradient(120deg,var(--acc),var(--acc2),var(--info)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .hero p{ color:var(--mut); margin:0 0 4px; font-size:.95rem; }
+  .levels{ display:flex; flex-direction:column; gap:10px; margin:18px 0 6px; }
+  .lvl{ display:flex; align-items:center; gap:12px; cursor:pointer; border:1.5px solid var(--line); border-radius:16px; padding:14px 16px; background:var(--card); transition:transform .1s,border-color .2s; }
+  .lvl:active{ transform:scale(.98); }
+  .lvl .dot{ width:14px; height:14px; border-radius:50%; flex:none; }
+  .lvl .t{ font-weight:800; font-size:1.05rem; }
+  .lvl .s{ font-size:.8rem; color:var(--mut); }
+
+  /* ── result ── */
+  .ring{ width:170px; height:170px; margin:6px auto 4px; position:relative; }
+  .ring svg{ transform:rotate(-90deg); }
+  .ring .pct{ position:absolute; inset:0; display:grid; place-items:center; flex-direction:column; }
+  .ring .pct .n{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:2.5rem; line-height:1; }
+  .ring .pct .l{ font-size:.66rem; letter-spacing:.18em; text-transform:uppercase; color:var(--mut); margin-top:4px; }
+  .tag{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:1.5rem; text-align:center; margin:6px 0 2px; }
+  .grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:18px 0; }
+  .stat{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 6px; text-align:center; }
+  .stat .n{ font-family:"Orbitron",sans-serif; font-weight:700; font-size:1.4rem; }
+  .stat .l{ font-size:.64rem; letter-spacing:.1em; text-transform:uppercase; color:var(--mut); margin-top:3px; }
+  .reward{ display:flex; gap:10px; margin:6px 0 2px; }
+  .reward .box{ flex:1; border-radius:16px; padding:14px; text-align:center; border:1px solid var(--line); }
+  .reward .box.gem{ background:linear-gradient(160deg,rgba(67,224,138,.18),rgba(67,224,138,.04)); border-color:rgba(67,224,138,.35); }
+  .reward .box.xp{ background:linear-gradient(160deg,rgba(75,201,255,.18),rgba(75,201,255,.04)); border-color:rgba(75,201,255,.35); }
+  .reward .box .n{ font-family:"Orbitron",sans-serif; font-weight:800; font-size:1.5rem; }
+  .reward .box .l{ font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--mut); margin-top:3px; }
+  .note{ text-align:center; font-size:.82rem; color:var(--mut); margin:12px 0 0; }
+  .review{ margin-top:8px; }
+  .review summary{ cursor:pointer; list-style:none; text-align:center; color:var(--acc2); font-weight:700; padding:12px; }
+  .review summary::-webkit-details-marker{ display:none; }
+  .rev{ border:1px solid var(--line); border-left:4px solid var(--mut); border-radius:12px; padding:11px 13px; margin:8px 0; background:var(--card); }
+  .rev.ok{ border-left-color:var(--good); }
+  .rev.no{ border-left-color:var(--bad); }
+  .rev.sk{ border-left-color:var(--warn); }
+  .rev .qq{ font-weight:600; font-size:.92rem; margin-bottom:6px; }
+  .rev .ln{ font-size:.82rem; color:var(--mut); }
+  .rev .ln b{ color:var(--ink); }
+  .fade{ animation:fadeUp .4s ease both; }
+  @keyframes fadeUp{ from{ opacity:0; transform:translateY(12px) } to{ opacity:1; transform:none } }
+  .spin{ width:34px; height:34px; border-radius:50%; border:3px solid rgba(255,255,255,.15); border-top-color:var(--acc); animation:sp .8s linear infinite; margin:40px auto; }
+  @keyframes sp{ to{ transform:rotate(360deg) } }
+  #confetti{ position:fixed; inset:0; pointer-events:none; z-index:50; }
 </style>
 </head>
 <body>
-<div id="app"></div>
+<canvas id="fx"></canvas>
+<div class="wrap"><div id="app"></div></div>
+<canvas id="confetti"></canvas>
 
 <script>
 const tg = window.Telegram?.WebApp;
-tg?.ready(); tg?.expand();
+try{ tg?.ready(); tg?.expand(); tg?.setHeaderColor?.("#0f0a1e"); tg?.setBackgroundColor?.("#080611"); }catch(e){}
 const params = new URLSearchParams(location.search);
 const VALID = ["quiz","tf","guess","firstline","author"];
 const GAME = VALID.includes(params.get("game")) ? params.get("game") : "quiz";
 const app = document.getElementById("app");
 
-let session = null, idx = 0, answers = [], timerInt = null, deadline = 0;
+const THEME = {
+  quiz:      { acc:"#b14bff", acc2:"#ff4bd8", icon:"🧠", title:"BRAIN QUIZ",   sub:"Test your literary IQ" },
+  tf:        { acc:"#4bc9ff", acc2:"#43e08a", icon:"⚡", title:"TRUE / FALSE", sub:"Trust your gut — fast" },
+  guess:     { acc:"#ffa24b", acc2:"#ff4bd8", icon:"📚", title:"GUESS THE BOOK", sub:"Name it from the blurb" },
+  firstline: { acc:"#43e08a", acc2:"#4bc9ff", icon:"✍️", title:"FIRST LINE",   sub:"Name it from line one" },
+  author:    { acc:"#ff5db4", acc2:"#b14bff", icon:"🖋️", title:"AUTHOR MATCH", sub:"Who wrote it?" },
+};
+const T = THEME[GAME];
+function hex2rgba(h,a){ const n=parseInt(h.slice(1),16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+document.documentElement.style.setProperty("--acc", T.acc);
+document.documentElement.style.setProperty("--acc2", T.acc2);
+document.documentElement.style.setProperty("--glow", hex2rgba(T.acc,.5));
 
-function h(html) { app.innerHTML = html; }
-function esc(s){ return (s||"").replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+const LEVELS = {
+  beginner: { dot:"#43e08a", t:"Beginner", s:"Warm up · +0.0625 / correct" },
+  moderate: { dot:"#ffc24b", t:"Moderate", s:"Step it up · +0.094 / correct" },
+  advanced: { dot:"#ff5d73", t:"Advanced", s:"For pros · +0.125 / correct" },
+};
 
-function screenStart() {
-  if (GAME !== "quiz") return start("beginner");   // only quiz has difficulty levels
-  h(`<h1>🧠 Quiz</h1><p class="hint">Pick a difficulty. 8 questions · 2 plays/day.</p>
-     <button class="big primary" data-l="beginner">🟢 Beginner</button>
-     <button class="big" data-l="moderate">🟡 Moderate</button>
-     <button class="big" data-l="advanced">🔴 Advanced</button>`);
-  app.querySelectorAll("button[data-l]").forEach(b =>
-    b.onclick = () => start(b.dataset.l));
+let S=null, idx=0, answers=[], timerInt=null, deadline=0, submitting=false;
+
+function H(html){ app.innerHTML = html; }
+function esc(s){ return (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function hap(t){ try{ tg?.HapticFeedback?.impactOccurred?.(t); }catch(e){} }
+function hapN(t){ try{ tg?.HapticFeedback?.notificationOccurred?.(t); }catch(e){} }
+async function api(path, body){
+  const r = await fetch(path,{ method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ init_data: tg?.initData || "", ...body }) });
+  return r.json();
 }
 
-async function start(level) {
-  h(`<p class="center hint">Loading…</p>`);
-  let r;
-  try {
-    r = await (await fetch("/api/game/new", {
-      method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ init_data: tg?.initData || "", game: GAME, level })
-    })).json();
-  } catch (e) { return h(`<p class="center neg">Network error. Try again.</p>`); }
-  if (r.error) return h(`<h1>🚫</h1><p class="center">${esc(r.error)}</p>
-     <button class="big primary" onclick="tg?.close()">Close</button>`);
-  session = r; idx = 0; answers = [];
-  deadline = Date.now() + (r.time_limit || 900) * 1000;
-  startTimer();
-  renderQ();
-}
+/* ── floating particles backdrop ── */
+(function fxLoop(){
+  const c=document.getElementById("fx"), x=c.getContext("2d"); let W,Hh,ps=[];
+  function rs(){ W=c.width=innerWidth; Hh=c.height=innerHeight;
+    ps=Array.from({length:Math.min(46,Math.floor(W/12))},()=>({x:Math.random()*W,y:Math.random()*Hh,
+      r:Math.random()*1.8+.4, s:Math.random()*.35+.06, o:Math.random()*.5+.15})); }
+  rs(); addEventListener("resize",rs);
+  (function f(){ x.clearRect(0,0,W,Hh);
+    for(const p of ps){ p.y-=p.s; if(p.y<-4){p.y=Hh+4;p.x=Math.random()*W;}
+      x.beginPath(); x.fillStyle=hex2rgba(T.acc,p.o); x.arc(p.x,p.y,p.r,0,7); x.fill(); }
+    requestAnimationFrame(f); })();
+})();
 
-function startTimer() {
-  clearInterval(timerInt);
-  timerInt = setInterval(() => {
-    const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
-    const el = document.getElementById("timer");
-    if (el) { const m = Math.floor(left/60), s = left%60; el.textContent = `⏱ ${m}:${String(s).padStart(2,'0')}`; }
-    if (left <= 0) { clearInterval(timerInt); finish(); }
-  }, 500);
-}
-
-function renderQ() {
-  const q = session.questions[idx];
-  const total = session.questions.length;
-  const pct = Math.round((idx / total) * 100);
-  const isMCQ = !!q.options;          // MCQ when the question carries options
-  let opts = "";
-  if (isMCQ) {
-    for (const k of ["A","B","C","D"]) {
-      if (q.options[k] == null) continue;
-      opts += `<button class="opt" data-a="${k}"><b>${k}.</b> ${esc(q.options[k])}</button>`;
-    }
+/* ── intro ── */
+function screenIntro(err){
+  const errBox = err ? `<div class="card center fade" style="border-color:${hex2rgba('#ff5d73',.5)};margin-bottom:14px">
+      <div style="font-size:1.6rem">🚫</div><div style="font-weight:700;margin-top:6px">${esc(err)}</div></div>` : "";
+  const rules = GAME==="quiz"
+    ? `<span class="chip"><b>8</b> questions</span><span class="chip"><b>2</b> plays/day</span><span class="chip"><b>15:00</b> total</span><span class="chip">skip = <b>free</b></span>`
+    : GAME==="tf"
+    ? `<span class="chip"><b>20</b> questions</span><span class="chip"><b>2</b> plays/day</span><span class="chip"><b>15:00</b> total</span><span class="chip">skip = <b>free</b></span>`
+    : `<span class="chip"><b>6</b> questions</span><span class="chip"><b>3</b> plays/day</span><span class="chip"><b>15:00</b> total</span><span class="chip">skip = <b>free</b></span>`;
+  let body;
+  if(GAME==="quiz"){
+    body = `<div class="levels fade">${Object.entries(LEVELS).map(([k,v])=>
+      `<div class="lvl" data-l="${k}"><span class="dot" style="background:${v.dot}"></span>
+        <div style="flex:1"><div class="t">${v.t}</div><div class="s">${v.s}</div></div>
+        <span style="font-size:1.3rem">▶</span></div>`).join("")}</div>`;
   } else {
-    opts = `<div class="row">
-       <button class="big primary" data-a="true">✅ TRUE</button>
-       <button class="big" data-a="false">❌ FALSE</button></div>`;
+    body = `<button class="btn block fade" id="go" style="margin-top:20px">▶  START</button>`;
   }
-  h(`<div><span class="hint">Q ${idx+1}/${total}</span><span class="timer" id="timer">⏱</span></div>
-     <div class="bar"><i style="width:${pct}%"></i></div>
-     <div class="q">${esc(q.q)}</div>
-     ${opts}
-     <button class="big skip" data-skip="1">⏭ Skip (−${session.skip_cost})</button>`);
-  app.querySelectorAll("button[data-a]").forEach(b =>
-    b.onclick = () => answer(isMCQ ? b.dataset.a : (b.dataset.a === "true")));
-  app.querySelector("button[data-skip]").onclick = () => answer(null);
+  H(`${errBox}<div class="hero fade">
+       <div class="emoji">${T.icon}</div>
+       <h1>${T.title}</h1>
+       <p>${T.sub}</p>
+       <div class="chips">${rules}</div>
+     </div>
+     <div class="card fade" style="margin-top:14px">
+       <div style="font-weight:700;margin-bottom:6px">How it works</div>
+       <div class="mut" style="font-size:.9rem;line-height:1.6">
+         • One <b style="color:var(--ink)">15-minute</b> clock for the whole round.<br>
+         • Tap any number to <b style="color:var(--ink)">jump around</b> — answer in any order.<br>
+         • Leave a question blank and come back — <b style="color:var(--ink)">no penalty</b>.<br>
+         • Hit <b style="color:var(--ink)">Finish</b> when you're ready (or let the clock do it).
+       </div>
+     </div>
+     ${body}`);
+  if(GAME==="quiz") app.querySelectorAll(".lvl").forEach(b=> b.onclick=()=>{ hap("medium"); start(b.dataset.l); });
+  else document.getElementById("go").onclick=()=>{ hap("medium"); start("beginner"); };
 }
 
-function answer(val) {
-  answers[idx] = val;
-  tg?.HapticFeedback?.impactOccurred?.("light");
-  idx++;
-  if (idx >= session.questions.length) finish();
-  else renderQ();
+async function start(level){
+  H(`<div class="spin"></div><p class="center mut">Loading round…</p>`);
+  let r; try{ r = await api("/api/game/new",{ game:GAME, level }); }
+  catch(e){ return screenIntro("Network error. Please try again."); }
+  if(r.error) return screenIntro(r.error);
+  S=r; idx=0; answers=new Array(r.count).fill(null);
+  deadline = Date.now() + (r.time_limit||900)*1000;
+  startTimer(); renderPlay();
 }
 
-async function finish() {
+function startTimer(){
   clearInterval(timerInt);
-  h(`<p class="center hint">Scoring…</p>`);
-  let r;
-  try {
-    r = await (await fetch("/api/game/submit", {
-      method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ init_data: tg?.initData || "", session_id: session.session_id, answers })
-    })).json();
-  } catch (e) { return h(`<p class="center neg">Network error submitting.</p>`); }
-  if (r.error) return h(`<p class="center neg">${esc(r.error)}</p>
-     <button class="big primary" onclick="tg?.close()">Close</button>`);
-  const cls = r.total >= 0 ? "pos" : "neg";
-  const sign = r.total >= 0 ? "+" : "";
-  let extra = "";
-  if (r.speed_bonus) extra += `<div class="res pos">🚀 Speed bonus +${r.speed_bonus} BGM</div>`;
-  if (r.timeout_penalty) extra += `<div class="res neg">⏱ Timeout −${r.timeout_penalty} BGM</div>`;
-  h(`<h1 class="center">🏁 Results</h1>
-     <div class="center big-num ${cls}">${sign}${(r.total||0).toFixed(3)} BGM</div>
-     <div class="res">✅ Correct: <b>${r.correct}</b></div>
-     <div class="res">❌ Wrong: <b>${r.wrong}</b></div>
-     <div class="res">⏭ Skipped: <b>${r.skipped}</b></div>
-     ${extra}
-     <button class="big primary" onclick="tg?.close()" style="margin-top:18px">Done</button>`);
-  tg?.HapticFeedback?.notificationOccurred?.(r.total >= 0 ? "success" : "warning");
+  timerInt=setInterval(()=>{
+    const left=Math.max(0,Math.round((deadline-Date.now())/1000));
+    const el=document.getElementById("tval"), wrap=document.getElementById("timer");
+    if(el){ const m=Math.floor(left/60), s=left%60; el.textContent=`${m}:${String(s).padStart(2,"0")}`; }
+    if(wrap){ wrap.className="pill"+(left<=30?" danger":left<=60?" warn":""); wrap.id="timer"; }
+    if(left<=0){ clearInterval(timerInt); finish(true); }
+  },300);
 }
 
-screenStart();
+function answeredCount(){ return answers.filter(a=>a!==null&&a!=="").length; }
+
+function renderPlay(animate=true){
+  const q=S.questions[idx], total=S.count;
+  const pct=Math.round((answeredCount()/total)*100);
+  const palette=S.questions.map((_,i)=>{
+    const done=answers[i]!==null&&answers[i]!=="";
+    return `<b class="${done?"done":""}${i===idx?" cur":""}" data-j="${i}">${i+1}</b>`;
+  }).join("");
+  let opts="";
+  if(S.mcq){
+    opts=`<div class="opts">`+["A","B","C","D"].filter(k=>q.options&&q.options[k]!=null).map(k=>
+      `<button class="opt ${answers[idx]===k?"sel":""}" data-a="${k}"><span class="key">${k}</span><span>${esc(q.options[k])}</span></button>`).join("")+`</div>`;
+  } else {
+    opts=`<div class="tfrow">
+      <div class="tf t ${answers[idx]===true?"sel":""}" data-a="true"><span class="ic">✅</span>TRUE</div>
+      <div class="tf f ${answers[idx]===false?"sel":""}" data-a="false"><span class="ic">❌</span>FALSE</div></div>`;
+  }
+  H(`<div class="hud">
+       <div class="pill"><span class="lab">Question</span><span class="val">${idx+1}<span class="mut" style="font-size:.8rem">/${total}</span></span></div>
+       <div class="pill"><span class="lab">Answered</span><span class="val">${answeredCount()}<span class="mut" style="font-size:.8rem">/${total}</span></span></div>
+       <div class="pill" id="timer"><span class="lab">Time left</span><span class="val" id="tval">15:00</span></div>
+     </div>
+     <div class="pbar"><i style="width:${pct}%"></i></div>
+     <div class="palette">${palette}</div>
+     <div class="card${animate?" fade":""}">
+       <div class="qnum">${T.icon} ${T.title} · Q${idx+1}</div>
+       <div class="q">${esc(q.q)}</div>
+       ${opts}
+     </div>
+     <div class="navrow">
+       <button class="btn ghost" id="prev" ${idx===0?"disabled":""}>‹ Prev</button>
+       ${idx<total-1 ? `<button class="btn" id="next">Next ›</button>` : `<button class="btn" id="fin">🏁 Finish</button>`}
+     </div>
+     ${idx<total-1 ? `<button class="btn ghost block" id="fin2" style="margin-top:10px">🏁 Finish round</button>`:""}`);
+  app.querySelectorAll("[data-a]").forEach(b=> b.onclick=()=>pick(b.dataset.a));
+  app.querySelectorAll("[data-j]").forEach(b=> b.onclick=()=>{ idx=+b.dataset.j; hap("light"); renderPlay(); });
+  const prev=document.getElementById("prev"); if(prev) prev.onclick=()=>{ if(idx>0){idx--;hap("light");renderPlay();} };
+  const next=document.getElementById("next"); if(next) next.onclick=()=>{ if(idx<total-1){idx++;hap("light");renderPlay();} };
+  const fin=document.getElementById("fin"); if(fin) fin.onclick=confirmFinish;
+  const fin2=document.getElementById("fin2"); if(fin2) fin2.onclick=confirmFinish;
+}
+
+function pick(raw){
+  const val = raw==="true"?true : raw==="false"?false : raw;
+  answers[idx] = (answers[idx]===val) ? null : val;   // tap again to unselect
+  hap("light");
+  renderPlay(false);   // update selection/palette in place — no re-fade flicker
+}
+
+function confirmFinish(){
+  const blank = S.count - answeredCount();
+  if(blank>0 && tg?.showConfirm){
+    tg.showConfirm(`You left ${blank} question${blank>1?"s":""} blank (no penalty). Finish now?`,(ok)=>{ if(ok) finish(false); });
+  } else { finish(false); }
+}
+
+async function finish(auto){
+  if(submitting) return; submitting=true;
+  clearInterval(timerInt);
+  H(`<div class="spin"></div><p class="center mut">${auto?"Time! ":""}Scoring your round…</p>`);
+  let r; try{ r = await api("/api/game/submit",{ session_id:S.session_id, answers }); }
+  catch(e){ submitting=false; return H(`<div class="card center">⚠️ Network error submitting.<br><br><button class="btn" onclick="location.reload()">Retry</button></div>`); }
+  if(r.error){ submitting=false; return H(`<div class="card center">${esc(r.error)}<br><br><button class="btn" onclick="tg?.close()">Close</button></div>`); }
+  renderResult(r);
+}
+
+const GRADE_COLOR={ legendary:"#ffd24b", great:"#43e08a", good:"#4bc9ff", meh:"#ffa24b", low:"#ff5d73" };
+const GRADE_EMOJI={ legendary:"🏆", great:"🌟", good:"👍", meh:"😅", low:"📚" };
+
+function renderResult(r){
+  const total=r.total_q||1, acc=Math.round((r.accuracy||0)*100);
+  const col=GRADE_COLOR[r.grade]||"#4bc9ff", emo=GRADE_EMOJI[r.grade]||"🎮";
+  const circ=2*Math.PI*70, off=circ*(1-(r.accuracy||0));
+  // build review
+  const rev=(r.review||[]).map((v,i)=>{
+    const cls=v.unanswered?"sk":v.ok?"ok":"no";
+    let your, corr;
+    if(v.options){ your = v.unanswered?"—":`${v.your}. ${esc(v.options[v.your]||"")}`; corr=`${v.correct}. ${esc(v.options[v.correct]||"")}`; }
+    else { your = v.unanswered?"—":(v.your?"True":"False"); corr=(v.correct?"True":"False"); }
+    return `<div class="rev ${cls}"><div class="qq">${i+1}. ${esc(v.q)}</div>
+      <div class="ln">Your answer: <b>${your}</b></div>
+      ${v.ok?"":`<div class="ln">Correct: <b style="color:var(--good)">${corr}</b></div>`}</div>`;
+  }).join("");
+  const netNote = (r.total<0)
+    ? `<div class="note">Net change this round: ${r.total.toFixed(3)} BGM — keep going, you'll bounce back! 💪</div>`
+    : (r.earned>0 ? `` : `<div class="note">No earnings this round — give it another shot!</div>`);
+  H(`<div class="hero fade" style="padding-bottom:0">
+       <div class="emoji" style="animation:none">${emo}</div>
+       <div class="tag" style="color:${col}">${esc(r.tag||"Round complete")}</div>
+     </div>
+     <div class="ring fade">
+       <svg width="170" height="170">
+         <circle cx="85" cy="85" r="70" stroke="rgba(255,255,255,.08)" stroke-width="13" fill="none"></circle>
+         <circle cx="85" cy="85" r="70" stroke="${col}" stroke-width="13" fill="none" stroke-linecap="round"
+           stroke-dasharray="${circ}" stroke-dashoffset="${circ}" style="transition:stroke-dashoffset 1.1s cubic-bezier(.2,.8,.2,1)" id="arc"></circle>
+       </svg>
+       <div class="pct"><div><div class="n" style="color:${col}">${acc}%</div><div class="l">Accuracy</div></div></div>
+     </div>
+     <div class="grid3 fade">
+       <div class="stat"><div class="n" style="color:var(--good)">${r.correct}</div><div class="l">Correct</div></div>
+       <div class="stat"><div class="n" style="color:var(--bad)">${r.wrong}</div><div class="l">Wrong</div></div>
+       <div class="stat"><div class="n" style="color:var(--warn)">${r.skipped}</div><div class="l">Skipped</div></div>
+     </div>
+     <div class="reward fade">
+       <div class="box gem"><div class="n" style="color:var(--good)">+${(r.earned||0).toFixed(3)}</div><div class="l">BGM Earned</div></div>
+       <div class="box xp"><div class="n" style="color:var(--info)">+${r.xp||0}</div><div class="l">XP Gained</div></div>
+     </div>
+     ${r.speed_bonus?`<div class="note" style="color:var(--warn);font-weight:700">🚀 Speed Bonus +${r.speed_bonus} BGM!</div>`:""}
+     ${netNote}
+     <details class="review fade"><summary>📋 Review answers</summary>${rev}</details>
+     <div class="navrow" style="margin-top:18px">
+       <button class="btn ghost" id="again">↻ Play again</button>
+       <button class="btn" id="done">Done</button>
+     </div>`);
+  setTimeout(()=>{ const a=document.getElementById("arc"); if(a) a.style.strokeDashoffset=off; },60);
+  hapN(r.grade==="low"||r.grade==="meh" ? "warning":"success");
+  if(r.grade==="great"||r.grade==="legendary") burst(col);
+  document.getElementById("done").onclick=()=>tg?.close();
+  document.getElementById("again").onclick=()=>{ submitting=false; screenIntro(); };
+}
+
+/* ── confetti burst ── */
+function burst(color){
+  const c=document.getElementById("confetti"); if(!c) return;
+  const x=c.getContext("2d");
+  c.width=innerWidth; c.height=innerHeight;
+  const cols=[color,"#ffffff",T.acc,T.acc2,"#43e08a","#4bc9ff"];
+  const P=Array.from({length:140},()=>({x:innerWidth/2+(Math.random()-.5)*120, y:innerHeight*.34,
+    vx:(Math.random()-.5)*9, vy:Math.random()*-13-4, g:.32+Math.random()*.2,
+    s:Math.random()*7+4, r:Math.random()*6, vr:(Math.random()-.5)*.4, c:cols[Math.random()*cols.length|0], a:1}));
+  let t=0;
+  (function f(){ x.clearRect(0,0,c.width,c.height); t++;
+    for(const p of P){ p.vy+=p.g; p.x+=p.vx; p.y+=p.vy; p.r+=p.vr; if(t>70)p.a-=.025;
+      x.save(); x.globalAlpha=Math.max(0,p.a); x.translate(p.x,p.y); x.rotate(p.r);
+      x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6); x.restore(); }
+    if(t<140) requestAnimationFrame(f); else x.clearRect(0,0,c.width,c.height);
+  })();
+}
+
+screenIntro();
 </script>
 </body>
 </html>

@@ -2,81 +2,205 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <title>Bookle</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: light dark; }
-  * { box-sizing: border-box; }
-  body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center;
-    gap:14px; padding:16px; font-family: system-ui, sans-serif;
-    background: var(--tg-theme-bg-color,#0f1115); color: var(--tg-theme-text-color,#e8e8e8); }
-  h1 { font-size:1.2rem; margin:.2rem 0; } .hint{ color:var(--tg-theme-hint-color,#8a8f98); font-size:.85rem; }
-  #grid { display:grid; grid-template-rows:repeat(6,1fr); gap:6px; }
-  .row { display:grid; grid-template-columns:repeat(5,48px); gap:6px; }
-  .cell { width:48px; height:48px; display:grid; place-items:center; font-weight:800; font-size:1.3rem;
-    border:2px solid #3a3f47; border-radius:8px; text-transform:uppercase; }
-  .c { background:#2e7d32; border-color:#2e7d32; color:#fff; }
-  .p { background:#b59f3b; border-color:#b59f3b; color:#fff; }
-  .a { background:#3a3f47; border-color:#3a3f47; color:#fff; }
-  #kb { display:flex; flex-direction:column; gap:6px; width:100%; max-width:380px; }
-  #kb .krow { display:flex; gap:5px; justify-content:center; }
-  #kb button { flex:1; min-width:26px; height:48px; border:0; border-radius:7px; font-weight:700; font-size:.95rem;
-    background: var(--tg-theme-secondary-bg-color,#262b33); color: var(--tg-theme-text-color,#e8e8e8); cursor:pointer; }
-  #kb button.wide { flex:1.5; font-size:.8rem; }
-  #kb button.c{background:#2e7d32;color:#fff} #kb button.p{background:#b59f3b;color:#fff} #kb button.a{background:#23272e;color:#777}
-  #msg { min-height:1.2em; font-weight:700; text-align:center; }
+  :root{
+    color-scheme: dark;
+    --acc:#43e08a; --acc2:#4bc9ff; --glow:rgba(67,224,138,.5);
+    --bg0:#060f0b; --bg1:#0a1a14; --ink:#eafff4; --mut:#8fc0aa;
+    --card:#0f201a; --card2:#152c23; --line:rgba(255,255,255,.08);
+    --c:#43e08a; --p:#ffc24b; --a:#39414b; --bad:#ff5d73; --info:#4bc9ff;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; min-height:100%; }
+  body{
+    font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--ink);
+    display:flex; flex-direction:column; align-items:center; gap:12px; padding:14px 12px 28px; overflow-x:hidden;
+    background:
+      radial-gradient(900px 480px at 50% -10%, rgba(67,224,138,.18), transparent 60%),
+      radial-gradient(700px 380px at 110% 6%, rgba(75,201,255,.14), transparent 55%),
+      linear-gradient(180deg,var(--bg1),var(--bg0));
+    background-attachment:fixed;
+  }
+  .head{ text-align:center; }
+  .head h1{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:1.6rem; margin:4px 0 2px; letter-spacing:.04em;
+    background:linear-gradient(120deg,var(--acc),var(--acc2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .head .sub{ color:var(--mut); font-size:.84rem; }
+  #grid{ display:grid; grid-template-rows:repeat(6,1fr); gap:8px; margin-top:4px; }
+  .row{ display:grid; grid-template-columns:repeat(5,56px); gap:8px; }
+  .cell{ width:56px; height:56px; display:grid; place-items:center; font-family:"Orbitron",sans-serif; font-weight:700;
+    font-size:1.5rem; border:2px solid var(--line); border-radius:12px; text-transform:uppercase; background:var(--card);
+    transition:transform .15s, border-color .15s, background .25s; }
+  .cell.fill{ border-color:var(--acc); animation:pop .15s ease; }
+  @keyframes pop{ 50%{ transform:scale(1.08) } }
+  .cell.rev{ animation:flip .5s ease both; }
+  @keyframes flip{ 0%{transform:rotateX(0)} 50%{transform:rotateX(90deg)} 100%{transform:rotateX(0)} }
+  .cell.c{ background:linear-gradient(160deg,#43e08a,#2bbf72); border-color:transparent; color:#06231a; box-shadow:0 6px 18px var(--glow); }
+  .cell.p{ background:linear-gradient(160deg,#ffc24b,#e0a52b); border-color:transparent; color:#2a1c00; }
+  .cell.a{ background:var(--a); border-color:transparent; color:#9aa3ad; }
+  #msg{ min-height:1.3em; font-weight:700; text-align:center; font-size:.95rem; }
+  #kb{ display:flex; flex-direction:column; gap:7px; width:100%; max-width:420px; margin-top:2px; }
+  .krow{ display:flex; gap:5px; justify-content:center; }
+  .key{ flex:1; min-width:0; height:50px; border:0; border-radius:9px; font-weight:800; font-size:1rem; font-family:inherit;
+    background:var(--card2); color:var(--ink); cursor:pointer; transition:transform .08s, background .25s; }
+  .key:active{ transform:translateY(1px) scale(.96); }
+  .key.wide{ flex:1.6; font-size:.78rem; letter-spacing:.04em; }
+  .key.c{ background:linear-gradient(160deg,#43e08a,#2bbf72); color:#06231a; }
+  .key.p{ background:linear-gradient(160deg,#ffc24b,#e0a52b); color:#2a1c00; }
+  .key.a{ background:#10211a; color:#5d6b62; }
+  /* result card */
+  .result{ width:100%; max-width:420px; background:linear-gradient(165deg,var(--card2),var(--card)); border:1px solid var(--line);
+    border-radius:18px; padding:18px; text-align:center; box-shadow:0 16px 40px rgba(0,0,0,.45); animation:up .4s ease both; display:none; }
+  @keyframes up{ from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
+  .result .emoji{ font-size:3rem; }
+  .result .tag{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:1.4rem; margin:6px 0 2px; }
+  .result .word b{ color:var(--acc); letter-spacing:.1em; }
+  .result .reward{ display:inline-block; margin-top:10px; background:linear-gradient(160deg,rgba(67,224,138,.18),rgba(67,224,138,.04));
+    border:1px solid rgba(67,224,138,.35); border-radius:14px; padding:10px 18px; }
+  .result .reward .n{ font-family:"Orbitron",sans-serif; font-weight:800; font-size:1.5rem; color:var(--acc); }
+  .result .reward .l{ font-size:.64rem; letter-spacing:.12em; text-transform:uppercase; color:var(--mut); }
+  .btn{ border:0; border-radius:13px; padding:13px 18px; font-size:.98rem; font-weight:800; cursor:pointer; color:#06231a; font-family:inherit;
+    background:linear-gradient(135deg,var(--acc),var(--acc2)); box-shadow:0 10px 26px var(--glow); margin-top:14px; }
+  .btn.ghost{ background:rgba(255,255,255,.06); color:var(--ink); box-shadow:none; border:1px solid var(--line); }
+  .btn:active{ transform:translateY(1px) scale(.99); }
+  .btnrow{ display:flex; gap:10px; justify-content:center; }
+  #confetti{ position:fixed; inset:0; pointer-events:none; z-index:50; }
 </style>
 </head>
 <body>
-<h1>🟩 Bookle</h1>
-<div class="hint">Guess the daily book-word in 6 tries · 1 game/day</div>
+<div class="head">
+  <h1>🟩 BOOKLE</h1>
+  <div class="sub">Crack the daily book word in 6 tries · 1 game/day</div>
+</div>
 <div id="grid"></div>
 <div id="msg"></div>
 <div id="kb"></div>
+<div class="result" id="result"></div>
+<canvas id="confetti"></canvas>
 
 <script>
-const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
+const tg = window.Telegram?.WebApp;
+try{ tg?.ready(); tg?.expand(); tg?.setHeaderColor?.("#0a1a14"); tg?.setBackgroundColor?.("#060f0b"); }catch(e){}
 const INIT = tg?.initData || "";
-const grid = document.getElementById("grid"), kbEl = document.getElementById("kb"), msg = document.getElementById("msg");
-let LEN=5, MAX=6, guesses=[], status="active", cur="";
-const kbState = {};
+const grid=document.getElementById("grid"), kbEl=document.getElementById("kb"),
+      msg=document.getElementById("msg"), resultEl=document.getElementById("result");
+let LEN=5, MAX=6, guesses=[], status="active", cur="", reward=0, word="";
+const kbState={};
+function hap(t){ try{ tg?.HapticFeedback?.impactOccurred?.(t); }catch(e){} }
+function hapN(t){ try{ tg?.HapticFeedback?.notificationOccurred?.(t); }catch(e){} }
 
 function buildGrid(){ grid.innerHTML="";
   for(let r=0;r<MAX;r++){ const row=document.createElement("div"); row.className="row";
     for(let c=0;c<LEN;c++){ const cell=document.createElement("div"); cell.className="cell"; cell.id=`r${r}c${c}`; row.appendChild(cell); }
     grid.appendChild(row); } }
-function paint(){
-  for(let r=0;r<MAX;r++) for(let c=0;c<LEN;c++){ const el=document.getElementById(`r${r}c${c}`); el.textContent=""; el.className="cell"; }
-  guesses.forEach((gx,r)=>{ for(let c=0;c<LEN;c++){ const el=document.getElementById(`r${r}c${c}`);
-    el.textContent=gx.g[c]; el.classList.add(gx.fb[c]); const k=gx.g[c];
-    const rank={a:0,p:1,c:2}; if(!(k in kbState)||rank[gx.fb[c]]>rank[kbState[k]]) kbState[k]=gx.fb[c]; } });
-  if(status==="active" && guesses.length<MAX){ for(let c=0;c<cur.length;c++){ const el=document.getElementById(`r${guesses.length}c${c}`); el.textContent=cur[c]; } }
+
+function paint(revealRow=-1){
+  for(let r=0;r<MAX;r++) for(let c=0;c<LEN;c++){ const el=document.getElementById(`r${r}c${c}`); if(!el)continue; el.textContent=""; el.className="cell"; }
+  guesses.forEach((gx,r)=>{ for(let c=0;c<LEN;c++){ const el=document.getElementById(`r${r}c${c}`); if(!el)continue;
+    el.textContent=gx.g[c];
+    const cls=gx.fb[c];
+    if(r===revealRow){ setTimeout(()=>{ el.classList.add("rev"); setTimeout(()=>el.classList.add(cls), 250); }, c*110); }
+    else el.classList.add(cls);
+    const k=gx.g[c], rank={a:0,p:1,c:2}; if(!(k in kbState)||rank[cls]>rank[kbState[k]]) kbState[k]=cls; } });
+  if(status==="active" && guesses.length<MAX){ for(let c=0;c<cur.length;c++){ const el=document.getElementById(`r${guesses.length}c${c}`); if(el){ el.textContent=cur[c]; el.classList.add("fill"); } } }
   renderKb();
 }
+
 const ROWS=["QWERTYUIOP","ASDFGHJKL","ZXCVBNM"];
 function renderKb(){ kbEl.innerHTML="";
   ROWS.forEach((rw,ri)=>{ const row=document.createElement("div"); row.className="krow";
-    if(ri===2){ const e=document.createElement("button"); e.className="wide"; e.textContent="ENTER"; e.onclick=submitGuess; row.appendChild(e); }
-    rw.split("").forEach(ch=>{ const b=document.createElement("button"); b.textContent=ch;
+    if(ri===2){ const e=document.createElement("button"); e.className="key wide"; e.textContent="ENTER"; e.onclick=submitGuess; row.appendChild(e); }
+    rw.split("").forEach(ch=>{ const b=document.createElement("button"); b.className="key"; b.textContent=ch;
       if(kbState[ch]) b.classList.add(kbState[ch]); b.onclick=()=>type(ch); row.appendChild(b); });
-    if(ri===2){ const d=document.createElement("button"); d.className="wide"; d.textContent="⌫"; d.onclick=()=>{cur=cur.slice(0,-1);paint();}; row.appendChild(d); }
+    if(ri===2){ const d=document.createElement("button"); d.className="key wide"; d.textContent="⌫"; d.onclick=()=>{ cur=cur.slice(0,-1); hap("light"); paint(); }; row.appendChild(d); }
     kbEl.appendChild(row); }); }
-function type(ch){ if(status!=="active") return; if(cur.length<LEN){ cur+=ch; paint(); } }
 
-async function load(){ try{ const r=await (await fetch("/api/bookle/new",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({init_data:INIT})})).json(); apply(r); }catch(e){ msg.textContent="Network error."; } }
-async function submitGuess(){ if(status!=="active") return; if(cur.length!==LEN){ msg.textContent="Need 5 letters"; return; }
-  msg.textContent="";
-  let r; try{ r=await (await fetch("/api/bookle/guess",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({init_data:INIT,guess:cur})})).json(); }catch(e){ msg.textContent="Network error."; return; }
-  if(r.error){ msg.textContent=r.error; return; } cur=""; apply(r); }
-function apply(r){ if(r.error){ msg.textContent=r.error; return; }
-  LEN=r.length||5; MAX=r.max||6; guesses=r.guesses||[]; status=r.status||"active"; buildGrid(); paint();
-  if(status==="won"){ msg.innerHTML=`🎉 <b>Solved!</b> +${(r.reward||0)} BGM`; tg?.HapticFeedback?.notificationOccurred?.("success"); }
-  else if(status==="lost"){ msg.innerHTML=`❌ Out of tries — it was <b>${r.word}</b>`; tg?.HapticFeedback?.notificationOccurred?.("warning"); }
-  else if(guesses.length===0){ msg.textContent="Type your first guess 👇"; }
+function type(ch){ if(status!=="active") return; if(cur.length<LEN){ cur+=ch; hap("light"); paint(); } }
+
+async function api(path, body){
+  const r = await fetch(path,{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ init_data:INIT, ...body }) });
+  return r.json();
 }
+async function load(){ try{ apply(await api("/api/bookle/new",{}), false); }catch(e){ msg.textContent="Network error."; } }
+async function submitGuess(){
+  if(status!=="active") return;
+  if(cur.length!==LEN){ msg.textContent="Need 5 letters"; hapN("error"); return; }
+  msg.textContent="";
+  let r; try{ r=await api("/api/bookle/guess",{ guess:cur }); }catch(e){ msg.textContent="Network error."; return; }
+  if(r.error){ msg.textContent=r.error; hapN("error"); return; }
+  cur=""; apply(r, true);
+}
+
+function apply(r, animateLast){
+  if(r.error){ msg.textContent=r.error; return; }
+  const prevLen=guesses.length;
+  LEN=r.length||5; MAX=r.max||6; guesses=r.guesses||[]; status=r.status||"active";
+  reward=r.reward||0; word=r.word||"";
+  buildGrid();
+  const revealRow = (animateLast && guesses.length>prevLen) ? guesses.length-1 : -1;
+  paint(revealRow);
+  if(status==="active"){
+    if(guesses.length===0) msg.textContent="Type your first guess 👇";
+    else msg.textContent=`${MAX-guesses.length} ${MAX-guesses.length===1?"try":"tries"} left`;
+  } else {
+    setTimeout(showResult, revealRow>=0 ? 700 : 0);
+  }
+}
+
+const GRADES_WIN=[ [2,"🏆","Legendary!","#ffd24b"], [4,"🌟","Great solve!","#43e08a"], [6,"😅","Phew — got it!","#4bc9ff"] ];
+function showResult(){
+  const won = status==="won";
+  let emoji="📚", tag="So close!", col="#ff5d73";
+  if(won){ const n=guesses.length; for(const [thr,e,t,c] of GRADES_WIN){ if(n<=thr){ emoji=e; tag=t; col=c; break; } } }
+  const share = guesses.map(g=> g.fb.split("").map(f=> f==="c"?"🟩":f==="p"?"🟨":"⬛").join("")).join("\n");
+  resultEl.style.display="block";
+  resultEl.innerHTML = `
+    <div class="emoji">${emoji}</div>
+    <div class="tag" style="color:${col}">${tag}</div>
+    ${won ? `<div class="sub" style="color:var(--mut)">Solved in <b style="color:var(--ink)">${guesses.length}/${MAX}</b></div>`
+          : `<div class="word">The word was <b>${word}</b></div>`}
+    ${won ? `<div class="reward"><div class="n">+${reward} BGM</div><div class="l">Reward earned</div></div>` : ``}
+    <div style="font-family:monospace;line-height:1.25;margin-top:14px;font-size:1.1rem">${share}</div>
+    <div class="btnrow">
+      <button class="btn ghost" id="copy">📋 Share</button>
+      <button class="btn" id="close">Done</button>
+    </div>`;
+  document.getElementById("close").onclick=()=>tg?.close();
+  document.getElementById("copy").onclick=()=>{
+    const txt=`🟩 Bookle ${won?guesses.length:"X"}/${MAX}\n${share}`;
+    try{ navigator.clipboard?.writeText(txt); }catch(e){}
+    msg.textContent="Copied to clipboard!";
+  };
+  hapN(won ? "success" : "warning");
+  if(won && guesses.length<=4) burst(col);
+}
+
+function burst(color){
+  const c=document.getElementById("confetti"); if(!c) return; const x=c.getContext("2d");
+  c.width=innerWidth; c.height=innerHeight;
+  const cols=[color,"#ffffff","#43e08a","#4bc9ff","#ffc24b"];
+  const P=Array.from({length:130},()=>({x:innerWidth/2+(Math.random()-.5)*120, y:innerHeight*.3,
+    vx:(Math.random()-.5)*9, vy:Math.random()*-13-4, g:.32+Math.random()*.2,
+    s:Math.random()*7+4, r:Math.random()*6, vr:(Math.random()-.5)*.4, c:cols[Math.random()*cols.length|0], a:1}));
+  let t=0;
+  (function f(){ x.clearRect(0,0,c.width,c.height); t++;
+    for(const p of P){ p.vy+=p.g; p.x+=p.vx; p.y+=p.vy; p.r+=p.vr; if(t>70)p.a-=.025;
+      x.save(); x.globalAlpha=Math.max(0,p.a); x.translate(p.x,p.y); x.rotate(p.r);
+      x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6); x.restore(); }
+    if(t<140) requestAnimationFrame(f); else x.clearRect(0,0,c.width,c.height);
+  })();
+}
+
+document.addEventListener("keydown",(e)=>{ if(status!=="active")return;
+  if(e.key==="Enter") submitGuess();
+  else if(e.key==="Backspace"){ cur=cur.slice(0,-1); paint(); }
+  else if(/^[a-zA-Z]$/.test(e.key)) type(e.key.toUpperCase());
+});
 load();
 </script>
 </body>

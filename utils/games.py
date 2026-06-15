@@ -1,26 +1,44 @@
 """
-utils/games.py — Quiz & True/False engine (server-authoritative).
+utils/games.py — Quiz / True-False / book-MCQ engine (server-authoritative).
 
-Security model: correct answers are NEVER sent to the client. The client only
-gets question text + options. Scoring, daily limits, and token credits all
-happen here, server-side, keyed to the Telegram-verified user id. Sessions are
+Security model: correct answers are NEVER sent to the client. The client gets
+question text + options only. Scoring, daily limits and token credits all happen
+here, server-side, keyed to the Telegram-verified user id. Sessions are
 single-use so a winning submission can't be replayed.
 
-Spec (locked):
-  Quiz: 8 Q, 2/day, 15-min limit. correct/wrong by level
+Player experience (2026 overhaul):
+  • ONE 15-minute clock for the WHOLE session (not per question).
+  • Free navigation — jump to any question, leave some blank, come back later.
+    Skipping costs NOTHING; an unanswered question is simply neutral.
+  • A per-user ROTATION cursor (game_progress) serves fresh questions every play
+    and only repeats once the whole bank has been cycled — so a big bank feels
+    endless.
+  • submit() returns a performance grade/tag, XP and a full answer review so the
+    Mini App can show a proper gaming result screen (wins up front, penalties
+    kept small).
+
+Economy (kept from the locked spec, minus the skip tax):
+  Quiz: 8 Q, 2/day. correct/wrong by level
         beginner +0.0625/-0.03125, moderate +0.09375/-0.046875,
-        advanced +0.125/-0.0625. Skip = 0.1 (BCN-first). Speed bonus +0.5 BGM
-        if all 8 done < 2 min (once/day).
-  TF:   20 Q, 2/day, 15-min limit (timeout -0.1 BGM). correct +0.05, wrong
-        -0.01, skip 0.01 (BCN-first). No bonus.
+        advanced +0.125/-0.0625. Speed bonus +0.5 BGM if a full clear < 2 min
+        (once/day).
+  TF:   20 Q, 2/day. correct +0.05, wrong -0.01.
+  Book games (guess / firstline / author): 6 Q, 3/day, fixed rewards.
 """
+import hashlib
+import json
+import os
 import random
+import re
 import string
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
+from bson import ObjectId
+from pymongo.errors import BulkWriteError
+
 from database.connection import MongoManager
-from utils.wallet import add_bgm, get_balances, spend
+from utils.wallet import add_bgm, get_balances
 
 QUIZ_REWARD = {
     "beginner": (0.0625, 0.03125),
@@ -28,20 +46,21 @@ QUIZ_REWARD = {
     "advanced": (0.125, 0.0625),
 }
 
+# Note: no "skip_cost" — navigating past a question is free now.
 CONFIG = {
-    "quiz": {"count": 8, "daily": 2, "time_limit": 900, "skip_cost": 0.1,
+    "quiz": {"count": 8, "daily": 2, "time_limit": 900,
              "speed_bonus": 0.5, "speed_secs": 120, "levels": True, "mcq": True},
-    "tf":   {"count": 20, "daily": 2, "time_limit": 900, "skip_cost": 0.01,
-             "correct": 0.05, "wrong": 0.01, "timeout_penalty": 0.1,
-             "levels": False, "mcq": False},
-    # MCQ book games (share the quiz engine; single-level, fixed rewards)
-    "guess":     {"count": 6, "daily": 3, "time_limit": 600, "skip_cost": 0.05,
+    "tf":   {"count": 20, "daily": 2, "time_limit": 900,
+             "correct": 0.05, "wrong": 0.01, "levels": False, "mcq": False},
+    "guess":     {"count": 6, "daily": 3, "time_limit": 900,
                   "correct": 0.08, "wrong": 0.04, "levels": False, "mcq": True},
-    "firstline": {"count": 6, "daily": 3, "time_limit": 600, "skip_cost": 0.05,
+    "firstline": {"count": 6, "daily": 3, "time_limit": 900,
                   "correct": 0.08, "wrong": 0.04, "levels": False, "mcq": True},
-    "author":    {"count": 6, "daily": 3, "time_limit": 600, "skip_cost": 0.05,
+    "author":    {"count": 6, "daily": 3, "time_limit": 900,
                   "correct": 0.07, "wrong": 0.035, "levels": False, "mcq": True},
 }
+
+VALID_GAMES = tuple(CONFIG.keys())
 
 
 def _now():
@@ -52,7 +71,26 @@ def _sid() -> str:
     return "".join(random.choices(string.ascii_lowercase + string.digits, k=16))
 
 
-# ── seed a small starter bank so games work out of the box ──────────────────────
+def qhash(game: str, q: str) -> str:
+    """Stable dedupe key: normalise whitespace/case and namespace by game."""
+    norm = re.sub(r"\s+", " ", (q or "").strip().lower())
+    return hashlib.sha1(f"{game}|{norm}".encode("utf-8")).hexdigest()
+
+
+def _grade(accuracy: float) -> tuple[str, str]:
+    """Map accuracy (0..1) to a (key, friendly message) performance tag."""
+    if accuracy >= 0.9:
+        return "legendary", "Absolutely legendary!"
+    if accuracy >= 0.75:
+        return "great", "You did great!"
+    if accuracy >= 0.5:
+        return "good", "Solid run!"
+    if accuracy >= 0.25:
+        return "meh", "Could've been better, tho."
+    return "low", "Keep practising — you'll level up!"
+
+
+# ── starter bank (tiny inline fallback so games work on a brand-new DB) ──────────
 _SEED_QUIZ = [
     ("beginner", "Who wrote 'Romeo and Juliet'?",
      {"A": "Dickens", "B": "Shakespeare", "C": "Tolstoy", "D": "Austen"}, "B"),
@@ -101,9 +139,7 @@ _SEED_TF = [
     ("Homer wrote 'The Divine Comedy'.", False),
     ("'Hamlet' is a comedy.", False),
 ]
-
-
-_SEED_GUESS = [  # blurb → which book?
+_SEED_GUESS = [
     ("A young wizard discovers he's famous and attends a school of magic.",
      {"A": "Harry Potter", "B": "The Hobbit", "C": "Eragon", "D": "Percy Jackson"}, "A"),
     ("A dystopia where a totalitarian state watches everyone via telescreens.",
@@ -117,7 +153,7 @@ _SEED_GUESS = [  # blurb → which book?
     ("Four siblings enter a magical land through a wardrobe.",
      {"A": "The Golden Compass", "B": "Narnia", "C": "Inkheart", "D": "Stardust"}, "B"),
 ]
-_SEED_FIRSTLINE = [  # famous opening line → which book?
+_SEED_FIRSTLINE = [
     ("\"Call me Ishmael.\"",
      {"A": "Moby-Dick", "B": "Dracula", "C": "Frankenstein", "D": "Robinson Crusoe"}, "A"),
     ("\"It was the best of times, it was the worst of times.\"",
@@ -131,7 +167,7 @@ _SEED_FIRSTLINE = [  # famous opening line → which book?
     ("\"In a hole in the ground there lived a hobbit.\"",
      {"A": "The Silmarillion", "B": "The Hobbit", "C": "The Fellowship of the Ring", "D": "Eragon"}, "B"),
 ]
-_SEED_AUTHOR = [  # book → who wrote it?
+_SEED_AUTHOR = [
     ("Who wrote 'The Old Man and the Sea'?",
      {"A": "Steinbeck", "B": "Hemingway", "C": "Faulkner", "D": "Fitzgerald"}, "B"),
     ("Who wrote 'Beloved'?",
@@ -147,21 +183,96 @@ _SEED_AUTHOR = [  # book → who wrote it?
 ]
 
 
+def _seed_path() -> str:
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "data", "questions_seed.json")
+
+
+def _normalize_seed(doc: dict) -> Optional[dict]:
+    """Coerce a raw seed dict into a storable question doc (+ qhash), or None."""
+    game = doc.get("game")
+    q = (doc.get("q") or "").strip()
+    if game not in VALID_GAMES or not q:
+        return None
+    out: dict[str, Any] = {"game": game, "q": q, "qhash": qhash(game, q)}
+    if game == "tf":
+        out["a"] = bool(doc.get("a"))
+    else:
+        opts = doc.get("options") or {}
+        if not all(opts.get(k) for k in ("A", "B", "C", "D")):
+            return None
+        ans = str(doc.get("a", "")).upper()
+        if ans not in ("A", "B", "C", "D"):
+            return None
+        out["options"] = {k: str(opts[k]) for k in ("A", "B", "C", "D")}
+        out["a"] = ans
+    if game == "quiz":
+        lvl = doc.get("level", "beginner")
+        out["level"] = lvl if lvl in QUIZ_REWARD else "beginner"
+    return out
+
+
+async def _bulk_load_seed_file(db) -> int:
+    """Fast-load the shipped seed bank on a fresh DB. De-dupes on the unique
+    qhash index (ordered=False → duplicates are skipped, not fatal)."""
+    path = _seed_path()
+    if not os.path.isfile(path):
+        return 0
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            raw = json.load(fh)
+    except Exception:
+        return 0
+    docs, seen = [], set()
+    for d in raw if isinstance(raw, list) else []:
+        norm = _normalize_seed(d)
+        if not norm or norm["qhash"] in seen:
+            continue
+        seen.add(norm["qhash"])
+        docs.append(norm)
+    if not docs:
+        return 0
+    coll = db.dbs[db.write_idx]["questions"]
+    loaded = 0
+    for i in range(0, len(docs), 1000):
+        chunk = docs[i:i + 1000]
+        try:
+            res = await coll.insert_many(chunk, ordered=False)
+            loaded += len(res.inserted_ids)
+        except BulkWriteError as bwe:
+            loaded += bwe.details.get("nInserted", 0)
+        except Exception:
+            pass
+    return loaded
+
+
+async def _insert_q(db, doc: dict) -> None:
+    norm = _normalize_seed(doc)
+    if norm:
+        await db.safe_insert("questions", norm)
+
+
 async def ensure_seed() -> None:
+    """Seed the question bank on first boot. Prefers the large shipped seed file
+    (data/questions_seed.json); falls back to the tiny inline bank per game so
+    every game is always playable even without the file."""
     db = await MongoManager.get()
+    # Only attempt the big file-load when the bank is essentially empty — avoids
+    # re-scanning thousands of rows on every restart.
+    if await db.count_global("questions") < 50:
+        await _bulk_load_seed_file(db)
+    # Per-game inline fallback (covers any game the file didn't include).
     if await db.count_global("questions", {"game": "quiz"}) == 0:
         for level, q, opts, a in _SEED_QUIZ:
-            await db.safe_insert("questions", {"game": "quiz", "level": level,
-                                               "q": q, "options": opts, "a": a})
+            await _insert_q(db, {"game": "quiz", "level": level, "q": q, "options": opts, "a": a})
     if await db.count_global("questions", {"game": "tf"}) == 0:
         for q, a in _SEED_TF:
-            await db.safe_insert("questions", {"game": "tf", "q": q, "a": bool(a)})
+            await _insert_q(db, {"game": "tf", "q": q, "a": bool(a)})
     for gtype, seed in (("guess", _SEED_GUESS), ("firstline", _SEED_FIRSTLINE),
                         ("author", _SEED_AUTHOR)):
         if await db.count_global("questions", {"game": gtype}) == 0:
             for q, opts, a in seed:
-                await db.safe_insert("questions", {"game": gtype, "q": q,
-                                                   "options": opts, "a": a})
+                await _insert_q(db, {"game": gtype, "q": q, "options": opts, "a": a})
 
 
 # ── daily limit ──────────────────────────────────────────────────────────────
@@ -172,28 +283,58 @@ async def plays_today(uid: int, game: str) -> int:
                                  {"uid": uid, "game": game, "started_at": {"$gte": since}})
 
 
-# ── new session ──────────────────────────────────────────────────────────────
+# ── new session (with per-user rotation) ────────────────────────────────────────
 async def new_session(uid: int, game: str, level: str = "beginner") -> dict:
     cfg = CONFIG[game]
-    if await plays_today(uid, game) >= cfg["daily"]:
-        return {"error": f"Daily limit reached ({cfg['daily']}/day)."}
-
     db = await MongoManager.get()
-    flt: dict[str, Any] = {"game": game}
-    if cfg["levels"]:
-        flt["level"] = level
-    pool = await db.find_global("questions", flt)
-    if len(pool) < 1:
-        return {"error": "No questions available yet."}
+    if await plays_today(uid, game) >= cfg["daily"]:
+        return {"error": f"Daily limit reached ({cfg['daily']}/day). Come back tomorrow!"}
 
-    random.shuffle(pool)
-    chosen = pool[:cfg["count"]]
+    if cfg["levels"]:
+        if level not in QUIZ_REWARD:
+            level = "beginner"
+    else:
+        level = "all"   # rotation/progress key for level-less games
+
+    base: dict[str, Any] = {"game": game}
+    if cfg["levels"]:
+        base["level"] = level
+
+    # rotation: serve questions this user hasn't seen this cycle first
+    prog = await db.find_one_global("game_progress",
+                                    {"uid": uid, "game": game, "level": level}) or {}
+    served = prog.get("served", [])
+    served_oids = []
+    for s in served:
+        try:
+            served_oids.append(ObjectId(s))
+        except Exception:  # noqa: BLE001 — ignore malformed cursor entries
+            pass
+
+    match = dict(base)
+    if served_oids:
+        match["_id"] = {"$nin": served_oids}
+    chosen = await db.sample_global("questions", match, cfg["count"])
+
+    reset = False
+    if len(chosen) < cfg["count"]:
+        # this user has exhausted the bank for this game/level → new cycle
+        chosen = await db.sample_global("questions", base, cfg["count"])
+        reset = True
+    if not chosen:
+        return {"error": "No questions in the bank yet — it's being filled. Try again soon!"}
+
+    chosen_ids = [str(q["_id"]) for q in chosen]
+    new_served = chosen_ids if reset else (served + chosen_ids)
+    await db.safe_update("game_progress", {"uid": uid, "game": game, "level": level},
+                         {"$set": {"served": new_served, "updated_at": _now()}}, upsert=True)
+
     sid = _sid()
-    # store correct answers server-side; client never sees them
-    answers = [{"a": q.get("a")} for q in chosen]
+    # full questions (incl. answers + options) stored server-side for scoring/review
+    qs = [{"q": q.get("q"), "options": q.get("options"), "a": q.get("a")} for q in chosen]
     await db.safe_insert("game_sessions", {
         "session_id": sid, "uid": uid, "game": game, "level": level,
-        "answers": answers, "started_at": _now(), "status": "active",
+        "qs": qs, "started_at": _now(), "status": "active",
     })
 
     public_q = []
@@ -203,15 +344,18 @@ async def new_session(uid: int, game: str, level: str = "beginner") -> dict:
             item["options"] = q.get("options")
         public_q.append(item)
 
-    payload = {"session_id": sid, "game": game, "level": level,
-               "questions": public_q, "time_limit": cfg["time_limit"]}
+    payload = {
+        "session_id": sid, "game": game,
+        "level": level if cfg["levels"] else None,
+        "questions": public_q, "count": len(public_q),
+        "time_limit": cfg["time_limit"], "mcq": bool(cfg.get("mcq")),
+    }
     if game == "quiz":
-        rwd, pen = QUIZ_REWARD[level]
-        payload.update({"reward": rwd, "penalty": pen, "skip_cost": cfg["skip_cost"],
-                        "speed_bonus": cfg["speed_bonus"], "speed_secs": cfg["speed_secs"]})
+        rwd, _pen = QUIZ_REWARD[level]
+        payload.update({"reward": rwd, "speed_bonus": cfg["speed_bonus"],
+                        "speed_secs": cfg["speed_secs"]})
     else:
-        payload.update({"reward": cfg["correct"], "penalty": cfg["wrong"],
-                        "skip_cost": cfg["skip_cost"]})
+        payload.update({"reward": cfg["correct"]})
     return payload
 
 
@@ -226,82 +370,85 @@ async def submit(uid: int, session_id: str, client_answers: list) -> dict:
 
     game = sess["game"]
     cfg = CONFIG[game]
-    correct_list = sess["answers"]
+    qs = sess.get("qs") or []
     elapsed = (_now() - sess["started_at"]).total_seconds()
-    timed_out = elapsed > cfg["time_limit"]
+    timed_out = elapsed > cfg["time_limit"] + 5  # small grace for the round-trip
 
     # mark done immediately (single-use → no replay)
     await db.safe_update("game_sessions", {"session_id": session_id},
                          {"$set": {"status": "done", "finished_at": _now()}}, upsert=False)
 
-    n = len(correct_list)
+    n = len(qs)
     answers = (client_answers or [])[:n]
-    correct = wrong = skipped = 0
-
     is_mcq = cfg.get("mcq")
-    rwd, pen = (QUIZ_REWARD[sess["level"]] if game == "quiz"
+    rwd, pen = (QUIZ_REWARD[sess.get("level", "beginner")] if game == "quiz"
                 else (cfg["correct"], cfg["wrong"]))
+
+    correct = wrong = skipped = 0
+    review = []
     for i in range(n):
         given = answers[i] if i < len(answers) else None
-        truth = correct_list[i]["a"]
+        truth = qs[i].get("a")
+        ok = False
+        unanswered = False
         if is_mcq:
             if given is None or given == "":
                 skipped += 1
+                unanswered = True
             elif str(given).upper() == str(truth).upper():
                 correct += 1
+                ok = True
             else:
                 wrong += 1
         else:  # true/false (boolean)
             if given is None:
                 skipped += 1
+                unanswered = True
             elif bool(given) == bool(truth):
                 correct += 1
+                ok = True
             else:
                 wrong += 1
+        review.append({
+            "q": qs[i].get("q"), "options": qs[i].get("options"),
+            "your": given, "correct": truth, "ok": ok, "unanswered": unanswered,
+        })
 
-    # token math ----------------------------------------------------------------
+    # token math — skips are free; only correct (+) and wrong (−) move the wallet
     net = round(correct * rwd - wrong * pen, 5)
-    # skips are BCN-first spends
-    skip_cost = cfg["skip_cost"]
-    skips_charged = 0
-    for _ in range(skipped):
-        if await spend(uid, skip_cost):
-            skips_charged += 1
-        # if they can't pay, the skip is free (couldn't have skipped in UI anyway)
 
     bonus = 0.0
-    if game == "quiz" and not timed_out and skipped == 0 and wrong == 0 and correct == n:
-        # full clear under time → eligible for speed bonus (once/day)
-        if elapsed <= cfg["speed_secs"]:
-            today = _now().strftime("%Y-%m-%d")
-            u = await db.find_one_global("users", {"user_id": uid},
-                                         {"speed_bonus_day": 1}) or {}
-            if u.get("speed_bonus_day") != today:
-                bonus = cfg["speed_bonus"]
-                await db.safe_update("users", {"user_id": uid},
-                                     {"$set": {"speed_bonus_day": today}})
+    if (game == "quiz" and not timed_out and skipped == 0 and wrong == 0
+            and correct == n and n > 0 and elapsed <= cfg["speed_secs"]):
+        today = _now().strftime("%Y-%m-%d")
+        u = await db.find_one_global("users", {"user_id": uid}, {"speed_bonus_day": 1}) or {}
+        if u.get("speed_bonus_day") != today:
+            bonus = cfg["speed_bonus"]
+            await db.safe_update("users", {"user_id": uid},
+                                 {"$set": {"speed_bonus_day": today}})
 
-    tf_timeout_penalty = 0.0
-    if game == "tf" and timed_out:
-        tf_timeout_penalty = cfg["timeout_penalty"]
-
-    total_delta = round(net + bonus - tf_timeout_penalty, 5)
+    total_delta = round(net + bonus, 5)
     if total_delta >= 0:
         await add_bgm(uid, total_delta)
     else:
-        # clamp so balance can't go below zero
+        # never let a wrong-answer penalty push the balance below zero
         bgm, _ = await get_balances(uid)
         await add_bgm(uid, -min(abs(total_delta), bgm))
 
-    # leaderboard stats (positive earnings + games played)
     await db.safe_update("users", {"user_id": uid},
                          {"$inc": {"games_played": 1, "game_bgm": max(0.0, total_delta)}})
     from utils.missions import mark
     await mark(uid, "play_game")
 
+    accuracy = (correct / n) if n else 0.0
+    grade, tag = _grade(accuracy)
+    earned = round(correct * rwd + bonus, 4)   # the positive, "headline" number
+    xp = correct * 10 + (5 if bonus else 0)
+
     return {
-        "ok": True, "correct": correct, "wrong": wrong, "skipped": skipped,
-        "net_bgm": round(net, 4), "speed_bonus": bonus,
-        "timeout_penalty": tf_timeout_penalty, "total": total_delta,
-        "timed_out": timed_out,
+        "ok": True, "game": game, "total_q": n,
+        "correct": correct, "wrong": wrong, "skipped": skipped,
+        "accuracy": round(accuracy, 3), "grade": grade, "tag": tag, "xp": xp,
+        "earned": earned, "net": round(net, 4), "speed_bonus": bonus,
+        "total": total_delta, "timed_out": timed_out, "review": review,
     }

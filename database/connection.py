@@ -14,6 +14,7 @@ care how many clusters exist.
 """
 import asyncio
 import logging
+import random
 from typing import Any, Dict, List, Optional
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
@@ -111,6 +112,12 @@ class MongoManager:
                 await db.users.create_index([("downloads", DESCENDING)])
                 await db.users.create_index([("ref_count", DESCENDING)])
                 await db.users.create_index([("login_streak", DESCENDING)])
+                # Question bank: fast pool lookup per game/level + dedupe by hash.
+                await db.questions.create_index([("game", ASCENDING), ("level", ASCENDING)])
+                await db.questions.create_index([("qhash", ASCENDING)], unique=True, sparse=True)
+                # Per-user rotation cursor (which questions a user has already seen).
+                await db.game_progress.create_index(
+                    [("uid", ASCENDING), ("game", ASCENDING), ("level", ASCENDING)], unique=True)
             except OperationFailure as exc:
                 # "already exists with different options" etc. are benign.
                 logger.debug("Index note on cluster %d: %s", idx, exc)
@@ -173,6 +180,20 @@ class MongoManager:
             key, direction = sort[0]
             results.sort(key=lambda d: d.get(key) or 0, reverse=(direction == DESCENDING))
         return results[:limit] if limit else results
+
+    async def sample_global(self, coll: str, match: Dict[str, Any], size: int) -> List[Dict[str, Any]]:
+        """Randomly sample up to `size` docs matching `match`, fanned across all
+        clusters. Used by the games engine to pull a fresh, shuffled batch of
+        questions without loading the whole pool into memory."""
+        if size <= 0:
+            return []
+        results: List[Dict[str, Any]] = []
+        for idx in self.healthy:
+            cur = self.dbs[idx][coll].aggregate(
+                [{"$match": match}, {"$sample": {"size": size}}])
+            results.extend([d async for d in cur])
+        random.shuffle(results)
+        return results[:size]
 
     async def find_one_and_update_global(self, coll: str, flt: Dict[str, Any],
                                          update: Dict[str, Any], *,

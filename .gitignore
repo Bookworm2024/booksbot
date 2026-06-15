@@ -15,3 +15,6 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Question-bank generation intermediates (the merged seed IS committed; batches aren't)
+data/_gen/

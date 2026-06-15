@@ -27,17 +27,20 @@ async def cb_games(call: CallbackQuery) -> None:
             reply_markup=kb([btn("🔙 Back", "menu_home", style="danger")]))
         return
     await call.message.edit_text(
-        "<b>🎮 Play &amp; Earn</b>\n"
+        "<b>🎮 Arcade — Play &amp; Earn</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "🧠 <b>Quiz</b> — pick a level, up to <b>0.125</b>/Q (+0.5 speed bonus)\n"
-        "✅ <b>True/False</b> — 20 Qs, beat the 15-min clock\n"
-        "📚 <b>Guess the Book</b> — name the book from a blurb\n"
-        "✍️ <b>First Line</b> — name the book from its opening line\n"
-        "🖋️ <b>Author Match</b> — who wrote it?\n\n"
-        "<i>Scored securely on our servers — no cheating possible.</i>",
+        "🧠 <b>Brain Quiz</b> — pick a level, up to <b>0.125</b> BGM/correct (+0.5 speed bonus)\n"
+        "⚡ <b>True/False</b> — 20 rapid-fire calls\n"
+        "📚 <b>Guess the Book</b> — name it from the blurb\n"
+        "✍️ <b>First Line</b> — name it from line one\n"
+        "🖋️ <b>Author Match</b> — who wrote it?\n"
+        "🟩 <b>Bookle</b> — the daily book-word puzzle\n\n"
+        "⏱ One <b>15-minute</b> clock per round · jump between questions freely · "
+        "<b>skipping is free</b>.\n"
+        "<i>Fresh questions every time — scored securely server-side.</i>",
         reply_markup=kb(
-            [webapp_btn("🧠 Quiz", "game.html", query="game=quiz", style="success"),
-             webapp_btn("✅ True/False", "game.html", query="game=tf", style="success")],
+            [webapp_btn("🧠 Brain Quiz", "game.html", query="game=quiz", style="success"),
+             webapp_btn("⚡ True/False", "game.html", query="game=tf", style="success")],
             [webapp_btn("📚 Guess the Book", "game.html", query="game=guess", style="success")],
             [webapp_btn("✍️ First Line", "game.html", query="game=firstline", style="success"),
              webapp_btn("🖋️ Author Match", "game.html", query="game=author", style="success")],
