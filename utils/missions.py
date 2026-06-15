@@ -39,6 +39,10 @@ async def mark(uid: int, key: str) -> None:
         else:
             await db.safe_update("users", {"user_id": uid},
                                  {"$addToSet": {"missions_done": key}})
+        if key == "play_game":
+            # daily game-play streak bonus (the "daily challenge"), once/day
+            from utils.game_streak import on_game_played
+            await on_game_played(uid)
     except Exception:  # noqa: BLE001 — missions must never break the host action
         pass
 

@@ -31,8 +31,8 @@ it's here, it's not done yet.
 
 ## 4. Games & Brain
 - 🔜 Cover-Guess · Speed-Reading WPM · Memory match
-- 🔜 Crossword · daily challenge · weekly tournament
-- 🔜 Game streak bonuses · global XP & levels
+- 🔜 Crossword · weekly tournament
+- 🔜 Global XP & levels
 - ⬜ Trivia battles (1v1) · clan/guild competitions
 - ⬜ Boss-quiz events · seasonal themed events
 

@@ -67,7 +67,8 @@ async def _view(uid: int, name: str):
         f"📥 Downloads: <b>{int(d.get('downloads') or 0)}</b>\n"
         f"🎮 Games: <b>{int(d.get('games_played') or 0)}</b> · "
         f"🎁 Referrals: <b>{int(d.get('ref_count') or 0)}</b>\n"
-        f"⭐ Favorites: <b>{favs}</b> · 🔥 Streak: <b>{int(d.get('login_streak') or 0)}d</b>"
+        f"⭐ Favorites: <b>{favs}</b> · 🔥 Login: <b>{int(d.get('login_streak') or 0)}d</b> · "
+        f"🎮 Game streak: <b>{int(d.get('game_streak') or 0)}d</b>"
     )
     share = (f"I'm Level {level} on @{BOT_USERNAME} 📚 — free books, audiobooks & "
              f"games. Join me!")

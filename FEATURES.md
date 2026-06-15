@@ -58,9 +58,10 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Literary Hangman (chat-based, server-side word, 6 lives, BGM reward, 3/day)
 - ✅ Word Anagram / Word-Builder (chat-based, 3 tries, free hint, BGM reward, 5/day)
 - 🔜 Cover-Guess · Speed-Reading WPM · Memory match
-- 🔜 Crossword · daily challenge · weekly tournament
+- ✅ Daily game-streak bonus (play any game daily → escalating BGM; the "daily challenge")
+- 🔜 Crossword · weekly tournament
 - ✅ Achievements (🏅 board with progress + unlock notifications)
-- 🔜 Streak bonuses · global XP & levels
+- 🔜 Global XP &amp; levels
 - ⬜ Trivia battles (1v1) · clan/guild competitions
 - ⬜ Boss-quiz events · seasonal themed events
 
