@@ -28,14 +28,14 @@ from config import (
 )
 from database.connection import MongoManager
 from handlers import (
-    admin, admin_tools, broadcast, captcha, daily, discover, economy, favorites,
-    featured_admin, games, gift, indexer, inline, invite, payments, qadmin,
-    leaderboards, missions, notifs, profile, rate, recommend, referral,
+    admin, admin_tools, ai_admin, broadcast, captcha, daily, discover, economy,
+    favorites, featured_admin, games, gift, indexer, inline, invite, payments,
+    qadmin, leaderboards, missions, notifs, profile, rate, recommend, referral,
     request, requests_manual, revenue, settings_admin, spin, start, stats,
     support, tagger, track, vip,
 )
 from handlers.payments import heleket_webhook
-from handlers.admin_api import api_admin_overview
+from handlers.admin_api import api_admin_overview, api_admin_ai, api_admin_ai_test
 from handlers.bookle_api import api_bookle_new, api_bookle_guess
 from handlers.games_api import api_game_new, api_game_submit
 from handlers.reader_api import (
@@ -106,6 +106,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(settings_admin.router)
     dp.include_router(featured_admin.router)
     dp.include_router(tagger.router)
+    dp.include_router(ai_admin.router)
     dp.include_router(admin_tools.router)
     dp.include_router(admin.router)
     # indexer last — channel_post observer, no overlap with user handlers.
@@ -129,6 +130,9 @@ async def _start_web(bot: Bot) -> web.AppRunner:
     app.router.add_post("/api/bookle/new", api_bookle_new)
     app.router.add_post("/api/bookle/guess", api_bookle_guess)
     app.router.add_get("/api/admin/overview", api_admin_overview)
+    app.router.add_get("/api/admin/ai", api_admin_ai)
+    app.router.add_post("/api/admin/ai", api_admin_ai)
+    app.router.add_post("/api/admin/ai/test", api_admin_ai_test)
     # Reader / audiobook Mini-App API
     app.router.add_get("/api/file", api_file)
     app.router.add_get("/api/reader/state", api_reader_state_get)

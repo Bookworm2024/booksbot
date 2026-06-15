@@ -10,16 +10,21 @@ endless. This tool is how you grow each category to 5000 over time.
 Categories (game[/level]):
   quiz/beginner, quiz/moderate, quiz/advanced, tf, guess, firstline, author
 
+Provider:
+  --provider free       (DEFAULT) uses the free bots.lt GPT API — NO key needed
+  --provider anthropic  uses Claude (needs ANTHROPIC_API_KEY); higher quality
+
 Requirements (env, same as the bot uses):
-  ANTHROPIC_API_KEY   — your Claude API key (generation engine)
-  MONGO_URL           — the bank lives in the same DB the bot reads
+  MONGO_URL           — the bank lives in the same DB the bot reads (required)
+  ANTHROPIC_API_KEY   — only for --provider anthropic
   ANTHROPIC_MODEL     — optional (defaults to config's model)
 
 Usage (PowerShell):
-  $env:ANTHROPIC_API_KEY="sk-ant-..."; $env:MONGO_URL="mongodb+srv://..."
-  python tools/gen_questions.py                 # fill every category to 5000
+  $env:MONGO_URL="mongodb+srv://..."
+  python tools/gen_questions.py                          # free provider, fill to 5000
   python tools/gen_questions.py --target 5000 --games quiz,tf
-  python tools/gen_questions.py --target 1000 --dry-run    # show the plan only
+  python tools/gen_questions.py --provider anthropic     # use Claude instead
+  python tools/gen_questions.py --target 1000 --dry-run  # show the plan only
 
 Notes:
   • Some categories have a natural content ceiling (e.g. 'firstline' — there are
@@ -41,12 +46,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL  # noqa: E402
 from database.connection import MongoManager  # noqa: E402
+from utils.ai import DEFAULT_FREE_URL  # noqa: E402
 from utils.games import VALID_GAMES, _normalize_seed  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("gen_questions")
 
 _URL = "https://api.anthropic.com/v1/messages"
+
+# set from CLI in main()
+_PROVIDER = "free"      # "free" (bots.lt, no key) | "anthropic" (needs key)
+_FREE_URL = DEFAULT_FREE_URL
 
 # (game, level) → list of subtopics to diversify generation & reduce collisions.
 CAT_SUBS = {
@@ -150,8 +160,27 @@ def _extract_array(text: str) -> list:
 
 async def _generate(session: aiohttp.ClientSession, game: str, level: str | None,
                     sub: str, n: int) -> list:
+    prompt = _prompt(game, level, sub, n) + "\nReturn ONLY a JSON array."
+    if _PROVIDER == "free":
+        try:
+            async with session.get(_FREE_URL, params={"message": prompt},
+                                   timeout=aiohttp.ClientTimeout(total=120)) as r:
+                if r.status != 200:
+                    logger.warning("  Free AI %s", r.status)
+                    return []
+                raw = await r.text()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("  free call failed: %s", exc)
+            return []
+        try:
+            data = json.loads(raw)
+            text = data.get("response", "") if isinstance(data, dict) else raw
+        except Exception:  # noqa: BLE001
+            text = raw
+        return _extract_array(text)
+    # anthropic
     payload = {"model": ANTHROPIC_MODEL, "max_tokens": 4500,
-               "messages": [{"role": "user", "content": _prompt(game, level, sub, n)}]}
+               "messages": [{"role": "user", "content": prompt}]}
     headers = {"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
                "content-type": "application/json"}
     try:
@@ -228,8 +257,10 @@ async def run(target, games, batch, max_batches, dry):
         logger.info("\n(dry run - nothing generated)")
         return
 
-    if not ANTHROPIC_API_KEY:
-        raise SystemExit("ANTHROPIC_API_KEY is not set. Export it and re-run.")
+    logger.info("Using provider: %s%s\n", _PROVIDER,
+                "" if _PROVIDER != "free" else f" ({_FREE_URL})")
+    if _PROVIDER == "anthropic" and not ANTHROPIC_API_KEY:
+        raise SystemExit("ANTHROPIC_API_KEY is not set (needed for --provider anthropic).")
 
     total_added = 0
     async with aiohttp.ClientSession() as session:
@@ -249,8 +280,15 @@ def main():
     ap.add_argument("--batch", type=int, default=45, help="Questions requested per API call.")
     ap.add_argument("--max-batches", type=int, default=400,
                     help="Safety cap on API calls per category.")
+    ap.add_argument("--provider", choices=("free", "anthropic"), default="free",
+                    help="AI backend: 'free' (bots.lt, no key) or 'anthropic' (needs key).")
+    ap.add_argument("--free-url", default=DEFAULT_FREE_URL, help="Free API base URL.")
     ap.add_argument("--dry-run", action="store_true", help="Show the plan; generate nothing.")
     args = ap.parse_args()
+
+    global _PROVIDER, _FREE_URL
+    _PROVIDER = args.provider
+    _FREE_URL = args.free_url
 
     if args.games.strip().lower() == "all":
         games = set(VALID_GAMES)

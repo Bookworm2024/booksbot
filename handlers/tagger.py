@@ -11,8 +11,8 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS, ANTHROPIC_API_KEY
-from utils.ai import classify_genre
+from config import ADMIN_IDS
+from utils.ai import ai_enabled, classify_genre
 from utils.files import set_genre, untagged_count, untagged_files
 from utils.keyboards import btn, kb
 
@@ -23,8 +23,8 @@ _BATCH = 25
 
 
 async def _run_batch(message: Message) -> None:
-    if not ANTHROPIC_API_KEY:
-        await message.answer("🏷 Tagging needs ANTHROPIC_API_KEY set.")
+    if not await ai_enabled():
+        await message.answer("🏷 Tagging needs AI enabled (admin: enable AI in /admin).")
         return
     files = await untagged_files(limit=_BATCH)
     if not files:

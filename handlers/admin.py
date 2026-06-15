@@ -56,6 +56,7 @@ def _panel_kb(is_super: bool):
                      btn("🎁 Bulk Grant", "admin_bulk", style="success")])
         rows.append([btn("🏷 Tag Genres", "admin_tag", style="primary"),
                      btn("🛡 Manage Admins", "admin_manage", style="primary")])
+        rows.append([btn("🤖 AI Settings", "admin_ai", style="primary")])
     return kb(*rows)
 
 

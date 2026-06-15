@@ -24,12 +24,26 @@
   #msg { text-align:center; padding:40px; }
   button.refresh { width:100%; margin-top:12px; padding:12px; border:0; border-radius:12px; font-weight:700;
     background: var(--tg-theme-button-color,#3390ec); color:#fff; cursor:pointer; }
+  .sec { margin-top:18px; }
+  .sec h2 { font-size:1rem; margin:0 0 4px; }
+  .field { margin:8px 0; }
+  .field label { display:block; font-size:.7rem; color:var(--tg-theme-hint-color,#8a8f98); text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px; }
+  .field input { width:100%; padding:11px 12px; border-radius:10px; border:1px solid rgba(127,127,127,.3);
+    background: var(--tg-theme-bg-color,#0f1115); color: var(--tg-theme-text-color,#e8e8e8); font-size:.92rem; }
+  .seg { display:flex; gap:8px; margin:8px 0; }
+  .seg button { flex:1; padding:10px 6px; border:1px solid rgba(127,127,127,.3); border-radius:10px; cursor:pointer;
+    background: var(--tg-theme-bg-color,#0f1115); color: var(--tg-theme-text-color,#e8e8e8); font-weight:700; font-size:.82rem; }
+  .seg button.sel { background: var(--tg-theme-button-color,#3390ec); color:#fff; border-color:transparent; }
+  .btn2 { flex:1; padding:11px 14px; border:0; border-radius:10px; font-weight:700; cursor:pointer; color:#fff; }
+  .btn2.save { background:#1f7a3d; } .btn2.test { background: var(--tg-theme-button-color,#3390ec); }
+  .aimsg { font-size:.82rem; margin-top:8px; min-height:1em; }
 </style>
 </head>
 <body>
 <h1>📊 Admin Dashboard</h1>
 <div class="sub" id="sub">Loading…</div>
 <div id="content"></div>
+<div id="ai"></div>
 
 <script>
 const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
@@ -66,7 +80,63 @@ async function load(){
     </div>
     <button class="refresh" onclick="load()">🔄 Refresh</button>`;
 }
+
+function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+let ai = { provider:"free", free_url:"", model:"", has_key:false, anthropic_key_masked:"", can_edit:false };
+
+async function loadAI(){
+  try { ai = await (await fetch(`/api/admin/ai?init_data=${encodeURIComponent(INIT)}`)).json(); }
+  catch(e){ return; }
+  if (ai.error){ document.getElementById("ai").innerHTML = ""; return; }
+  renderAI("");
+}
+function provBtn(p, label){ return `<button data-p="${p}" class="${ai.provider===p?'sel':''}">${label}</button>`; }
+function renderAI(msg){
+  const ro = !ai.can_edit;
+  document.getElementById("ai").innerHTML = `
+    <div class="sec"><div class="card wide">
+      <h2>🤖 AI Provider</h2>
+      <div class="s">Powers Recommendations, Summaries &amp; genre tagging. The Free API needs no key.</div>
+      <div class="seg">${provBtn("free","🆓 Free")}${provBtn("anthropic","💎 Claude")}${provBtn("off","🚫 Off")}</div>
+      <div class="field"><label>Free API URL</label><input id="ai_url" value="${esc(ai.free_url)}" ${ro?'disabled':''}></div>
+      <div class="field"><label>Claude key ${ai.has_key?'· set ('+esc(ai.anthropic_key_masked)+')':''}</label>
+        <input id="ai_key" type="password" placeholder="${ai.has_key?'leave blank to keep':'sk-ant-…'}" ${ro?'disabled':''}></div>
+      <div class="field"><label>Claude model</label><input id="ai_model" value="${esc(ai.model)}" ${ro?'disabled':''}></div>
+      ${ro ? '<div class="s">🔒 Read-only — super admin can edit.</div>'
+           : '<div style="display:flex;gap:8px;margin-top:6px"><button class="btn2 save" id="ai_save">💾 Save</button><button class="btn2 test" id="ai_test">🧪 Test</button></div>'}
+      <div class="aimsg" id="ai_msg">${esc(msg)}</div>
+    </div></div>`;
+  document.querySelectorAll('#ai .seg button').forEach(b => b.onclick = () => {
+    if (ai.can_edit){ ai.provider = b.dataset.p; renderAI(""); }
+  });
+  if (!ro){
+    document.getElementById("ai_save").onclick = saveAI;
+    document.getElementById("ai_test").onclick = testAI;
+  }
+}
+async function saveAI(){
+  const body = { init_data:INIT, provider:ai.provider,
+    free_url: document.getElementById("ai_url").value,
+    model: document.getElementById("ai_model").value };
+  const key = document.getElementById("ai_key").value.trim();
+  if (key) body.anthropic_key = key;
+  document.getElementById("ai_msg").textContent = "Saving…";
+  try {
+    const d = await (await fetch("/api/admin/ai", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)})).json();
+    if (d.error){ document.getElementById("ai_msg").textContent = "❌ " + d.error; return; }
+    ai = d; renderAI("✅ Saved — applies immediately.");
+  } catch(e){ document.getElementById("ai_msg").textContent = "❌ Network error."; }
+}
+async function testAI(){
+  document.getElementById("ai_msg").textContent = "Testing…";
+  try {
+    const d = await (await fetch("/api/admin/ai/test", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({init_data:INIT})})).json();
+    document.getElementById("ai_msg").textContent = d.ok ? ("✅ Working — reply: " + d.sample) : "❌ No response — check the URL/key.";
+  } catch(e){ document.getElementById("ai_msg").textContent = "❌ Network error."; }
+}
+
 load();
+loadAI();
 </script>
 </body>
 </html>

@@ -13,9 +13,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import ANTHROPIC_API_KEY
 from database.connection import MongoManager
-from utils.ai import recommend_titles, summarize_book
+from utils.ai import ai_enabled, recommend_titles, summarize_book
 from utils.keyboards import btn, kb
 from utils.wallet import get_balances, refund, spend
 
@@ -43,9 +42,9 @@ async def cb_recommend(call: CallbackQuery) -> None:
 
 
 async def _intro(message: Message, uid: int) -> None:
-    if not ANTHROPIC_API_KEY:
-        await message.answer("🤖 AI recommendations aren't enabled yet "
-                             "(admin: set ANTHROPIC_API_KEY).")
+    if not await ai_enabled():
+        await message.answer("🤖 AI recommendations are turned off right now "
+                             "(admin: enable AI in /admin).")
         return
     bgm, bcn = await get_balances(uid)
     if bgm + bcn < _COST:
@@ -162,8 +161,8 @@ async def cb_summary(call: CallbackQuery) -> None:
 
 
 async def _summary_intro(message: Message, uid: int) -> None:
-    if not ANTHROPIC_API_KEY:
-        await message.answer("📝 AI summaries aren't enabled yet (admin: set ANTHROPIC_API_KEY).")
+    if not await ai_enabled():
+        await message.answer("📝 AI summaries are turned off right now (admin: enable AI in /admin).")
         return
     bgm, bcn = await get_balances(uid)
     if bgm + bcn < _COST:
