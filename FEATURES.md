@@ -89,7 +89,11 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Admin Mini-App dashboard (📊 users/VIP/archive/downloads, revenue ₹+$,
   requests, BGM/BCN circulation, maintenance state; admin-gated initData)
 - ✅ Bulk BGM grant (to all users, atomic update_many)
-- 🔜 Bulk message / bulk ban · dashboard write-ops
+- ✅ Manage admins live (add/remove at runtime, no redeploy; env/super fixed)
+- ✅ Interactive redeem-code creator (🎟️ Create Code panel) + /create command
+- ✅ AI provider config from /admin (free bots.lt / Claude / off, URL+key, live test)
+  — dashboard + chat write-ops
+- 🔜 Bulk message / bulk ban
 - 🔜 Scheduled broadcasts · A/B broadcast · audience segments · feature flags
 - 🔜 Role-based admin permissions (granular) · audit log
 - 🔜 Auto-moderation rules · spam/abuse detection

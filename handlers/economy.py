@@ -28,6 +28,20 @@ router = Router()
 
 class RedeemFSM(StatesGroup):
     awaiting_code = State()
+    cc_max = State()      # create-code: how many claims
+    cc_total = State()    # create-code: total BGM to split
+
+
+async def _mint_code(max_claims: int, total: float, created_by: int) -> tuple[str, float]:
+    """Create a redeem code splitting `total` BGM across `max_claims` claims."""
+    per = round(total / max_claims, 3)
+    code = "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    db = await MongoManager.get()
+    await db.safe_insert("codes", {
+        "code": code, "amount_per_claim": per, "remaining": max_claims,
+        "created_by": created_by, "created_at": datetime.now(timezone.utc),
+    })
+    return code, per
 
 
 def _fmt_dur(seconds: int) -> str:
@@ -272,17 +286,63 @@ async def cmd_create(message: Message, command: CommandObject) -> None:
                              "Example: <code>/create 20 50</code> → 2.5 BGM each.")
         return
     max_claims, total = int(parts[0]), float(parts[1])
-    if max_claims <= 0:
-        await message.answer("❌ Max claims must be > 0.")
+    if max_claims <= 0 or total <= 0:
+        await message.answer("❌ Max claims and total BGM must be > 0.")
         return
-    per = round(total / max_claims, 3)
-    code = "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
-    db = await MongoManager.get()
-    await db.safe_insert("codes", {
-        "code": code, "amount_per_claim": per, "remaining": max_claims,
-        "created_by": message.chat.id, "created_at": datetime.now(timezone.utc),
-    })
+    code, per = await _mint_code(max_claims, total, message.chat.id)
     await message.answer(
         "✅ <b>Redeem Code Created</b>\n\n"
         f"🎟️ <code>{code}</code>\n🧮 Claims: {max_claims}\n"
-        f"💸 Per user: {per} BGM\n💰 Total: {total} BGM")
+        f"💸 Per user: {per} BGM\n💰 Total: {total:g} BGM")
+
+
+# ── 🎟️ Create Code (admin panel — interactive) ─────────────────────────────────
+@router.callback_query(F.data == "admin_create")
+async def cb_admin_create(call: CallbackQuery, state: FSMContext) -> None:
+    if call.from_user.id not in ADMIN_IDS:
+        await call.answer("Access denied", show_alert=True)
+        return
+    await call.answer()
+    await state.set_state(RedeemFSM.cc_max)
+    await call.message.answer(
+        "🎟️ <b>Create Redeem Code</b>\n\nHow many users can claim it? "
+        "Send a whole number. /cancel to abort.")
+
+
+@router.message(RedeemFSM.cc_max, F.text)
+async def cc_max_in(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if raw.lower() == "/cancel":
+        await state.clear(); await message.answer("❌ Cancelled."); return
+    if not raw.isdigit() or int(raw) <= 0:
+        await message.answer("❌ Send a whole number greater than 0.")
+        return
+    await state.update_data(max_claims=int(raw))
+    await state.set_state(RedeemFSM.cc_total)
+    await message.answer("💰 Total <b>BGM</b> to load into the code (split across claims)? "
+                         "e.g. <code>50</code>")
+
+
+@router.message(RedeemFSM.cc_total, F.text)
+async def cc_total_in(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if raw.lower() == "/cancel":
+        await state.clear(); await message.answer("❌ Cancelled."); return
+    try:
+        total = float(raw)
+        if total <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("❌ Send a positive number.")
+        return
+    data = await state.get_data()
+    await state.clear()
+    max_claims = int(data.get("max_claims", 1))
+    code, per = await _mint_code(max_claims, total, message.chat.id)
+    await message.answer(
+        "✅ <b>Redeem Code Created</b>\n\n"
+        f"🎟️ <code>{code}</code>\n🧮 Claims: {max_claims}\n"
+        f"💸 Per user: {per} BGM\n💰 Total: {total:g} BGM\n\n"
+        "Share the code — users claim it via 🎟 Redeem.",
+        reply_markup=kb([btn("🎟️ Create Another", "admin_create", style="success")],
+                        [btn("🔙 Admin", "admin_open", style="primary")]))

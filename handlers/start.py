@@ -236,18 +236,7 @@ async def cb_tools(call: CallbackQuery) -> None:
                                  reply_markup=kb(*rows))
 
 
-# ── phase-2 stubs (never dead-end) ─────────────────────────────────────────────
-# Actions still pending a phase. Implemented actions (menu_request, acc_balance,
-# acc_redeem, lib_favorites, …) are handled by their own routers and removed here.
-_COMING = {
-    "lib_recommend": "🤖 AI recommendations are coming soon (pending the LLM key).",
-}
-
-
-@router.callback_query(F.data.in_(set(_COMING)))
-async def cb_coming(call: CallbackQuery) -> None:
-    await call.answer()
-    await call.message.edit_text(
-        f"{_COMING[call.data]}",
-        reply_markup=kb([btn("🔙 Back", "menu_home", style="danger")]),
-    )
+# All dashboard actions now have real handlers in their own routers
+# (recommend, requests_manual, track, economy, games, …). No "coming soon"
+# stubs remain — adding one here would SHADOW the real handler, since start.router
+# is included first.

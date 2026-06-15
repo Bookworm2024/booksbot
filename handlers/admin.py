@@ -19,6 +19,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS, SUPER_ADMIN_ID
+from utils.admins import add_admin, get_extra_admins, remove_admin
 from utils.keyboards import btn, kb, webapp_btn
 from utils.users import set_ban
 
@@ -29,6 +30,8 @@ router = Router()
 class AdminFSM(StatesGroup):
     awaiting_ban_id = State()
     awaiting_unban_id = State()
+    awaiting_add_admin = State()
+    awaiting_remove_admin = State()
 
 
 def _is_admin(uid: int) -> bool:
@@ -134,9 +137,85 @@ async def do_unban(message: Message, state: FSMContext) -> None:
         pass
 
 
-# ── stubs for later phases ──────────────────────────────────────────────────────
-# Live elsewhere: requests_manual, broadcast, qadmin, revenue, settings_admin,
-# featured_admin, admin_tools (add BGM / user lookup / maintenance).
-@router.callback_query(F.data.in_({"admin_create", "admin_manage"}))
-async def cb_admin_stub(call: CallbackQuery) -> None:
-    await call.answer("Coming in a later phase.", show_alert=True)
+# ── manage admins (super admin) ─────────────────────────────────────────────────
+# (admin_create is handled in economy.py; requests/broadcast/etc. live in their
+#  own routers.)
+async def _manage_text() -> str:
+    extra = set(await get_extra_admins())
+    lines = ["<b>🛡 Manage Admins</b>\n━━━━━━━━━━━━━━━━━━"]
+    for a in sorted(ADMIN_IDS):
+        tag = "👑 super" if a == SUPER_ADMIN_ID else ("➕ added" if a in extra else "🔧 env")
+        lines.append(f"• <code>{a}</code> — {tag}")
+    lines.append("\n<i>Added admins can be removed here. Env &amp; super admins are "
+                 "fixed in config.</i>")
+    return "\n".join(lines)
+
+
+@router.callback_query(F.data == "admin_manage")
+async def cb_manage(call: CallbackQuery) -> None:
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("Super admin only", show_alert=True)
+        return
+    await call.answer()
+    await call.message.edit_text(
+        await _manage_text(),
+        reply_markup=kb([btn("➕ Add Admin", "adm_add", style="success"),
+                         btn("➖ Remove Admin", "adm_remove", style="danger")],
+                        [btn("🔙 Back", "admin_open", style="primary")]))
+
+
+@router.callback_query(F.data == "adm_add")
+async def cb_adm_add(call: CallbackQuery, state: FSMContext) -> None:
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("Super admin only", show_alert=True)
+        return
+    await call.answer()
+    await state.set_state(AdminFSM.awaiting_add_admin)
+    await call.message.answer("🆔 Send the <b>User ID</b> to promote to admin. /cancel to abort.")
+
+
+@router.callback_query(F.data == "adm_remove")
+async def cb_adm_remove(call: CallbackQuery, state: FSMContext) -> None:
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("Super admin only", show_alert=True)
+        return
+    await call.answer()
+    await state.set_state(AdminFSM.awaiting_remove_admin)
+    await call.message.answer("🆔 Send the <b>User ID</b> to remove from admins. /cancel to abort.")
+
+
+@router.message(AdminFSM.awaiting_add_admin)
+async def do_add_admin(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    target = (message.text or "").strip()
+    if target.lower() == "/cancel":
+        await message.answer("❌ Cancelled."); return
+    if not target.isdigit():
+        await message.answer("❌ Invalid numeric User ID."); return
+    added = await add_admin(int(target))
+    await message.answer(
+        f"✅ <code>{target}</code> is now an admin." if added
+        else f"ℹ️ <code>{target}</code> was already an admin.",
+        reply_markup=kb([btn("🛡 Manage Admins", "admin_manage", style="primary")]))
+    if added:
+        try:
+            await message.bot.send_message(
+                int(target), "🛡 <b>You're now an admin</b> of this bot. Open /admin.")
+        except Exception:  # noqa: BLE001
+            pass
+
+
+@router.message(AdminFSM.awaiting_remove_admin)
+async def do_remove_admin(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    target = (message.text or "").strip()
+    if target.lower() == "/cancel":
+        await message.answer("❌ Cancelled."); return
+    if not target.isdigit():
+        await message.answer("❌ Invalid numeric User ID."); return
+    ok = await remove_admin(int(target))
+    await message.answer(
+        f"✅ <code>{target}</code> removed from admins." if ok else
+        f"⚠️ <code>{target}</code> isn't a removable admin "
+        "(env &amp; super admins are fixed in config).",
+        reply_markup=kb([btn("🛡 Manage Admins", "admin_manage", style="primary")]))

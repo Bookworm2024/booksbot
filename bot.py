@@ -43,6 +43,7 @@ from handlers.reader_api import (
 )
 from middlewares.ban import BanMiddleware
 from middlewares.maintenance import MaintenanceMiddleware
+from utils.admins import load_extra_admins
 from utils.email_monitor import run_email_monitor
 from utils.games import ensure_seed
 from utils.reminders import run_reminder_loop
@@ -157,7 +158,8 @@ async def main() -> None:
 
     # Connect Mongo up front so a bad URL fails fast & loud.
     await MongoManager.get()
-    await ensure_seed()  # seed the starter question bank if empty
+    await ensure_seed()         # seed the starter question bank if empty
+    await load_extra_admins()   # merge admins added via /admin into ADMIN_IDS
     logger.info("MongoDB ready.")
 
     bot = _build_bot()

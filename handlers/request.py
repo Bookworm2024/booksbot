@@ -231,11 +231,6 @@ async def cb_download(call: CallbackQuery) -> None:
             pass
 
 
-# ── stubs (later phases) ─────────────────────────────────────────────────────────
-@router.callback_query(F.data.in_({"req_manual", "req_history"}))
-async def cb_req_stub(call: CallbackQuery) -> None:
-    await call.answer()
-    msg = ("👤 Admin requests arrive in the requests phase."
-           if call.data == "req_manual" else "📜 Request history arrives soon.")
-    await call.message.edit_text(msg, reply_markup=kb([btn("🔙 Back", "menu_request",
-                                                           style="danger")]))
+# NOTE: req_manual and req_history are handled by requests_manual.py and track.py.
+# Do NOT add stub handlers for them here — request.router is included before those,
+# so a stub would shadow the real, working features.
