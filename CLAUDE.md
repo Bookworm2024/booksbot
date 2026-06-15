@@ -13,6 +13,7 @@ TeleBotCreator (TBC) no-code "BJS" engine** into a real self-hosted app.
 - End commit messages with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 - Push needs `gh auth login` done on this machine (gh auth is shared across repos).
 - **Always read `PLAN.md` first** — it's the source-of-truth roadmap + phase status.
+- **`IMPROVEMENTS.md` is the living backlog** of unfinished features. When you ship one, **delete it from `IMPROVEMENTS.md`** and flip it ✅ in `FEATURES.md`. If it's still in IMPROVEMENTS.md, it isn't done.
 
 ## House rules
 - **Coloured keyboards everywhere** — build every button through `utils/keyboards.py` (`style=` field; auto success/primary/danger). Never hand-roll bare buttons.

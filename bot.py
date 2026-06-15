@@ -36,6 +36,7 @@ from handlers import (
 )
 from handlers.payments import heleket_webhook
 from handlers.admin_api import api_admin_overview, api_admin_ai, api_admin_ai_test
+from handlers.broadcast import run_scheduled_broadcasts
 from handlers.bookle_api import api_bookle_new, api_bookle_guess
 from handlers.games_api import api_game_new, api_game_submit
 from handlers.reader_api import (
@@ -170,9 +171,10 @@ async def main() -> None:
     dp = _build_dispatcher()
     runner = await _start_web(bot)
 
-    # Background workers (UPI email auto-verify; comeback reminders).
+    # Background workers (UPI email auto-verify; comeback reminders; scheduled broadcasts).
     monitor_task = asyncio.create_task(run_email_monitor(bot))
     reminder_task = asyncio.create_task(run_reminder_loop(bot))
+    sched_bc_task = asyncio.create_task(run_scheduled_broadcasts(bot))
 
     try:
         me = await bot.get_me()
@@ -182,6 +184,7 @@ async def main() -> None:
     finally:
         monitor_task.cancel()
         reminder_task.cancel()
+        sched_bc_task.cancel()
         await runner.cleanup()
         await bot.session.close()
 

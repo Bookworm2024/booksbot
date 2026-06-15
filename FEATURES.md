@@ -96,8 +96,10 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Interactive redeem-code creator (🎟️ Create Code panel) + /create command
 - ✅ AI provider config from /admin (free bots.lt / Claude / off, URL+key, live test)
   — dashboard + chat write-ops
-- 🔜 Bulk message / bulk ban
-- 🔜 Scheduled broadcasts · A/B broadcast · audience segments · feature flags
+- ✅ Scheduled broadcasts (send in +1/+6/+24h, background worker fires them) +
+  audience segments (👥 all / 👑 VIP / 🟢 active 7d / 😴 inactive / 📦 legacy)
+  with live recipient counts
+- 🔜 Bulk ban · A/B broadcast · feature flags
 - 🔜 Role-based admin permissions (granular) · audit log
 - 🔜 Auto-moderation rules · spam/abuse detection
 - ⬜ Canned replies · macro buttons · staff shifts
