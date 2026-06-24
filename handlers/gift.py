@@ -14,8 +14,9 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
+from utils.format import MAX_AMOUNT, fmt_amount, valid_amount
 from utils.keyboards import btn, kb
-from utils.wallet import add_bgm, get_balances
+from utils.wallet import add_bgm, charge_bgm, get_balances
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -44,7 +45,7 @@ async def _open(message: Message, state: FSMContext) -> None:
     await state.set_state(GiftFSM.awaiting_recipient)
     await message.answer(
         "🎁 <b>Gift BGM</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"Your balance: <b>{bgm:.2f} BGM</b>\n\n"
+        f"Your balance: <b>{fmt_amount(bgm)} BGM</b>\n\n"
         "Send the <b>recipient's User ID</b> (they must have started the bot).\n"
         "/cancel to abort.")
 
@@ -70,7 +71,7 @@ async def on_recipient(message: Message, state: FSMContext) -> None:
     await state.update_data(target=target)
     await state.set_state(GiftFSM.awaiting_amount)
     await message.answer(f"💎 How much <b>BGM</b> to gift to <code>{target}</code>? "
-                         f"(min {_MIN_GIFT:g})")
+                         f"(min {fmt_amount(_MIN_GIFT)})")
 
 
 @router.message(GiftFSM.awaiting_amount, F.text)
@@ -80,33 +81,29 @@ async def on_amount(message: Message, state: FSMContext) -> None:
         await state.clear()
         await message.answer("❌ Cancelled.")
         return
-    try:
-        amount = round(float(raw), 3)
-    except ValueError:
-        await message.answer("⚠️ Enter a number.")
+    ok, amount = valid_amount(raw)
+    if not ok:
+        await message.answer(f"⚠️ Enter a positive number up to {fmt_amount(MAX_AMOUNT)}.")
         return
     if amount < _MIN_GIFT:
-        await message.answer(f"⚠️ Minimum gift is {_MIN_GIFT:g} BGM.")
+        await message.answer(f"⚠️ Minimum gift is {fmt_amount(_MIN_GIFT)} BGM.")
         return
     data = await state.get_data()
     target = data.get("target")
     await state.clear()
     sender = message.chat.id
 
-    # atomic: deduct from sender only if they still hold enough
-    db = await MongoManager.get()
-    debited = await db.find_one_and_update_global(
-        "users", {"user_id": sender, "bookgem": {"$gte": amount}},
-        {"$inc": {"bookgem": -amount}})
-    if not debited:
+    # atomic: deduct from sender only if they still hold enough (combined across
+    # clusters), then credit recipient. charge_bgm rolls back on a partial debit.
+    if not await charge_bgm(sender, amount):
         await message.answer("❌ Insufficient BGM balance.")
         return
     await add_bgm(target, amount)
-    await message.answer(f"✅ Sent <b>{amount:g} BGM</b> to <code>{target}</code>. 🎁",
+    await message.answer(f"✅ Sent <b>{fmt_amount(amount)} BGM</b> to <code>{target}</code>. 🎁",
                          reply_markup=kb([btn("💼 Balance", "acc_balance", style="primary")]))
     try:
         await message.bot.send_message(
-            target, f"🎁 <b>You received a gift!</b>\n💎 <b>+{amount:g} BGM</b> "
+            target, f"🎁 <b>You received a gift!</b>\n💎 <b>+{fmt_amount(amount)} BGM</b> "
             f"from <code>{sender}</code>.")
     except Exception:  # noqa: BLE001
         pass

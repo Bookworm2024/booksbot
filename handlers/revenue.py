@@ -14,6 +14,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS, SUPER_ADMIN_ID
 from database.connection import MongoManager
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ async def _build() -> str:
         if uid is not None:
             buyers[uid] = buyers.get(uid, 0) + float(d.get("bgm") or 0)
     top = sorted(buyers.items(), key=lambda kv: kv[1], reverse=True)[:5]
-    top_lines = "\n".join(f"  {i}. <code>{u}</code> — {b:g} BGM"
+    top_lines = "\n".join(f"  {i}. <code>{u}</code> — {fmt_amount(b)} BGM"
                           for i, (u, b) in enumerate(top, 1)) or "  —"
 
     # rough gross (INR + crypto converted at a nominal ₹85/$ for a single figure)
@@ -66,7 +67,7 @@ async def _build() -> str:
         "<b>💰 Revenue Dashboard</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
         f"🧾 <b>Paid orders:</b> <code>{orders}</code>\n"
-        f"💎 <b>BGM sold:</b> <code>{bgm_sold:g}</code>\n\n"
+        f"💎 <b>BGM sold:</b> <code>{fmt_amount(bgm_sold)}</code>\n\n"
         "<b>Collected</b>\n"
         f"🏦 UPI: <code>₹{inr_total:,.2f}</code>\n"
         f"🌐 Crypto: <code>${usd_total:,.2f}</code>\n"

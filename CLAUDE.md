@@ -22,7 +22,9 @@ TeleBotCreator (TBC) no-code "BJS" engine** into a real self-hosted app.
 - Two admin roles: super admin (`SUPER_ADMIN_ID`) + normal admins (`ADMIN_IDS`).
 
 ## Locked decisions
-- 30k-file archive search: index the file channel's history with a **Telethon userbot** (`tools/backfill.py`) — the Bot API can't read channel history. Deliver to users via `bot.copy_message(FILE_CHANNEL_ID, msg_id)`.
+- 30k-file archive search: index the file channel's history with a **Telethon userbot** (`tools/backfill.py`) — the Bot API can't read channel history. Deliver to users via `bot.copy_message(<file channel>, msg_id)`.
+- The file/database channel id is a **live setting** (`utils/channel.py`, kv `file_channel_id`), changeable in-bot via Admin → 🗂 File Channel. `FILE_CHANNEL_ID` env is only the first-run seed. Old files can also be **forward-imported** (admin forwards them → indexed via `forward_origin.message_id`). Never bind the channel into an import-time `F.chat.id == …` filter again — the indexer reads the live id per-update.
+- **Token amounts**: every credit/debit/display goes through `utils/wallet.py` + `utils/format.py`. Never `$inc bookgem` with a raw `float()` input or render a balance with `:g`/raw `{}` — use `add_bgm`/`charge_bgm`/`spend` and `fmt_amount`/`valid_amount` (no `1e+21`, no false "insufficient").
 - Build order: basic runnable bot first; advanced features as later phases (see PLAN.md).
 
 ## Layout

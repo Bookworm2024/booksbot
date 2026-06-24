@@ -15,9 +15,10 @@ from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS
 from database.connection import MongoManager
+from utils.format import MAX_AMOUNT, fmt_amount, valid_amount
 from utils.keyboards import btn, kb
 from utils.vip import badge
-from utils.wallet import add_bgm, get_balances
+from utils.wallet import add_bgm, get_balances, set_bgm
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -28,6 +29,7 @@ class ToolsFSM(StatesGroup):
     addbgm_amount = State()
     lookup = State()
     bulk_amount = State()
+    setbgm_amount = State()
 
 
 def _is_admin(uid: int) -> bool:
@@ -62,16 +64,18 @@ async def on_addbgm_amount(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     data = await state.get_data()
     await state.clear()
-    try:
-        amount = round(float(raw), 3)
-    except ValueError:
-        await message.answer("⚠️ Enter a number."); return
+    ok, amount = valid_amount(raw)
+    if not ok:
+        await message.answer(
+            f"⚠️ Enter a positive number up to {fmt_amount(MAX_AMOUNT)} "
+            "(no <code>1e21</code> / <code>inf</code>).")
+        return
     target = data.get("target")
     await add_bgm(target, amount)
-    await message.answer(f"✅ Added <b>{amount:g} BGM</b> to <code>{target}</code>.")
+    await message.answer(f"✅ Added <b>{fmt_amount(amount)} BGM</b> to <code>{target}</code>.")
     try:
         await message.bot.send_message(
-            target, f"🎁 An admin granted you <b>+{amount:g} BGM</b>.")
+            target, f"🎁 An admin granted you <b>+{fmt_amount(amount)} BGM</b>.")
     except Exception:  # noqa: BLE001
         pass
 
@@ -118,15 +122,54 @@ async def on_lookup(message: Message, state: FSMContext) -> None:
         f"🧑 {u.get('first_name','—')} (@{u.get('username') or '—'})\n"
         f"🚦 {'🚫 BANNED' if u.get('is_banned') else '✅ Active'}\n"
         f"👑 VIP: {vip}\n"
-        f"💎 BGM: <code>{bgm:.2f}</code> · 🪙 BCN: <code>{bcn:.2f}</code>\n"
+        f"💎 BGM: <code>{fmt_amount(bgm)}</code> · 🪙 BCN: <code>{fmt_amount(bcn)}</code>\n"
         f"📥 Downloads: <code>{int(u.get('downloads') or 0)}</code>\n"
         f"📚 eBook reqs: <code>{int(u.get('ebook_requests') or 0)}</code> · "
         f"🎧 Audio: <code>{int(u.get('audiobook_requests') or 0)}</code>\n"
         f"📨 Requests: ⏳{pending} · ✅{fulfilled}\n"
         f"🎁 Referrals: <code>{int(u.get('ref_count') or 0)}</code>\n"
-        f"🎮 Game BGM: <code>{float(u.get('game_bgm') or 0):.2f}</code>\n"
+        f"🎮 Game BGM: <code>{fmt_amount(u.get('game_bgm'))}</code>\n"
         f"📅 Joined: {joined_s}",
-        reply_markup=kb([btn("➕ Add BGM", "admin_addbgm", style="success")]))
+        reply_markup=kb([btn("➕ Add BGM", "admin_addbgm", style="success"),
+                         btn("✏️ Set BGM", f"admin_setbgm:{uid}", style="primary")]))
+
+
+# ── Set / fix BGM (repair a corrupted balance) ───────────────────────────────────
+@router.callback_query(F.data.startswith("admin_setbgm:"))
+async def cb_setbgm(call: CallbackQuery, state: FSMContext) -> None:
+    if not _is_admin(call.from_user.id):
+        await call.answer("Access denied", show_alert=True)
+        return
+    try:
+        target = int(call.data.split(":", 1)[1])
+    except ValueError:
+        await call.answer("Bad target", show_alert=True)
+        return
+    await call.answer()
+    await state.set_state(ToolsFSM.setbgm_amount)
+    await state.update_data(setbgm_target=target)
+    await call.message.answer(
+        f"✏️ <b>Set BGM</b> for <code>{target}</code>\nSend the exact BGM balance to "
+        "set (this OVERWRITES the current value and collapses any split). /cancel to abort.")
+
+
+@router.message(ToolsFSM.setbgm_amount, F.text)
+async def on_setbgm_amount(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if raw.lower() == "/cancel":
+        await state.clear(); await message.answer("❌ Cancelled."); return
+    data = await state.get_data()
+    await state.clear()
+    ok, amount = valid_amount(raw, allow_zero=True)
+    if not ok:
+        await message.answer(
+            f"⚠️ Enter a value from 0 to {fmt_amount(MAX_AMOUNT)} "
+            "(no <code>1e21</code> / <code>inf</code>).")
+        return
+    target = data.get("setbgm_target")
+    new_val = await set_bgm(target, amount)
+    await message.answer(
+        f"✅ BGM for <code>{target}</code> set to <b>{fmt_amount(new_val)}</b>.")
 
 
 # ── Bulk BGM grant (to ALL users) ───────────────────────────────────────────────
@@ -146,17 +189,14 @@ async def on_bulk_amount(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     if raw.lower() == "/cancel":
         await state.clear(); await message.answer("❌ Cancelled."); return
-    try:
-        amount = round(float(raw), 3)
-        if amount <= 0:
-            raise ValueError
-    except ValueError:
-        await message.answer("⚠️ Enter a positive number."); return
+    ok, amount = valid_amount(raw)
+    if not ok:
+        await message.answer(f"⚠️ Enter a positive number up to {fmt_amount(MAX_AMOUNT)}."); return
     await state.clear()
     db = await MongoManager.get()
     total = await db.count_global("users")
     await message.answer(
-        f"⚠️ Grant <b>{amount:g} BGM</b> to all <b>{total}</b> users?",
+        f"⚠️ Grant <b>{fmt_amount(amount)} BGM</b> to all <b>{total}</b> users?",
         reply_markup=kb([btn("✅ Confirm", f"bulk_do:{amount}", style="success")],
                         [btn("❌ Cancel", "admin_open", style="danger")]))
 
@@ -166,14 +206,18 @@ async def cb_bulk_do(call: CallbackQuery) -> None:
     if call.from_user.id not in ADMIN_IDS:
         await call.answer("Access denied", show_alert=True)
         return
-    amount = float(call.data.split(":", 1)[1])
+    ok, amount = valid_amount(call.data.split(":", 1)[1])
+    if not ok:
+        await call.answer("Invalid amount.", show_alert=True)
+        return
     await call.answer("Granting…")
     db = await MongoManager.get()
     affected = 0
     for idx in db.healthy:
         res = await db.dbs[idx]["users"].update_many({}, {"$inc": {"bookgem": amount}})
         affected += res.modified_count
-    await call.message.edit_text(f"✅ Granted <b>{amount:g} BGM</b> to <b>{affected}</b> users.")
+    await call.message.edit_text(
+        f"✅ Granted <b>{fmt_amount(amount)} BGM</b> to <b>{affected}</b> users.")
 
 
 # ── Maintenance mode ─────────────────────────────────────────────────────────

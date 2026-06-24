@@ -13,6 +13,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 from utils.wallet import add_bgm
 
@@ -61,6 +62,6 @@ async def _spin(message: Message, uid: int) -> None:
     jackpot = "🎉 <b>JACKPOT!</b>\n" if prize >= 5 else ""
     await message.answer(
         f"🎡 <b>Daily Spin</b>\n━━━━━━━━━━━━━━━━━━\n{jackpot}"
-        f"You won <b>+{prize:g} BGM</b>! 💎\n\n<i>Spin again tomorrow.</i>",
+        f"You won <b>+{fmt_amount(prize)} BGM</b>! 💎\n\n<i>Spin again tomorrow.</i>",
         reply_markup=kb([btn("💼 Balance", "acc_balance", style="primary"),
                          btn("🎮 Games", "menu_games", style="success")]))

@@ -9,6 +9,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 from utils.missions import MISSIONS, claim, status
 
@@ -22,8 +23,8 @@ async def _board(uid: int):
     for key, (label, reward) in MISSIONS.items():
         mark = "✅" if key in st["done"] else "⬜"
         tag = " (claimed)" if key in st["claimed"] else ""
-        lines.append(f"{mark} {label} — <b>+{reward:g} BGM</b>{tag}")
-    lines.append(f"\n💎 <b>Claimable now:</b> {st['claimable']:g} BGM")
+        lines.append(f"{mark} {label} — <b>+{fmt_amount(reward)} BGM</b>{tag}")
+    lines.append(f"\n💎 <b>Claimable now:</b> {fmt_amount(st['claimable'])} BGM")
     rows = []
     if st["claimable"] > 0:
         rows.append([btn("🎁 Claim Rewards", "missions_claim", style="success")])
@@ -48,6 +49,6 @@ async def cb_missions(call: CallbackQuery) -> None:
 @router.callback_query(F.data == "missions_claim")
 async def cb_claim(call: CallbackQuery) -> None:
     got = await claim(call.from_user.id)
-    await call.answer(f"+{got:g} BGM!" if got else "Nothing to claim yet.", show_alert=bool(got))
+    await call.answer(f"+{fmt_amount(got)} BGM!" if got else "Nothing to claim yet.", show_alert=bool(got))
     text, markup = await _board(call.from_user.id)
     await call.message.edit_text(text, reply_markup=markup)

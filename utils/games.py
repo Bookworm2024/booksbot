@@ -38,7 +38,7 @@ from bson import ObjectId
 from pymongo.errors import BulkWriteError
 
 from database.connection import MongoManager
-from utils.wallet import add_bgm, get_balances
+from utils.wallet import add_bgm, cut_bgm, get_balances
 
 QUIZ_REWARD = {
     "beginner": (0.0625, 0.03125),
@@ -431,9 +431,10 @@ async def submit(uid: int, session_id: str, client_answers: list) -> dict:
     if total_delta >= 0:
         await add_bgm(uid, total_delta)
     else:
-        # never let a wrong-answer penalty push the balance below zero
+        # never let a wrong-answer penalty push the balance below zero.
+        # cut_bgm (a real deduction) — add_bgm sanitizes negatives to a no-op.
         bgm, _ = await get_balances(uid)
-        await add_bgm(uid, -min(abs(total_delta), bgm))
+        await cut_bgm(uid, min(abs(total_delta), bgm))
 
     await db.safe_update("users", {"user_id": uid},
                          {"$inc": {"games_played": 1, "game_bgm": max(0.0, total_delta)}})

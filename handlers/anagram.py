@@ -17,6 +17,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 from utils.wallet import add_bgm
 
@@ -154,7 +155,7 @@ async def on_answer(message: Message, state: FSMContext) -> None:
         from utils.missions import mark
         await mark(message.chat.id, "play_game")
         await message.answer(
-            f"🎉 <b>Correct — {word}!</b>\n💎 <b>+{rwd:g} BGM</b>",
+            f"🎉 <b>Correct — {word}!</b>\n💎 <b>+{fmt_amount(rwd)} BGM</b>",
             reply_markup=kb([btn("🔀 Play Again", "anag_new", style="success"),
                              btn("🎮 Games", "menu_games", style="primary")]))
         return

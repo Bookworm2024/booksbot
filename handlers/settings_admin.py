@@ -14,6 +14,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import SUPER_ADMIN_ID
 from utils.deals import banner, clear_deal, get_deal, set_deal
+from utils.format import fmt_amount, valid_amount
 from utils.keyboards import btn, kb
 from utils.settings import DEFAULTS, all_settings, set_setting
 
@@ -41,7 +42,7 @@ async def _panel():
         lines.append(f"\n<b>{cat}</b>")
         for k in cat_keys:
             label = DEFAULTS[k][1]
-            lines.append(f"• {label}: <b>{vals[k]:g}</b>")
+            lines.append(f"• {label}: <b>{fmt_amount(vals[k], 3)}</b>")
             rows.append([btn(f"✏️ {label}", f"price_edit:{k}", style="primary")])
     rows.append([btn("🔙 Back", "admin_open", style="danger")])
     return "\n".join(lines), kb(*rows)
@@ -83,15 +84,15 @@ async def on_value(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     key = data.get("key")
     await state.clear()
-    try:
-        value = float(raw)
-        if value < 0:
-            raise ValueError
-    except ValueError:
-        await message.answer("❌ Enter a non-negative number.")
+    # valid_amount rejects inf/nan/negative/absurd — the old `value < 0` guard let
+    # float("inf")/float("nan") through, which then exploded purchase-bonus math.
+    ok, value = valid_amount(raw, allow_zero=True)
+    if not ok:
+        await message.answer("❌ Enter a non-negative number (no <code>inf</code> / "
+                             "<code>1e21</code>).")
         return
     await set_setting(key, value)
-    await message.answer(f"✅ <b>{DEFAULTS[key][1]}</b> set to <b>{value:g}</b>. "
+    await message.answer(f"✅ <b>{DEFAULTS[key][1]}</b> set to <b>{fmt_amount(value, 3)}</b>. "
                          "Applies immediately.")
 
 

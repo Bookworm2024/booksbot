@@ -29,11 +29,11 @@ from config import (
 from database.connection import MongoManager
 from handlers import (
     admin, admin_extra, admin_tools, ai_admin, anagram, broadcast, captcha,
-    cosmetics, daily, discover, economy, favorites, featured_admin, feed, games,
-    gift, goals, indexer, inline, invite, hangman, payments, qadmin, leaderboards,
-    missions, notifs, profile, rate, ratings, recommend, referral, report, request,
-    requests_manual, revenue, settings_admin, spin, start, stats, support, tbr,
-    tagger, track, vip,
+    channel_admin, cosmetics, daily, discover, economy, favorites, featured_admin,
+    feed, games, gift, goals, indexer, inline, invite, hangman, payments, qadmin,
+    leaderboards, missions, notifs, profile, rate, ratings, recommend, referral,
+    report, request, requests_manual, revenue, settings_admin, spin, start, stats,
+    support, tbr, tagger, track, vip,
 )
 from handlers.payments import heleket_webhook
 from handlers.admin_api import api_admin_overview, api_admin_ai, api_admin_ai_test
@@ -48,6 +48,7 @@ from middlewares.maintenance import MaintenanceMiddleware
 from middlewares.ratelimit import RateLimitMiddleware
 from utils.admins import load_extra_admins
 from utils.email_monitor import run_email_monitor
+from utils.files import backfill_chan_id
 from utils.games import ensure_seed
 from utils.digest import run_weekly_digest
 from utils.reminders import run_reminder_loop
@@ -121,6 +122,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(qadmin.router)
     dp.include_router(revenue.router)
     dp.include_router(settings_admin.router)
+    dp.include_router(channel_admin.router)
     dp.include_router(featured_admin.router)
     dp.include_router(tagger.router)
     dp.include_router(ai_admin.router)
@@ -178,6 +180,7 @@ async def main() -> None:
     await ensure_seed()                  # seed the starter question bank if empty
     await load_extra_admins()            # merge admins added via /admin into ADMIN_IDS
     await backfill_first_purchase_flag()  # protect first-purchase bonus from existing buyers
+    await backfill_chan_id()             # stamp legacy files with their source channel
     logger.info("MongoDB ready.")
 
     bot = _build_bot()

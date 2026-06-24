@@ -164,7 +164,7 @@ function showResult(){
     <div class="tag" style="color:${col}">${tag}</div>
     ${won ? `<div class="sub" style="color:var(--mut)">Solved in <b style="color:var(--ink)">${guesses.length}/${MAX}</b></div>`
           : `<div class="word">The word was <b>${word}</b></div>`}
-    ${won ? `<div class="reward"><div class="n">+${reward} BGM</div><div class="l">Reward earned</div></div>` : ``}
+    ${won ? `<div class="reward"><div class="n">+${Number(reward||0).toLocaleString('en-US',{maximumFractionDigits:3})} BGM</div><div class="l">Reward earned</div></div>` : ``}
     <div style="font-family:monospace;line-height:1.25;margin-top:14px;font-size:1.1rem">${share}</div>
     <div class="btnrow">
       <button class="btn ghost" id="copy">📋 Share</button>

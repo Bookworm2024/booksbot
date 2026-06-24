@@ -11,6 +11,7 @@ the reward is granted later, the first time the user clears the join-gate.
 import logging
 
 from database.connection import MongoManager
+from utils.format import fmt_amount
 from utils.settings import get_float
 from utils.wallet import add_bgm
 
@@ -57,11 +58,11 @@ async def grant_referral(bot, uid: int) -> None:
         "users", {"user_id": ref}, {"$inc": {"ref_count": 1}})
     new_count = int((updated or {}).get("ref_count") or 0)
     try:
-        await bot.send_message(uid, f"🎁 <b>Referral Bonus!</b> +{new_bonus:g} BGM added.")
+        await bot.send_message(uid, f"🎁 <b>Referral Bonus!</b> +{fmt_amount(new_bonus)} BGM added.")
     except Exception:  # noqa: BLE001
         pass
     try:
-        await bot.send_message(ref, f"🎉 <b>New Referral!</b> You earned +{ref_bonus:g} BGM "
+        await bot.send_message(ref, f"🎉 <b>New Referral!</b> You earned +{fmt_amount(ref_bonus)} BGM "
                                     f"(total {new_count}).")
     except Exception:  # noqa: BLE001
         pass
@@ -71,6 +72,6 @@ async def grant_referral(bot, uid: int) -> None:
         await add_bgm(ref, bonus)
         try:
             await bot.send_message(
-                ref, f"🏆 <b>Milestone!</b> {new_count} referrals → <b>+{bonus:g} BGM</b> bonus!")
+                ref, f"🏆 <b>Milestone!</b> {new_count} referrals → <b>+{fmt_amount(bonus)} BGM</b> bonus!")
         except Exception:  # noqa: BLE001
             pass

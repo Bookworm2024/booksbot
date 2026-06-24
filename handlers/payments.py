@@ -35,6 +35,7 @@ from utils.heleket import (
     CRYPTO_CHOICES, MIN_USD_AMOUNT, PAID_STATUSES, create_invoice, make_order_id,
     verify_webhook,
 )
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb, url_btn
 from utils.settings import get_float
 from utils.wallet import add_bgm
@@ -106,14 +107,14 @@ async def _buy_view():
     usd_price = await get_float("bgm_price_usd")
     min_inr = int(MIN_BGM_PURCHASE * inr_price)
     fp_pct = await get_float("first_purchase_pct")
-    fp_line = f"🥳 <b>First purchase:</b> +{fp_pct:g}% bonus BGM!\n" if fp_pct > 0 else ""
+    fp_line = f"🥳 <b>First purchase:</b> +{fmt_amount(fp_pct)}% bonus BGM!\n" if fp_pct > 0 else ""
     text = (
         "<b>💎 Buy BookGems (BGM)</b>\n"
         + (f"{deal}\n" if deal else "")
         + "━━━━━━━━━━━━━━━━━━\n"
         "Permanent tokens — never expire.\n\n"
-        f"🏦 <b>UPI (INR):</b> ₹{inr_price:g}/BGM · min {MIN_BGM_PURCHASE} (₹{min_inr})\n"
-        f"🌐 <b>Crypto:</b> ${usd_price:g}/BGM\n"
+        f"🏦 <b>UPI (INR):</b> ₹{fmt_amount(inr_price)}/BGM · min {MIN_BGM_PURCHASE} (₹{min_inr})\n"
+        f"🌐 <b>Crypto:</b> ${fmt_amount(usd_price)}/BGM\n"
         f"🎁 <b>Bonus BGM:</b> {tiers_blurb()}\n"
         + fp_line +
         "\n<i>Both auto-credit — UPI is verified from the payment receipt, crypto "
@@ -153,7 +154,7 @@ async def on_coupon(message: Message, state: FSMContext) -> None:
                          {"$set": {"active_coupon": raw.strip().upper()}})
     kind = res.get("kind")
     val = res.get("value")
-    desc = f"+{val:g}% bonus" if kind == "pct" else f"+{val:g} BGM bonus"
+    desc = f"+{fmt_amount(val)}% bonus" if kind == "pct" else f"+{fmt_amount(val)} BGM bonus"
     await message.answer(f"✅ <b>Coupon applied!</b> ({desc})\nIt'll be added to your next "
                          "purchase. Open 💎 Buy BGM to pay.",
                          reply_markup=kb([btn("💎 Buy BGM", "acc_buy", style="success")]))
@@ -206,7 +207,7 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     rows = []
     if PAYMENT_QR_URL:
         rows.append([url_btn("📷 View QR", PAYMENT_QR_URL)])
-    bonus_line = f"🎁 <b>Bonus:</b> +{bonus:g} BGM!\n" if bonus else ""
+    bonus_line = f"🎁 <b>Bonus:</b> +{fmt_amount(bonus)} BGM!\n" if bonus else ""
     await message.answer(
         f"<b>💳 Pay ₹{inr:.2f}</b> for <b>{bgm} BGM</b>\n{bonus_line}"
         "━━━━━━━━━━━━━━━━━━\n"
@@ -279,13 +280,13 @@ async def _confirm_payment(doc: dict, bot, *, email_txn_id: str = "",
     cpn = await _redeem_coupon(flipped.get("coupon", ""), flipped["user_id"], base)
     total = base + bonus + fp + cpn
     await add_bgm(flipped["user_id"], total)
-    bonus_line = f" (incl. +{bonus:g} bonus)" if bonus else ""
-    fp_line = f"\n🥳 First-purchase bonus: <b>+{fp:g} BGM</b>!" if fp else ""
-    cpn_line = f"\n🎟️ Coupon bonus: <b>+{cpn:g} BGM</b>!" if cpn else ""
+    bonus_line = f" (incl. +{fmt_amount(bonus)} bonus)" if bonus else ""
+    fp_line = f"\n🥳 First-purchase bonus: <b>+{fmt_amount(fp)} BGM</b>!" if fp else ""
+    cpn_line = f"\n🎟️ Coupon bonus: <b>+{fmt_amount(cpn)} BGM</b>!" if cpn else ""
     try:
         await bot.send_message(
             flipped["user_id"],
-            f"🎉 <b>Payment confirmed!</b>\n💎 <b>+{total:g} BGM</b>{bonus_line} added.{fp_line}{cpn_line}\n"
+            f"🎉 <b>Payment confirmed!</b>\n💎 <b>+{fmt_amount(total)} BGM</b>{bonus_line} added.{fp_line}{cpn_line}\n"
             f"🧾 Ref: <code>{email_txn_id or flipped.get('submitted_utr','')}</code>")
     except Exception:  # noqa: BLE001
         pass
@@ -315,7 +316,7 @@ async def cb_crypto(call: CallbackQuery) -> None:
     rows.append([btn("🔙 Back", "acc_buy", style="danger")])
     await call.message.edit_text(
         "🌐 <b>Crypto Payment</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"${await get_float('bgm_price_usd'):g}/BGM · gateway minimum ${MIN_USD_AMOUNT:g}.\n\n"
+        f"${fmt_amount(await get_float('bgm_price_usd'))}/BGM · gateway minimum ${fmt_amount(MIN_USD_AMOUNT)}.\n\n"
         "Choose the coin/network you'll pay with:",
         reply_markup=kb(*rows))
 
@@ -332,7 +333,7 @@ async def cb_coin(call: CallbackQuery) -> None:
     for u in _USD_PACKS:
         b = round(u / usd_price)
         bn = bonus_for(b)
-        extra = f" +{bn:g}🎁" if bn else ""
+        extra = f" +{fmt_amount(bn)}🎁" if bn else ""
         rows.append([btn(f"💰 ${u} → {b:,} BGM{extra}", f"hk_buy:{idx}:{u}", style="success")])
     rows.append([btn("🔙 Back", "pay_crypto", style="danger")])
     await call.message.edit_text(
@@ -415,13 +416,13 @@ async def heleket_webhook(request: web.Request) -> web.Response:
     cpn = await _redeem_coupon(order.get("coupon", ""), order["user_id"], base)
     total = base + float(order.get("bonus") or 0) + fp + cpn
     await add_bgm(order["user_id"], total)
-    fp_line = f"\n🥳 First-purchase bonus: +{fp:g} BGM!" if fp else ""
-    cpn_line = f"\n🎟️ Coupon bonus: +{cpn:g} BGM!" if cpn else ""
+    fp_line = f"\n🥳 First-purchase bonus: +{fmt_amount(fp)} BGM!" if fp else ""
+    cpn_line = f"\n🎟️ Coupon bonus: +{fmt_amount(cpn)} BGM!" if cpn else ""
     bot = request.app["bot"]
     try:
         await bot.send_message(order["user_id"],
                                f"🎉 <b>Crypto payment confirmed!</b>\n"
-                               f"💎 +{total:g} BGM added to your wallet.{fp_line}{cpn_line}")
+                               f"💎 +{fmt_amount(total)} BGM added to your wallet.{fp_line}{cpn_line}")
     except Exception:  # noqa: BLE001
         pass
     return web.Response(text="ok")

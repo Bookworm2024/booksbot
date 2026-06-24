@@ -95,7 +95,12 @@ Legend counts toward ~500 features across 14 pillars.
 ## 6. Admin Power Tools (ease of working)
 - ✅ Admin panel, ban/unban, request queue, broadcast, question bank
 - ✅ Live settings/pricing editor · revenue dashboard · flash-sale · featured
-- ✅ Add BGM to a user · 👤 360° user lookup (balance/VIP/requests/flags)
+- ✅ Add BGM to a user · ✏️ Set/Fix BGM (repair a corrupted balance) ·
+  👤 360° user lookup (balance/VIP/requests/flags)
+- ✅ Change the file/database channel live from the panel (🗂 File Channel — send
+  the chat id or forward a message; stored in kv, no redeploy)
+- ✅ Import old files (📥 forward existing channel files → indexed with the right
+  channel msg_id + a bot-usable file_id) — complements the Telethon bulk backfill
 - ✅ Maintenance mode (blocks non-admins; middleware-enforced)
 - ✅ Admin Mini-App dashboard (📊 users/VIP/archive/downloads, revenue ₹+$,
   requests, BGM/BCN circulation, maintenance state; admin-gated initData)
@@ -148,7 +153,8 @@ Legend counts toward ~500 features across 14 pillars.
 - ⬜ Buddy reading · shared shelves · author AMAs
 
 ## 11. Content Pipeline (uploaders/admins)
-- ✅ Telethon backfill (30k archive) · real-time indexer · watchlist
+- ✅ Telethon backfill (30k archive) · real-time indexer (live channel id) ·
+  forward-import for old files · watchlist
 - ✅ AI genre auto-tagging (admin batch) → 🏷 Browse-by-Genre in Discover
 - 🔜 Metadata enrichment · cover fetch · duplicate detection · OCR for scans
 - 🔜 Uploader rewards/leaderboard · bounty requests

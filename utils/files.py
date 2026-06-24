@@ -17,6 +17,7 @@ title) — predictable and matches the original bot's behaviour. At 30k docs thi
 is comfortably fast; the `name_lc` index plus the text index back it up.
 """
 import difflib
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -24,6 +25,8 @@ from typing import Any
 from pymongo import DESCENDING
 
 from database.connection import MongoManager
+
+logger = logging.getLogger(__name__)
 
 _AUDIO_EXT = {"mp3", "m4b", "m4a", "wav", "ogg", "flac", "aac"}
 _MAX_SCAN = 500  # cap matches materialised per search (memory bound)
@@ -75,14 +78,97 @@ def trigrams(text: str) -> list[str]:
     return sorted({s[i:i + 3] for i in range(len(s) - 2)})
 
 
+def extract_from_message(message, *, msg_id: int | None = None,
+                         chan_id: int | None = None) -> dict | None:
+    """Build a `files` doc from an aiogram Message carrying a document/audio/video,
+    or None if it carries no file. Shared by the live channel indexer and the
+    admin forward-import flow.
+
+    `msg_id` overrides the channel message id — forward-import passes the ORIGINAL
+    channel message id (from forward_origin), since message.message_id there is the
+    id of the forwarded copy in the admin's chat and is useless for delivery.
+    `chan_id` overrides the source channel — forward-import passes the channel id
+    (from forward_origin.chat), since message.chat there is the admin's DM. The
+    channel is stored on the doc so delivery survives a later channel change.
+    """
+    raw_name = ""
+    file_id = file_uid = None
+    kind = "document"
+    if message.document:
+        d = message.document
+        raw_name = d.file_name or ""
+        file_id, file_uid = d.file_id, d.file_unique_id
+        kind = "document"
+    elif message.audio:
+        a = message.audio
+        raw_name = a.file_name or a.title or ""
+        file_id, file_uid = a.file_id, a.file_unique_id
+        kind = "audio"
+    elif message.video:
+        v = message.video
+        raw_name = v.file_name or ""
+        file_id, file_uid = v.file_id, v.file_unique_id
+        kind = "video"
+    else:
+        return None
+    if not raw_name:
+        raw_name = (message.caption or "").split("\n")[0]
+    if not raw_name:
+        return None
+    ext = raw_name.rsplit(".", 1)[-1].lower() if "." in raw_name else ""
+    name = clean_title(raw_name)
+    mid = msg_id if msg_id is not None else message.message_id
+    cid = chan_id if chan_id is not None else (message.chat.id if message.chat else None)
+    return {
+        "file_unique_id": file_uid or str(mid),
+        "name": name,
+        "name_lc": name.lower(),
+        "ext": ext,
+        "kind": "video" if message.video else kind_for_ext(ext),
+        "chan_id": cid,
+        "msg_id": mid,
+        "file_id": file_id,
+        "caption": message.caption or "",
+    }
+
+
 async def index_file(doc: dict[str, Any]) -> bool:
     """Upsert one file. Returns True if newly inserted. Stamps indexed_at and a
-    trigram index of the title (for fuzzy search) if missing."""
+    trigram index of the title (for fuzzy search) if missing.
+
+    Dedupe is on file_unique_id (unique index) AND on (chan_id, msg_id): the same
+    channel message can arrive with DIFFERENT file_unique_ids — the Telethon
+    backfill keys on the raw Telegram doc id while the Bot API keys on its own
+    file_unique_id token — so without the channel-message guard the same file
+    would be indexed twice (duplicate search results)."""
     db = await MongoManager.get()
     doc.setdefault("indexed_at", datetime.now(timezone.utc))
     if "name_tg" not in doc:
         doc["name_tg"] = trigrams(doc.get("name_lc") or doc.get("name", ""))
+    if doc.get("chan_id") is not None and doc.get("msg_id") is not None:
+        dup = await db.find_one_global(
+            "files", {"chan_id": doc["chan_id"], "msg_id": doc["msg_id"]}, {"_id": 1})
+        if dup:
+            return False
     return await db.safe_insert("files", doc)
+
+
+async def backfill_chan_id() -> None:
+    """One-time migration: stamp chan_id on legacy `files` docs (indexed before the
+    field existed) with the current live channel, so repointing the file channel
+    later doesn't orphan them. Guarded by a kv flag; retries until a channel is set."""
+    db = await MongoManager.get()
+    if await db.kv_get("files_chan_id_migrated", False):
+        return
+    from utils.channel import get_file_channel
+    live = await get_file_channel()
+    if not live:
+        return  # no channel yet — try again next startup
+    for idx in db.healthy:
+        await db.dbs[idx]["files"].update_many(
+            {"chan_id": {"$exists": False}}, {"$set": {"chan_id": live}})
+    await db.kv_set("files_chan_id_migrated", True)
+    logger.info("files chan_id backfill complete (channel %d).", live)
 
 
 def _ftype_clause(ftype: str | None) -> dict | None:

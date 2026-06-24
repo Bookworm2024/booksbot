@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
-from config import FILE_CHANNEL_ID
+from utils.channel import get_file_channel
 from database.connection import MongoManager
 from utils.files import get_file, icon_for
 from utils.keyboards import btn, kb, webapp_btn
@@ -41,7 +41,7 @@ async def cb_fav_add(call: CallbackQuery) -> None:
     await db.safe_insert("favorites", {
         "user_id": uid, "file_unique_id": fuid,
         "name": f.get("name"), "ext": f.get("ext"), "kind": f.get("kind"),
-        "msg_id": f.get("msg_id"), "file_id": f.get("file_id"),
+        "chan_id": f.get("chan_id"), "msg_id": f.get("msg_id"), "file_id": f.get("file_id"),
         "added_at": datetime.now(timezone.utc),
     })
     await call.answer("⭐ Added to favorites!")
@@ -117,9 +117,10 @@ async def cb_fav_get(call: CallbackQuery) -> None:
         return
     await call.answer("📤 Sending…")
     caption = f"{icon_for(f.get('ext',''))} <b>{f.get('name','Your File')}</b>\n\n⭐ From your favorites"
+    src_channel = f.get("chan_id") or await get_file_channel()
     try:
-        if FILE_CHANNEL_ID and f.get("msg_id"):
-            await call.bot.copy_message(uid, FILE_CHANNEL_ID, f["msg_id"], caption=caption)
+        if src_channel and f.get("msg_id"):
+            await call.bot.copy_message(uid, src_channel, f["msg_id"], caption=caption)
         elif f.get("file_id"):
             await call.bot.send_document(uid, f["file_id"], caption=caption)
         else:

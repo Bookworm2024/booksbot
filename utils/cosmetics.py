@@ -7,6 +7,7 @@ user can afford it and doesn't already own it — no double-charge, no double-ow
 Owned ids live on users.cosmetics; the equipped one on users.equipped_flair(_id).
 """
 from database.connection import MongoManager
+from utils.wallet import charge_bgm
 
 # id · shop label · price (BGM) · flair emblem shown on the profile
 FLAIRS = [
@@ -32,27 +33,38 @@ async def owned(uid: int) -> set:
 
 
 async def buy(uid: int, fid: str) -> tuple[bool, str]:
-    """Atomically buy a flair. Returns (ok, reason): reason in
-    'ok'/'unknown'/'free'/'owned'/'insufficient'."""
+    """Buy a flair. Returns (ok, reason): reason in
+    'ok'/'unknown'/'free'/'owned'/'insufficient'.
+
+    Atomicity: the ownership grant is the gate. We $addToSet the flair only if it
+    isn't already owned (a single conditional update — a concurrent double-tap
+    matches `cosmetics:{$ne:fid}` once, so only ONE tap claims it). Only the
+    winning tap then charges BGM (combined across clusters); if the charge fails,
+    we roll the grant back. This restores the single-statement guarantee against
+    double-charge while keeping the cross-cluster spend fix."""
     item = by_id(fid)
     if not item:
         return False, "unknown"
     if item["price"] <= 0:
         return False, "free"
     db = await MongoManager.get()
-    price = float(item["price"])
-    # atomic: only deduct + grant if affordable AND not already owned
+    # atomically claim ownership in whichever cluster holds the user's doc
+    claimed = False
     for idx in db.healthy:
         res = await db.dbs[idx]["users"].update_one(
-            {"user_id": uid, "bookgem": {"$gte": price}, "cosmetics": {"$ne": fid}},
-            {"$inc": {"bookgem": -price}, "$addToSet": {"cosmetics": fid}})
+            {"user_id": uid, "cosmetics": {"$ne": fid}},
+            {"$addToSet": {"cosmetics": fid}})
         if res.modified_count:
-            return True, "ok"
-    # no update happened → figure out why
-    doc = await db.find_one_global("users", {"user_id": uid}, {"cosmetics": 1}) or {}
-    if fid in (doc.get("cosmetics") or []):
-        return False, "owned"
-    return False, "insufficient"
+            claimed = True
+            break
+    if not claimed:
+        # already owned (somewhere), or the user has no doc yet
+        return False, ("owned" if fid in await owned(uid) else "insufficient")
+    if not await charge_bgm(uid, float(item["price"])):
+        await db.safe_update("users", {"user_id": uid},
+                             {"$pull": {"cosmetics": fid}}, upsert=False)
+        return False, "insufficient"
+    return True, "ok"
 
 
 async def equip(uid: int, fid: str) -> bool:

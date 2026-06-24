@@ -17,7 +17,9 @@ from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
 from utils.cosmetics import FLAIRS, buy, equip, owned
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb
+from utils.wallet import charge_bgm
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -62,11 +64,11 @@ async def cb_shop(call: CallbackQuery, answer: bool = True) -> None:
             rows.append([btn(("✅ " if f["id"] == eq else "👜 ") + f["label"] + tag,
                              f"cos_eq:{f['id']}", style="success" if f["id"] == eq else "primary")])
         else:
-            rows.append([btn(f"{f['label']} — {f['price']:g} BGM", f"cos_buy:{f['id']}",
+            rows.append([btn(f"{f['label']} — {fmt_amount(f['price'])} BGM", f"cos_buy:{f['id']}",
                              style="primary")])
     rows.append([btn("🔙 Back", "acc_customize", style="danger")])
     await call.message.edit_text(
-        f"✨ <b>Flair Shop</b>\n💎 Balance: <b>{bgm:.2f} BGM</b>\n\n"
+        f"✨ <b>Flair Shop</b>\n💎 Balance: <b>{fmt_amount(bgm)} BGM</b>\n\n"
         "Flair shows next to your name on your profile.",
         reply_markup=kb(*rows))
 
@@ -102,7 +104,7 @@ async def cb_vanity(call: CallbackQuery, state: FSMContext) -> None:
     await call.message.edit_text(
         f"✍️ <b>Vanity Handle</b>\nCurrent: <b>{d.get('vanity') or '—'}</b>\n\n"
         f"Send a new display name (3–20 letters/numbers/spaces). Costs "
-        f"<b>{_VANITY_COST:g} BGM</b>. /cancel to abort.")
+        f"<b>{fmt_amount(_VANITY_COST)} BGM</b>. /cancel to abort.")
 
 
 @router.message(CosFSM.vanity, F.text)
@@ -115,19 +117,14 @@ async def on_vanity(message: Message, state: FSMContext) -> None:
         await message.answer("⚠️ 3–20 characters — letters, numbers, spaces or underscores only.")
         return
     db = await MongoManager.get()
-    done = False
-    for idx in db.healthy:   # atomic spend + set, never overdrawn
-        res = await db.dbs[idx]["users"].update_one(
-            {"user_id": message.chat.id, "bookgem": {"$gte": _VANITY_COST}},
-            {"$inc": {"bookgem": -_VANITY_COST}, "$set": {"vanity": raw}})
-        if res.modified_count:
-            done = True
-            break
-    if done:
-        await message.answer(f"✅ Vanity handle set to <b>{raw}</b> (−{_VANITY_COST:g} BGM).",
+    # charge_bgm combines BGM across clusters (never falsely "insufficient" on a
+    # split balance) and rolls back on a partial debit; then set the handle.
+    if await charge_bgm(message.chat.id, _VANITY_COST):
+        await db.safe_update("users", {"user_id": message.chat.id}, {"$set": {"vanity": raw}})
+        await message.answer(f"✅ Vanity handle set to <b>{raw}</b> (−{fmt_amount(_VANITY_COST)} BGM).",
                              reply_markup=kb([btn("👤 Profile", "acc_profile", style="primary")]))
     else:
-        await message.answer(f"❌ You need {_VANITY_COST:g} BGM to set a vanity handle.")
+        await message.answer(f"❌ You need {fmt_amount(_VANITY_COST)} BGM to set a vanity handle.")
 
 
 # ── reading DNA ──────────────────────────────────────────────────────────────

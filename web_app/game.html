@@ -362,7 +362,7 @@ function renderResult(r){
        <div class="box gem"><div class="n" style="color:var(--good)">+${(r.earned||0).toFixed(3)}</div><div class="l">BGM Earned</div></div>
        <div class="box xp"><div class="n" style="color:var(--info)">+${r.xp||0}</div><div class="l">XP Gained</div></div>
      </div>
-     ${r.speed_bonus?`<div class="note" style="color:var(--warn);font-weight:700">🚀 Speed Bonus +${r.speed_bonus} BGM!</div>`:""}
+     ${r.speed_bonus?`<div class="note" style="color:var(--warn);font-weight:700">🚀 Speed Bonus +${Number(r.speed_bonus||0).toLocaleString('en-US',{maximumFractionDigits:3})} BGM!</div>`:""}
      ${netNote}
      <details class="review fade"><summary>📋 Review answers</summary>${rev}</details>
      <div class="navrow" style="margin-top:18px">

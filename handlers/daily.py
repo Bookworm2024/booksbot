@@ -13,6 +13,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
+from utils.format import fmt_amount, sanitize_amount
 from utils.keyboards import btn, kb
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,7 @@ async def _claim(message: Message, uid: int) -> None:
     # ── comeback bonus (returning after a long lapse) ─────────────────────────
     comeback = 1.0 if _gap_days(prev_daily) >= 7 else 0.0
     if comeback:
-        extras.append(f"👋 Welcome back! <b>+{comeback:g} BGM</b> comeback bonus")
+        extras.append(f"👋 Welcome back! <b>+{fmt_amount(comeback)} BGM</b> comeback bonus")
 
     # ── anniversary gift (yearly, on the join month-day) ──────────────────────
     anniv = 0.0
@@ -108,10 +109,12 @@ async def _claim(message: Message, uid: int) -> None:
                 and now.year > joined.year and int(before.get("anniv_year") or 0) != now.year):
             anniv = 2.0
             set_fields["anniv_year"] = now.year
-            extras.append(f"🎂 Happy bot-anniversary! <b>+{anniv:g} BGM</b> gift")
+            extras.append(f"🎂 Happy bot-anniversary! <b>+{fmt_amount(anniv)} BGM</b> gift")
 
     reward = _REWARDS[min(streak, 7) - 1]
-    total = round(reward + comeback + anniv, 3)
+    # sanitize keeps this credit inside the same [0, MAX_AMOUNT] guard the rest of
+    # the economy enforces, even though the components are fixed constants today.
+    total = sanitize_amount(round(reward + comeback + anniv, 3))
     # Credit + bookkeeping in ONE write so the reward and streak/freeze state
     # commit together (the atomic last_daily gate above already prevents a
     # double-claim).
@@ -129,7 +132,7 @@ async def _claim(message: Message, uid: int) -> None:
         "🎁 <b>Daily Reward Claimed!</b>\n━━━━━━━━━━━━━━━━━━\n"
         f"🔥 <b>Day {streak}</b> streak\n{dots}\n"
         f"{extra_block}\n"
-        f"💎 <b>+{total:g} BGM</b>\n<i>Keep the streak — day 7 pays the most!</i>",
+        f"💎 <b>+{fmt_amount(total)} BGM</b>\n<i>Keep the streak — day 7 pays the most!</i>",
         reply_markup=kb([btn("💼 Balance", "acc_balance", style="primary"),
                          btn("🎡 Daily Spin", "daily_spin", style="success")]))
 

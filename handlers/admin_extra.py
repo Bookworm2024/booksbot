@@ -21,6 +21,7 @@ from database.connection import MongoManager
 from utils.audit import log_action, recent
 from utils.coupons import active_coupons, create_coupon
 from utils.flags import FLAGS, all_flags, is_on, set_flag
+from utils.format import fmt_amount, valid_amount
 from utils.keyboards import btn, kb
 from utils.users import set_ban
 
@@ -296,7 +297,8 @@ async def cb_coupons(call: CallbackQuery) -> None:
     if not coupons:
         lines.append("<i>No active coupons.</i>")
     for c in coupons:
-        val = f"{c.get('value'):g}%" if c.get("kind") == "pct" else f"{c.get('value'):g} BGM"
+        val = (f"{fmt_amount(c.get('value'))}%" if c.get("kind") == "pct"
+               else f"{fmt_amount(c.get('value'))} BGM")
         exp = c.get("expires_at")
         exp_s = exp.strftime("%d %b") if hasattr(exp, "strftime") else "—"
         lines.append(f"<code>{c.get('code')}</code> · {val} · "
@@ -338,12 +340,10 @@ async def on_cpn_value(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     if raw.lower() == "/cancel":
         await state.clear(); await message.answer("❌ Cancelled."); return
-    try:
-        val = float(raw)
-        if val <= 0:
-            raise ValueError
-    except ValueError:
-        await message.answer("⚠️ Enter a positive number."); return
+    ok, val = valid_amount(raw)
+    if not ok:
+        await message.answer("⚠️ Enter a positive number (no <code>inf</code> / <code>1e21</code>).")
+        return
     if (await state.get_data()).get("cpn_kind") == "pct" and val > 100:
         await message.answer("⚠️ Percent bonus can't exceed 100%. Enter 1–100.")
         return
@@ -377,7 +377,8 @@ async def on_cpn_days(message: Message, state: FSMContext) -> None:
                                int(raw), message.chat.id)
     await log_action(message.chat.id, "coupon_create",
                      f"{code} {data['cpn_kind']}={data['cpn_value']:g}")
-    val = f"{data['cpn_value']:g}%" if data["cpn_kind"] == "pct" else f"{data['cpn_value']:g} BGM"
+    val = (f"{fmt_amount(data['cpn_value'])}%" if data["cpn_kind"] == "pct"
+           else f"{fmt_amount(data['cpn_value'])} BGM")
     await message.answer(
         f"✅ <b>Coupon created</b>\n\n🎟️ <code>{code}</code>\n💸 Bonus: {val}\n"
         f"🧮 Uses: {data['cpn_uses']} · ⏳ {raw} day(s)\n\nShare it — users apply it under 💎 Buy BGM.",

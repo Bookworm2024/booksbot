@@ -18,9 +18,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import FILE_CHANNEL_ID, LOG_CHANNEL_ID
+from config import LOG_CHANNEL_ID
 from database.connection import MongoManager
+from utils.channel import get_file_channel
 from utils.files import fuzzy_search, get_file, icon_for, search
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 from utils.wallet import get_balances, refund, spend
 
@@ -244,7 +246,7 @@ async def cb_download(call: CallbackQuery) -> None:
         if bgm + bcn < cost:
             await call.answer()
             await call.message.answer(
-                f"❌ <b>Insufficient balance.</b>\nYou need {cost:g} BCN/BGM to download.\n"
+                f"❌ <b>Insufficient balance.</b>\nYou need {fmt_amount(cost)} BCN/BGM to download.\n"
                 "💡 Use /claim for free BCN, buy BGM, or go 💎 Premium for cheaper downloads.",
                 reply_markup=kb([btn("💎 Buy BGM", "acc_buy", style="success"),
                                  btn("💎 Premium", "acc_vip", style="primary")]),
@@ -261,10 +263,14 @@ async def cb_download(call: CallbackQuery) -> None:
     fav_kb = kb([btn("⭐ Add to Favorites", f"fav_add:{fuid}", style="success")])
 
     delivered = False
+    # Deliver from the channel the file was INDEXED in (falls back to the live
+    # channel for legacy docs), so repointing the file channel never serves the
+    # wrong file or breaks old results.
+    src_channel = f.get("chan_id") or await get_file_channel()
     try:
-        if FILE_CHANNEL_ID and f.get("msg_id"):
+        if src_channel and f.get("msg_id"):
             await call.bot.copy_message(
-                chat_id=uid, from_chat_id=FILE_CHANNEL_ID, message_id=f["msg_id"],
+                chat_id=uid, from_chat_id=src_channel, message_id=f["msg_id"],
                 caption=caption, reply_markup=fav_kb,
             )
             delivered = True

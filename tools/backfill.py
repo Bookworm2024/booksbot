@@ -73,20 +73,28 @@ def extract(msg) -> dict | None:
 
 
 async def run() -> None:
-    if not (API_ID and API_HASH and TELETHON_SESSION and FILE_CHANNEL_ID):
-        raise SystemExit("Set API_ID, API_HASH, TELETHON_SESSION and FILE_CHANNEL_ID first.")
+    if not (API_ID and API_HASH and TELETHON_SESSION):
+        raise SystemExit("Set API_ID, API_HASH and TELETHON_SESSION first.")
 
     db = await MongoManager.get()
+    # Prefer the live channel set in-bot (admin panel → 🗂 File Channel); fall back
+    # to the FILE_CHANNEL_ID env constant. So in-bot config and backfill agree.
+    channel = int(await db.kv_get("file_channel_id", 0) or 0) or FILE_CHANNEL_ID
+    if not channel:
+        raise SystemExit("No file channel set. Set it in-bot (🗂 File Channel) or via FILE_CHANNEL_ID.")
     resume_id = int(await db.kv_get("backfill_last_msg_id", 0) or 0)
-    logger.info("Resuming from msg_id > %d", resume_id)
+    logger.info("Backfilling channel %d, resuming from msg_id > %d", channel, resume_id)
 
     client = TelegramClient(StringSession(TELETHON_SESSION), API_ID, API_HASH)
     await client.start()
 
     indexed = 0
-    async for msg in client.iter_messages(FILE_CHANNEL_ID, reverse=True, min_id=resume_id):
+    async for msg in client.iter_messages(channel, reverse=True, min_id=resume_id):
         item = extract(msg)
         if item:
+            # stamp the source channel so delivery survives a later channel change
+            # and so (chan_id, msg_id) dedupes against Bot-API-indexed copies.
+            item["chan_id"] = channel
             # index_file stamps indexed_at + the trigram index (for fuzzy search)
             created = await index_file(item)
             if created:

@@ -16,6 +16,7 @@ from aiogram.types import CallbackQuery, Message
 from database.connection import MongoManager
 from utils.ai import (ai_enabled, mood_titles, recommend_titles, similar_titles,
                       summarize_book)
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 from utils.settings import get_float
 from utils.wallet import get_balances, refund, spend
@@ -57,7 +58,7 @@ async def _intro(message: Message, uid: int) -> None:
     bgm, bcn = await get_balances(uid)
     cost = await _ai_cost()
     if bgm + bcn < cost:
-        await message.answer(f"❌ <b>Insufficient balance.</b> AI recs cost {cost:g} BCN/BGM.")
+        await message.answer(f"❌ <b>Insufficient balance.</b> AI recs cost {fmt_amount(cost)} BCN/BGM.")
         return
     await message.answer(
         "✨ <b>AI Book Recommendations</b>\n"
@@ -65,7 +66,7 @@ async def _intro(message: Message, uid: int) -> None:
         "🎯 <b>By Genre</b> — 100 titles in any genre\n"
         "📚 <b>Similar to a Book</b> — more like one you loved\n"
         "🎭 <b>By Mood</b> — match a vibe (cozy, fast, dark…)\n\n"
-        f"💎 Cost: <b>{cost:g} BCN/BGM</b>\n💳 Balance: {bcn:.2f} BCN · {bgm:.2f} BGM",
+        f"💎 Cost: <b>{fmt_amount(cost)} BCN/BGM</b>\n💳 Balance: {bcn:.2f} BCN · {bgm:.2f} BGM",
         reply_markup=kb([btn("🎯 By Genre", "rec_proceed", style="success")],
                         [btn("📚 Similar to a Book", "rec_similar", style="success")],
                         [btn("🎭 By Mood", "rec_mood", style="success")],
@@ -107,7 +108,7 @@ async def on_genre(message: Message, state: FSMContext) -> None:
         await refund(uid, refund_amt, "BGM")
         await notice.edit_text(
             f"❌ <b>{genre}</b> isn't a genre I could use.\n"
-            f"💸 Refunded <b>{refund_amt:g} BGM</b>. Try another genre via 🤖 AI Recommendations.")
+            f"💸 Refunded <b>{fmt_amount(refund_amt)} BGM</b>. Try another genre via 🤖 AI Recommendations.")
         return
 
     db = await MongoManager.get()
@@ -150,7 +151,7 @@ async def _deliver_or_refund(message: Message, uid: int, currency: str, label: s
     if not titles:
         refund_amt = round(await _ai_cost() * (0.75 if currency == "BCN" else 0.9), 3)
         await refund(uid, refund_amt, "BGM")
-        await notice.edit_text(f"❌ Couldn't use <b>{label}</b>. Refunded <b>{refund_amt:g} BGM</b>. "
+        await notice.edit_text(f"❌ Couldn't use <b>{label}</b>. Refunded <b>{fmt_amount(refund_amt)} BGM</b>. "
                                "Try again with something more specific.")
         return
     db = await MongoManager.get()
@@ -252,13 +253,13 @@ async def _summary_intro(message: Message, uid: int) -> None:
     bgm, bcn = await get_balances(uid)
     cost = await _ai_cost()
     if bgm + bcn < cost:
-        await message.answer(f"❌ <b>Insufficient balance.</b> A summary costs {cost:g} BCN/BGM.")
+        await message.answer(f"❌ <b>Insufficient balance.</b> A summary costs {fmt_amount(cost)} BCN/BGM.")
         return
     await message.answer(
         "📝 <b>AI Book Summary</b>\n━━━━━━━━━━━━━━━━━━\n"
         "Get a crisp, spoiler-light summary of any book — overview, themes, "
         "who it's for, and key takeaways.\n\n"
-        f"💎 Cost: <b>{cost:g} BCN/BGM</b> · Balance: {bcn:.2f} BCN · {bgm:.2f} BGM",
+        f"💎 Cost: <b>{fmt_amount(cost)} BCN/BGM</b> · Balance: {bcn:.2f} BCN · {bgm:.2f} BGM",
         reply_markup=kb([btn("🚀 Proceed & Pay", "sum_proceed", style="success")],
                         [btn("🔙 Back", "menu_library", style="danger")]))
 
@@ -294,7 +295,7 @@ async def on_summary_title(message: Message, state: FSMContext) -> None:
         refund_amt = round(await _ai_cost() * (0.75 if currency == "BCN" else 0.9), 3)
         await refund(uid, refund_amt, "BGM")
         await notice.edit_text(
-            f"❌ I couldn't find <b>{title}</b>. Refunded <b>{refund_amt:g} BGM</b>. "
+            f"❌ I couldn't find <b>{title}</b>. Refunded <b>{fmt_amount(refund_amt)} BGM</b>. "
             "Try the exact title + author.")
         return
     await notice.edit_text(

@@ -15,6 +15,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS
 from database.connection import MongoManager
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ def _render_req(req: dict) -> str:
     extra = ""
     if req.get("status") == "cancelled":
         extra = (f"\n📭 <b>Reason:</b> {req.get('cancel_reason', '—')}"
-                 f"\n💰 <b>Refunded:</b> {req.get('refunded', 0)} BGM")
+                 f"\n💰 <b>Refunded:</b> {fmt_amount(req.get('refunded', 0))} BGM")
     return ("📦 <b>Request Status</b>\n"
             f"🆔 <code>{req.get('request_id')}</code>\n"
             f"📖 {req.get('title')}\n✍️ {req.get('author')}\n"

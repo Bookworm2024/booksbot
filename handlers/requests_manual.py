@@ -33,6 +33,7 @@ from aiogram.types import CallbackQuery, Message
 from config import ADMIN_IDS, LOG_CHANNEL_ID
 from database.connection import MongoManager
 from utils.files import clean_title, index_file, kind_for_ext
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 from utils.wallet import get_balances, refund, spend
 
@@ -70,7 +71,7 @@ async def cb_req_manual(call: CallbackQuery, state: FSMContext) -> None:
     bgm, bcn = await get_balances(call.from_user.id)
     if bgm + bcn < cost:
         await call.message.edit_text(
-            f"🚫 <b>Insufficient balance.</b>\nManual requests cost <b>{cost:g} tokens</b>.\n"
+            f"🚫 <b>Insufficient balance.</b>\nManual requests cost <b>{fmt_amount(cost)} tokens</b>.\n"
             f"You have {bgm + bcn:.2f}.",
             reply_markup=kb([btn("💎 Buy BGM", "acc_buy", style="success")],
                             [btn("🔙 Back", "menu_request", style="danger")]))
@@ -78,7 +79,7 @@ async def cb_req_manual(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_data({})
     await call.message.edit_text(
         "<b>👤 Admin Request</b>\n\nWhat are you requesting?\n"
-        f"💰 Cost: <b>{cost:g} BCN/BGM</b> (deducted on confirm).",
+        f"💰 Cost: <b>{fmt_amount(cost)} BCN/BGM</b> (deducted on confirm).",
         reply_markup=kb(
             [btn("📘 Ebook", "mreq_ebook", style="primary"),
              btn("🎧 Audiobook", "mreq_audio", style="success")],
@@ -147,7 +148,7 @@ async def on_cover(message: Message, state: FSMContext) -> None:
                  f"📖 <b>Title:</b> {data.get('title')}\n"
                  f"✍️ <b>Author:</b> {data.get('author')}\n"
                  f"📂 <b>Type:</b> {data.get('category').title()}{fmt}\n"
-                 f"💰 <b>Cost:</b> {cost:g} BCN/BGM"),
+                 f"💰 <b>Cost:</b> {fmt_amount(cost)} BCN/BGM"),
         reply_markup=kb([btn("✅ Approve & Submit", "mreq_confirm", style="success")],
                         [btn("❌ Cancel", "mreq_cancel", style="danger")]))
 
@@ -397,11 +398,11 @@ async def on_reason(message: Message, state: FSMContext) -> None:
     await db.safe_update("requests", {"request_id": rid},
                          {"$set": {"status": "cancelled", "cancel_reason": reason,
                                    "refunded": refund_amt, "cancelled_at": _now()}})
-    await message.answer(f"✅ Cancelled <code>{rid}</code> · refunded {refund_amt} BGM.")
+    await message.answer(f"✅ Cancelled <code>{rid}</code> · refunded {fmt_amount(refund_amt)} BGM.")
     try:
         await message.bot.send_message(
             req["user_id"],
             f"❌ <b>Request Cancelled</b>\n🆔 <code>{rid}</code>\n📖 {req.get('title')}\n\n"
-            f"📭 <b>Reason:</b> {reason}\n💰 <b>Refund:</b> {refund_amt} BGM")
+            f"📭 <b>Reason:</b> {reason}\n💰 <b>Refund:</b> {fmt_amount(refund_amt)} BGM")
     except Exception:  # noqa: BLE001
         pass

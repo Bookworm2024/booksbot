@@ -19,9 +19,12 @@ from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS, BCN_EXPIRY_SECONDS
 from database.connection import MongoManager
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 from utils.settings import get_float
-from utils.wallet import add_bgm, get_balances, seconds_until_claim, set_daily_bcn
+from utils.wallet import (
+    add_bcn, add_bgm, drain_bcn, get_balances, seconds_until_claim, set_daily_bcn,
+)
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -68,9 +71,9 @@ async def _balance_view(uid: int):
         "<b>💼 Your Wallet</b>\n"
         + (f"{vip}\n" if vip else "")
         + "━━━━━━━━━━━━━━━━━━\n"
-        f"💎 <b>BGM:</b> <code>{bgm:.3f}</code>  <i>(permanent)</i>\n"
-        f"🪙 <b>BCN:</b> <code>{bcn:.3f}</code>  <i>(expires 24h)</i>\n"
-        f"⚖️ <b>Total:</b> <code>{bgm + bcn:.3f}</code>\n\n"
+        f"💎 <b>BGM:</b> <code>{fmt_amount(bgm, 3)}</code>  <i>(permanent)</i>\n"
+        f"🪙 <b>BCN:</b> <code>{fmt_amount(bcn, 3)}</code>  <i>(expires 24h)</i>\n"
+        f"⚖️ <b>Total:</b> <code>{fmt_amount(bgm + bcn, 3)}</code>\n\n"
         f"📚 eBook reqs: <code>{eb}</code>  ·  🎧 Audio reqs: <code>{ab}</code>  ·  "
         f"📈 Total: <code>{eb + ab}</code>\n\n"
         f"{claim_line}"
@@ -191,7 +194,7 @@ async def on_code(message: Message, state: FSMContext) -> None:
 
     await add_bgm(uid, amount)
     await message.answer(
-        f"✨ <b>Redeemed!</b>\n\n🎁 <b>+{amount} BGM</b> added to your wallet.",
+        f"✨ <b>Redeemed!</b>\n\n🎁 <b>+{fmt_amount(amount)} BGM</b> added to your wallet.",
         reply_markup=kb([btn("💼 Check Balance", "acc_balance", style="primary")]),
     )
 
@@ -230,8 +233,8 @@ async def cb_convert(call: CallbackQuery) -> None:
         return
     if bgm < min_bgm:
         await call.message.edit_text(
-            f"🔒 <b>Converter Locked</b>\n\nYou must hold at least <b>{min_bgm:.0f} BGM</b> "
-            f"to use the converter.\nYou have {bgm:.2f} BGM.",
+            f"🔒 <b>Converter Locked</b>\n\nYou must hold at least <b>{fmt_amount(min_bgm)} BGM</b> "
+            f"to use the converter.\nYou have {fmt_amount(bgm)} BGM.",
             reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
         return
     if used >= _CONVERT_MONTHLY_CAP:
@@ -243,9 +246,9 @@ async def cb_convert(call: CallbackQuery) -> None:
     credited = round(bcn * (1 - tax), 3)
     await call.message.edit_text(
         "<b>🔄 Convert BCN → BGM</b>\n"
-        f"🪙 Converting: <code>{bcn:.3f} BCN</code>\n"
-        f"🧾 Tax ({tax * 100:g}%): <code>{bcn * tax:.3f}</code>\n"
-        f"💎 You receive: <code>{credited:.3f} BGM</code>\n\n"
+        f"🪙 Converting: <code>{fmt_amount(bcn, 3)} BCN</code>\n"
+        f"🧾 Tax ({fmt_amount(tax * 100)}%): <code>{fmt_amount(bcn * tax, 3)}</code>\n"
+        f"💎 You receive: <code>{fmt_amount(credited, 3)} BGM</code>\n\n"
         f"Uses this month: {used}/{_CONVERT_MONTHLY_CAP}",
         reply_markup=kb([btn("✅ Confirm Convert", "convert_do", style="success")],
                         [btn("🔙 Back", "acc_balance", style="danger")]))
@@ -264,22 +267,29 @@ async def cb_convert_do(call: CallbackQuery) -> None:
         await call.answer("Conditions no longer met.", show_alert=True)
         return
     await call.answer()
-    # Atomic: flip bookcoin→0 only if it's still >0, returning the OLD value so
-    # the credited amount is computed from exactly what we zeroed. A concurrent
-    # second tap finds bookcoin already 0 → no match → no double credit.
-    old = await db.find_one_and_update_global(
-        "users", {"user_id": uid, "bookcoin": {"$gt": 0}},
-        {"$set": {"bookcoin": 0.0, "bcn_claimed_at": None,
-                  "convert_month": _month_key(), "convert_count": used + 1}},
-        return_before=True)
-    if not old:
+    # Atomically zero bookcoin across ALL clusters, returning the TOTAL drained so
+    # a split BCN balance converts in full and the credited amount matches exactly
+    # what we zeroed. A concurrent second tap drains 0 → no double credit.
+    drained = await drain_bcn(uid)
+    if drained <= 0:
         await call.message.edit_text("Nothing to convert.",
                                      reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
         return
-    credited = round(float(old.get("bookcoin") or 0) * (1 - tax), 3)
-    await add_bgm(uid, credited)
+    await db.safe_update("users", {"user_id": uid},
+                         {"$set": {"convert_month": _month_key(), "convert_count": used + 1}})
+    credited = round(drained * (1 - tax), 3)
+    try:
+        await add_bgm(uid, credited)
+    except Exception:  # noqa: BLE001 — never strand the user's drained BCN
+        logger.exception("convert: crediting %.3f BGM failed for %s; restoring %.3f BCN",
+                         credited, uid, drained)
+        await add_bcn(uid, drained)
+        await call.message.edit_text(
+            "⚠️ Conversion hit a snag — your BCN was restored. Please try again.",
+            reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
+        return
     text, markup = await _balance_view(uid)
-    await call.message.edit_text(f"✅ Converted to <b>{credited:.3f} BGM</b>.\n\n" + text,
+    await call.message.edit_text(f"✅ Converted to <b>{fmt_amount(credited, 3)} BGM</b>.\n\n" + text,
                                  reply_markup=markup)
 
 
@@ -302,7 +312,7 @@ async def cmd_create(message: Message, command: CommandObject) -> None:
     await message.answer(
         "✅ <b>Redeem Code Created</b>\n\n"
         f"🎟️ <code>{code}</code>\n🧮 Claims: {max_claims}\n"
-        f"💸 Per user: {per} BGM\n💰 Total: {total:g} BGM")
+        f"💸 Per user: {fmt_amount(per, 3)} BGM\n💰 Total: {fmt_amount(total)} BGM")
 
 
 # ── 🎟️ Create Code (admin panel — interactive) ─────────────────────────────────
@@ -351,7 +361,7 @@ async def cc_total_in(message: Message, state: FSMContext) -> None:
     await message.answer(
         "✅ <b>Redeem Code Created</b>\n\n"
         f"🎟️ <code>{code}</code>\n🧮 Claims: {max_claims}\n"
-        f"💸 Per user: {per} BGM\n💰 Total: {total:g} BGM\n\n"
+        f"💸 Per user: {fmt_amount(per, 3)} BGM\n💰 Total: {fmt_amount(total)} BGM\n\n"
         "Share the code — users claim it via 🎟 Redeem.",
         reply_markup=kb([btn("🎟️ Create Another", "admin_create", style="success")],
                         [btn("🔙 Admin", "admin_open", style="primary")]))

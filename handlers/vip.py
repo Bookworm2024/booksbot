@@ -11,6 +11,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 from utils.vip import TIERS, get_status, subscribe
 from utils.wallet import get_balances
@@ -27,7 +28,7 @@ async def _view(uid: int):
         cfg = TIERS[st["tier"]]
         lines.append(f"✅ Active: <b>{cfg['emoji']} {cfg['name']}</b> "
                      f"until {st['until'].strftime('%d %b %Y')}")
-    lines.append(f"💎 Your balance: <b>{bgm:.2f} BGM</b>\n")
+    lines.append(f"💎 Your balance: <b>{fmt_amount(bgm)} BGM</b>\n")
     for t, cfg in TIERS.items():
         dl = "free downloads" if cfg["dl_discount"] >= 1 else f"{int(cfg['dl_discount']*100)}% off downloads"
         lines.append(

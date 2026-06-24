@@ -16,6 +16,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
+from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 from utils.wallet import add_bgm
 
@@ -75,7 +76,7 @@ def _board(word: str, guessed: list, wrong: int, status: str) -> tuple[str, list
     else:
         won = status == "won"
         rwd = _reward(wrong) if won else 0.0
-        head += (f"\n🎉 <b>Solved it!</b> The word was <b>{word}</b>.\n💎 <b>+{rwd:g} BGM</b>"
+        head += (f"\n🎉 <b>Solved it!</b> The word was <b>{word}</b>.\n💎 <b>+{fmt_amount(rwd)} BGM</b>"
                  if won else f"\n💀 <b>Out of guesses!</b> The word was <b>{word}</b>.")
         rows.append([btn("🔁 New Word", "hm_new", style="success"),
                      btn("🎮 Games", "menu_games", style="primary")])

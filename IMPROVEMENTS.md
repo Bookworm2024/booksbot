@@ -94,14 +94,23 @@ it's here, it's not done yet.
 ---
 
 ### Tech debt / hardening (surfaced by review workflows)
-- ⬜ Per-user balance writes (wallet.spend, cosmetics buy, vanity) assume one user
-  doc per cluster. On a true multi-cluster deploy, a cross-cluster duplicate +
-  concurrency could split-charge / double-grant. Fix: route balance writes to a
-  deterministic home cluster `hash(uid) % n`. (Not reachable on today's single-cluster deploy.)
+- ✅ Balance reads now SUM across clusters and spends COMBINE BCN+BGM across all
+  clusters (`utils.wallet`: get_balances / spend / charge_bgm / drain_bcn), so a
+  cross-cluster duplicate no longer splits a balance, falsely blocks a download,
+  or hides a BCN→BGM conversion. cosmetics buy / vanity / gift / VIP all route
+  through the shared `charge_bgm`.
+- ⬜ Bulk grant (`update_many` per cluster) can still double-credit a user whose
+  doc is duplicated across clusters. Low impact (admin-only). Fix later: dedupe to
+  a deterministic home cluster `hash(uid) % n`, or consolidate duplicate docs.
 - ⬜ BGM is stored as a float → IEEE drift over many transactions. Move the economy
-  to integer minor units (the inflowads "wallet integer cents" invariant).
+  to integer minor units (the inflowads "wallet integer cents" invariant). Mitigated
+  for now: every credit/debit and display passes through `utils.format`
+  (`sanitize_amount` clamps to [0, 1e9] & drops NaN/inf; `valid_amount` rejects
+  `1e21`/`inf` at input; `fmt_amount` never renders scientific notation).
 
 ### Operational (not a feature, but pending)
 - Deploy the latest `main` to Koyeb (each batch needs a redeploy to go live).
-- Run the Telethon backfill once `API_ID`/`API_HASH`/`TELETHON_SESSION` +
-  `FILE_CHANNEL_ID` are set (indexes the ~30k archive; now also stamps trigrams).
+- The file/database channel is now a LIVE setting: set it in-bot via Admin →
+  🗂 File Channel (send the chat id or forward a message). `FILE_CHANNEL_ID` env is
+  only a first-run seed/default. Old files: forward them via 📥 Import Old Files,
+  or run the Telethon backfill for the bulk ~30k (now reads the live channel too).

@@ -10,7 +10,8 @@ User doc fields: vip_tier (0/1/2), vip_until (datetime).
 from datetime import datetime, timedelta, timezone
 
 from database.connection import MongoManager
-from utils.wallet import add_bgm
+from utils.format import fmt_amount
+from utils.wallet import add_bgm, charge_bgm
 
 TIERS = {
     1: {"name": "Silver VIP", "emoji": "🥈", "price": 50, "days": 30,
@@ -56,13 +57,12 @@ async def subscribe(uid: int, tier: int) -> tuple[bool, str]:
     if not cfg:
         return False, "Unknown tier."
     db = await MongoManager.get()
-    # atomic BGM debit (only if they hold the price)
-    debit = await db.find_one_and_update_global(
-        "users", {"user_id": uid, "bookgem": {"$gte": cfg["price"]}},
-        {"$inc": {"bookgem": -cfg["price"]}})
-    if not debit:
-        return False, f"You need {cfg['price']} BGM for {cfg['name']}."
-    cur_until = debit.get("vip_until")
+    # BGM debit, combined across clusters (no false "insufficient" on a split
+    # balance); rolls back a partial debit on failure.
+    if not await charge_bgm(uid, cfg["price"]):
+        return False, f"You need {fmt_amount(cfg['price'])} BGM for {cfg['name']}."
+    doc = await db.find_one_global("users", {"user_id": uid}, {"vip_until": 1}) or {}
+    cur_until = doc.get("vip_until")
     base = cur_until if isinstance(cur_until, datetime) and cur_until > _now() else _now()
     new_until = base + timedelta(days=cfg["days"])
     await db.safe_update("users", {"user_id": uid},
@@ -71,7 +71,7 @@ async def subscribe(uid: int, tier: int) -> tuple[bool, str]:
         await add_bgm(uid, cfg["monthly_bgm"])
     return True, (f"{cfg['emoji']} <b>{cfg['name']} activated!</b>\n"
                   f"Valid until {new_until.strftime('%d %b %Y')}.\n"
-                  f"🎁 +{cfg['monthly_bgm']} BGM granted now.")
+                  f"🎁 +{fmt_amount(cfg['monthly_bgm'])} BGM granted now.")
 
 
 async def badge(uid: int) -> str:

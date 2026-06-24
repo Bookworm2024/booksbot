@@ -89,6 +89,9 @@ class MongoManager:
                 await db.files.create_index([("name", TEXT)], default_language="english")
                 await db.files.create_index([("name_lc", ASCENDING)])
                 await db.files.create_index([("name_tg", ASCENDING)])  # trigrams → fuzzy search
+                # Cross-path dedupe + channel-scoped delivery: collapse the same
+                # channel message indexed via Telethon vs Bot API into one doc.
+                await db.files.create_index([("chan_id", ASCENDING), ("msg_id", ASCENDING)])
                 await db.files.create_index([("indexed_at", DESCENDING)])
                 await db.files.create_index([("dl_count", DESCENDING)])
                 await db.files.create_index([("featured_until", DESCENDING)])
