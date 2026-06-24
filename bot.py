@@ -29,8 +29,8 @@ from config import (
 from database.connection import MongoManager
 from handlers import (
     admin, admin_extra, admin_tools, ai_admin, anagram, broadcast, captcha,
-    channel_admin, cosmetics, daily, discover, economy, favorites, featured_admin,
-    feed, games, gift, goals, indexer, inline, invite, hangman, payments, qadmin,
+    channel_admin, cosmetics, daily, discover, economy, fallback, favorites,
+    featured_admin, feed, games, gift, goals, indexer, inline, invite, hangman, payments, qadmin,
     leaderboards, missions, notifs, profile, rate, ratings, recommend, referral,
     report, request, requests_manual, revenue, settings_admin, spin, start, stats,
     support, tbr, tagger, track, vip,
@@ -129,6 +129,9 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(admin_extra.router)
     dp.include_router(admin_tools.router)
     dp.include_router(admin.router)
+    # fallback last among message routers: catches stray non-command text only
+    # when no FSM flow is active, so it can never shadow a real handler.
+    dp.include_router(fallback.router)
     # indexer last — channel_post observer, no overlap with user handlers.
     dp.include_router(indexer.router)
     return dp

@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 
 from aiogram import F, Router
 from aiogram.filters import CommandObject, CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS, LOG_CHANNEL_ID, REQUIRED_CHANNELS
@@ -65,7 +66,10 @@ def _join_kb(missing: list[str]):
 
 # ── /start ───────────────────────────────────────────────────────────────────
 @router.message(CommandStart())
-async def cmd_start(message: Message, command: CommandObject) -> None:
+async def cmd_start(message: Message, command: CommandObject, state: FSMContext) -> None:
+    # /start is the universal escape hatch: drop any half-finished flow (search,
+    # gift, redeem, …) so the user is never trapped answering a stale prompt.
+    await state.clear()
     if message.chat.type != "private":
         await message.answer(
             "👋 <b>Hello!</b> Please talk to me in private to use my features.",
@@ -104,7 +108,8 @@ async def cmd_start(message: Message, command: CommandObject) -> None:
 
 
 @router.callback_query(F.data == "verify_join")
-async def cb_verify(call: CallbackQuery) -> None:
+async def cb_verify(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
     await call.answer("Checking membership…")
     await _render_gate_or_dashboard(call.message, override_user=call.from_user.id,
                                     first_name=call.from_user.first_name)
@@ -172,7 +177,8 @@ async def _send_dashboard(message: Message, name: str) -> None:
 
 # ── dashboard navigation ───────────────────────────────────────────────────────
 @router.callback_query(F.data == "menu_home")
-async def cb_home(call: CallbackQuery) -> None:
+async def cb_home(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()  # leaving to the dashboard exits any half-finished flow
     await call.answer()
     await call.message.edit_text(
         f"👋 <b>Welcome back, {call.from_user.first_name or 'Reader'}!</b>\n\n"
@@ -182,7 +188,8 @@ async def cb_home(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data == "menu_library")
-async def cb_library(call: CallbackQuery) -> None:
+async def cb_library(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
     await call.answer()
     await call.message.edit_text(
         "<b>📖 My Library</b>\n\nYour personal reading hub.",
@@ -202,7 +209,8 @@ async def cb_library(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data == "menu_account")
-async def cb_account(call: CallbackQuery) -> None:
+async def cb_account(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
     await call.answer()
     await call.message.edit_text(
         "<b>👤 My Account</b>\n\nProfile, tokens, rewards and activity.",
@@ -224,7 +232,8 @@ async def cb_account(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data == "menu_tools")
-async def cb_tools(call: CallbackQuery) -> None:
+async def cb_tools(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
     await call.answer()
     rows = [
         [btn("🏆 Leaderboards", "lb_hub", style="primary"),

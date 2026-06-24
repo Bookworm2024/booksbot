@@ -21,7 +21,7 @@ from aiogram.types import CallbackQuery, Message
 from config import LOG_CHANNEL_ID
 from database.connection import MongoManager
 from utils.channel import get_file_channel
-from utils.files import fuzzy_search, get_file, icon_for, search
+from utils.files import archive_count, fuzzy_search, get_file, icon_for, search
 from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 from utils.wallet import get_balances, refund, spend
@@ -44,7 +44,8 @@ def _norm(text: str) -> str:
 
 # ── Request Center ─────────────────────────────────────────────────────────────
 @router.callback_query(F.data == "menu_request")
-async def cb_request_center(call: CallbackQuery) -> None:
+async def cb_request_center(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
     await call.answer()
     await call.message.edit_text(
         "<b>📚 Request Center</b>\n\n"
@@ -174,12 +175,26 @@ async def _render_results(message: Message, state: FSMContext, query: str,
         fuzzy = total > 0
 
     if total == 0 and sf == "all":
-        await _add_watchlist(message.chat.id, query)
-        text = ("❌ <b>No matches found</b> (even fuzzy).\n\n"
-                f"✨ Added <code>{query}</code> to your <b>Watchlist</b> — I'll DM you "
-                "the moment it's uploaded.\n\nOr request it from an admin for priority:")
-        markup = kb([btn("👤 Request from Admin", "req_manual", style="primary")],
-                    [btn("🔙 Back", "menu_request", style="danger")])
+        # Exit the search flow so the user isn't trapped re-searching every text
+        # they type. The query stays in search_history for the opt-in watchlist.
+        await state.clear()
+        if await archive_count() == 0:
+            # the archive itself is empty/unindexed — be honest, don't blame the query
+            text = ("📚 <b>The library is still being set up.</b>\n\n"
+                    "No files have been indexed yet, so search can't find anything. "
+                    "An admin needs to add the file channel and import the books.\n\n"
+                    "<i>Check back soon!</i>")
+            markup = kb([btn("👤 Request from Admin", "req_manual", style="primary")],
+                        [btn("🔙 Menu", "menu_home", style="danger")])
+        else:
+            text = (f"❌ <b>No matches for</b> <code>{query}</code>.\n\n"
+                    "Double-check the spelling, or:\n"
+                    "• 🔔 get a ping when it's added\n"
+                    "• 👤 ask an admin to source it")
+            markup = kb([btn("🔔 Notify me when added", "wl_last", style="success")],
+                        [btn("🔍 New Search", "req_auto", style="primary"),
+                         btn("👤 Request from Admin", "req_manual", style="primary")],
+                        [btn("🔙 Menu", "menu_home", style="danger")])
         await (message.edit_text if edit else message.answer)(text, reply_markup=markup)
         return
 
@@ -223,6 +238,25 @@ async def _add_watchlist(user_id: int, query: str) -> None:
         {"$set": {"user_id": user_id, "query": query, "query_norm": _norm(query),
                   "matched": False, "created_at": datetime.now(timezone.utc)}},
     )
+
+
+@router.callback_query(F.data == "wl_last")
+async def cb_watch_last(call: CallbackQuery) -> None:
+    """Opt-in: add the user's most recent search to their watchlist on demand
+    (instead of auto-adding every no-match, which spammed the list)."""
+    db = await MongoManager.get()
+    u = await db.find_one_global("users", {"user_id": call.from_user.id},
+                                 {"search_history": 1}) or {}
+    hist = u.get("search_history") or []
+    if not hist:
+        await call.answer("Nothing to watch yet.", show_alert=True)
+        return
+    await _add_watchlist(call.from_user.id, hist[0])
+    await call.answer("🔔 Added — I'll DM you when it's uploaded.", show_alert=True)
+    await call.message.edit_text(
+        f"🔔 <b>Watching</b> <code>{hist[0]}</code>\nI'll message you the moment it lands.",
+        reply_markup=kb([btn("🔍 New Search", "req_auto", style="primary")],
+                        [btn("🔙 Menu", "menu_home", style="danger")]))
 
 
 # ── Download / delivery ─────────────────────────────────────────────────────────

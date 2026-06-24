@@ -2,9 +2,10 @@
 utils/format.py — safe display formatting for token amounts.
 
 The single source of truth for turning a BGM/BCN value into a human string.
-Telegram chat (here) and the Mini-Apps (web_app/_fmt.js) must NEVER render a
-balance in scientific notation — that is the "1e+21" bug: Python's ``:g`` and
-JavaScript's ``String(n)`` both flip to exponential for large magnitudes.
+Telegram chat (here) and the Mini-Apps (which use ``toLocaleString``/``toFixed``
+in web_app/*.html) must NEVER render a balance in scientific notation — that is
+the "1e+21" bug: Python's ``:g`` and JavaScript's ``String(n)`` both flip to
+exponential for large magnitudes.
 
 `fmt_amount` renders the *actual* number, finite-guarded, no exponent, decimals
 trimmed, thousands separators. `sanitize_amount` clamps a stored/computed value

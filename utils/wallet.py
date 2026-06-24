@@ -28,6 +28,8 @@ the claim cooldown — and a refund of BCN can set a fresh expiry without touchi
 the cooldown. (Legacy docs only have ``bcn_claimed_at``; the cooldown read falls
 back to it so the split is migration-safe.)
 """
+import logging
+import math
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -35,10 +37,39 @@ from pymongo import ReturnDocument
 
 from config import BCN_EXPIRY_SECONDS
 from database.connection import MongoManager
-from utils.format import sanitize_amount
+from utils.format import MAX_AMOUNT, sanitize_amount
+
+logger = logging.getLogger(__name__)
 
 # Float comparison slack so rounding noise never blocks a legitimate spend.
 _EPS = 1e-9
+
+
+def _is_clean(raw) -> bool:
+    """True if a stored balance is already a finite number within range — i.e. it
+    needs no healing. Strings, NaN/inf, negatives and out-of-range values are
+    'unclean' and get rewritten to their sanitized form on access. This matters
+    because Mongo range queries ({$gte: n}) are type-bracketed: a string/garbage
+    bookgem would pass sanitize() on read yet never match the spend deduction —
+    the "I have tons of BGM but it says insufficient" bug."""
+    return (isinstance(raw, (int, float)) and not isinstance(raw, bool)
+            and math.isfinite(raw) and 0.0 <= raw <= MAX_AMOUNT)
+
+
+async def _heal(db, user_id: int, fields: tuple[str, ...] = ("bookgem", "bookcoin")) -> None:
+    """Rewrite any corrupt stored balance to a clean sanitized float across every
+    cluster, so a corrupt value (e.g. a leftover 1e21) self-repairs on first
+    access and spend/convert work normally afterward."""
+    for idx in db.healthy:
+        doc = await db.dbs[idx]["users"].find_one(
+            {"user_id": user_id}, {f: 1 for f in fields})
+        if not doc:
+            continue
+        fix = {f: sanitize_amount(doc.get(f)) for f in fields
+               if doc.get(f) is not None and not _is_clean(doc.get(f))}
+        if fix:
+            logger.warning("healing corrupt balance for %s: %s", user_id, fix)
+            await db.dbs[idx]["users"].update_one({"user_id": user_id}, {"$set": fix})
 
 
 class Receipt(str):
@@ -91,16 +122,28 @@ async def check_bcn_expiry(user_id: int) -> None:
 
 
 async def get_balances(user_id: int) -> tuple[float, float]:
-    """Return (bgm, bcn) SUMMED across all clusters, after applying expiry."""
+    """Return (bgm, bcn) SUMMED across all clusters, after applying expiry.
+    Self-heals any corrupt stored value in passing so spend always agrees."""
     await check_bcn_expiry(user_id)
     db = await MongoManager.get()
     bgm = bcn = 0.0
     for idx in db.healthy:
         doc = await db.dbs[idx]["users"].find_one(
             {"user_id": user_id}, {"bookgem": 1, "bookcoin": 1})
-        if doc:
-            bgm += sanitize_amount(doc.get("bookgem"))
-            bcn += sanitize_amount(doc.get("bookcoin"))
+        if not doc:
+            continue
+        g, c = doc.get("bookgem"), doc.get("bookcoin")
+        gg, cc = sanitize_amount(g), sanitize_amount(c)
+        fix = {}
+        if g is not None and not _is_clean(g):
+            fix["bookgem"] = gg
+        if c is not None and not _is_clean(c):
+            fix["bookcoin"] = cc
+        if fix:
+            logger.warning("healing corrupt balance for %s: %s", user_id, fix)
+            await db.dbs[idx]["users"].update_one({"user_id": user_id}, {"$set": fix})
+        bgm += gg
+        bcn += cc
     # A second clamp on the total guarantees no display path ever sees a value
     # outside the legitimate range (defence in depth against corruption).
     return sanitize_amount(bgm), sanitize_amount(bcn)
@@ -198,6 +241,7 @@ async def drain_bcn(user_id: int) -> float:
     your BCN can never reset the daily-claim cooldown."""
     await check_bcn_expiry(user_id)
     db = await MongoManager.get()
+    await _heal(db, user_id, ("bookcoin",))  # so {$gt:0} matches even if stored corrupt
     total = 0.0
     for idx in db.healthy:
         doc = await db.dbs[idx]["users"].find_one_and_update(
@@ -240,10 +284,22 @@ async def _charge(user_id: int, cost: float, fields: tuple[str, ...]) -> Optiona
     proj = {f: 1 for f in fields}
     for idx in db.healthy:
         doc = await db.dbs[idx]["users"].find_one({"user_id": user_id}, proj)
-        if doc:
-            bal = {f: sanitize_amount(doc.get(f)) for f in fields}
-            rows.append((idx, bal))
-            total += sum(bal.values())
+        if not doc:
+            continue
+        bal, fix = {}, {}
+        for f in fields:
+            raw = doc.get(f)
+            clean = sanitize_amount(raw)
+            bal[f] = clean
+            if raw is not None and not _is_clean(raw):
+                fix[f] = clean
+        if fix:
+            # rewrite corrupt values to clean floats so the conditional deduction
+            # below ({$gte}) actually matches — fixes "enough BGM but insufficient".
+            logger.warning("healing corrupt balance for %s: %s", user_id, fix)
+            await db.dbs[idx]["users"].update_one({"user_id": user_id}, {"$set": fix})
+        rows.append((idx, bal))
+        total += sum(bal.values())
     if total + _EPS < cost:
         return None
 

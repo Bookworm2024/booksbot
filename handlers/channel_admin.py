@@ -24,9 +24,10 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from config import SUPER_ADMIN_ID
+from database.connection import MongoManager
 from utils.audit import log_action
 from utils.channel import get_file_channel, set_file_channel
-from utils.files import extract_from_message, index_file
+from utils.files import archive_count, extract_from_message, index_file
 from utils.keyboards import btn, kb
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,54 @@ async def cb_filechan(call: CallbackQuery) -> None:
         await _panel_text(),
         reply_markup=kb([btn("✏️ Change Channel ID", "filechan_change", style="primary")],
                         [btn("📥 Import Old Files", "admin_import", style="success")],
+                        [btn("🔎 Diagnostics", "filechan_diag", style="primary")],
                         [btn("🔙 Back", "admin_open", style="danger")]))
+
+
+@router.callback_query(F.data == "filechan_diag")
+async def cb_diag(call: CallbackQuery) -> None:
+    if not _is_super(call.from_user.id):
+        await call.answer("Super admin only", show_alert=True)
+        return
+    await call.answer("Checking…")
+    db = await MongoManager.get()
+    total = await archive_count()
+    deliverable = await db.count_global("files", {"msg_id": {"$ne": None}})
+    live = await get_file_channel()
+
+    # can the bot actually reach the channel (needed to index new posts & deliver)?
+    access = "—"
+    if live:
+        try:
+            chat = await call.bot.get_chat(live)
+            title = getattr(chat, "title", None) or live
+            try:
+                me = await call.bot.get_chat_member(live, (await call.bot.get_me()).id)
+                role = getattr(me, "status", "member")
+                access = f"✅ <b>{title}</b> (bot is {role})"
+            except Exception:  # noqa: BLE001
+                access = f"✅ reachable: <b>{title}</b>"
+        except Exception as exc:  # noqa: BLE001
+            access = f"❌ can't reach it — add the bot as <b>admin</b>\n<i>{str(exc)[:80]}</i>"
+
+    health = "🟢 healthy" if (live and total > 0) else "🔴 needs setup"
+    tips = []
+    if not live:
+        tips.append("• Set the channel: <b>✏️ Change Channel ID</b>")
+    if total == 0:
+        tips.append("• Import existing files: <b>📥 Import Old Files</b> (or run the Telethon backfill)")
+    tip_block = ("\n\n<b>To fix:</b>\n" + "\n".join(tips)) if tips else ""
+
+    await call.message.edit_text(
+        "🔎 <b>Archive Diagnostics</b>\n━━━━━━━━━━━━━━━━━━\n"
+        f"Status: <b>{health}</b>\n"
+        f"📚 Files indexed: <b>{total}</b>\n"
+        f"📤 Deliverable (have msg id): <b>{deliverable}</b>\n"
+        f"🗂 Channel: <code>{live or 'not set'}</code>\n"
+        f"🔌 Access: {access}"
+        + tip_block,
+        reply_markup=kb([btn("🔄 Refresh", "filechan_diag", style="primary")],
+                        [btn("🔙 Back", "admin_filechan", style="primary")]))
 
 
 # ── change channel id ────────────────────────────────────────────────────────
