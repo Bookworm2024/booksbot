@@ -97,7 +97,9 @@ Legend counts toward ~500 features across 14 pillars.
 - 🔜 Coupons (purchase discounts)
 - ✅ Sell ad slots inside the bot (📢 weighted sponsored placements on the
   dashboard, impression/click tracking, admin create/toggle/delete) · 🔜 affiliate payouts
-- 🔜 Abandoned-cart / win-back nudges · low-balance upsell
+- ✅ Abandoned-cart nudge (opened Buy but didn't pay → follow-up DM) · ✅ low-balance
+  upsell (out-of-tokens engaged users nudged once/day + 💡 in-wallet prompt) ·
+  win-back via the existing reminder loop
 - ⬜ Gift cards · tipping authors/uploaders
 - ⬜ Revenue forecasting · cohort LTV · churn alerts
 - ⬜ Per-admin commission tracking · payout ledger

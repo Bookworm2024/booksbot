@@ -35,7 +35,6 @@ it's here, it's not done yet.
 
 ## 5. Money — Admin Revenue Engine
 - 🔜 Affiliate payouts
-- 🔜 Abandoned-cart / win-back nudges · low-balance upsell
 - ⬜ Gift cards · tipping authors/uploaders
 - ⬜ Revenue forecasting · cohort LTV · churn alerts
 - ⬜ Per-admin commission tracking · payout ledger

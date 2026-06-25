@@ -78,6 +78,10 @@ async def _balance_view(uid: int):
         f"📈 Total: <code>{eb + ab}</code>\n\n"
         f"{claim_line}"
     )
+    # low-balance upsell — surface a gentle prompt when nearly out of tokens
+    if bgm + bcn < 1:
+        text += ("\n\n💡 <b>Running low!</b> Use /claim for free BCN, spin the wheel, "
+                 "or top up BGM to keep downloading.")
     rows = []
     if left == 0:
         rows.append([btn("⚡ Claim Daily BCN", "do_claim", style="success")])

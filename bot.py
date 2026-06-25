@@ -222,6 +222,7 @@ async def main() -> None:
 
     from utils.metrics import mark_start
     from utils.backup import run_backup_loop
+    from utils.nudges import run_nudge_loop
     mark_start()
 
     bot = _build_bot()
@@ -235,6 +236,7 @@ async def main() -> None:
     sched_bc_task = asyncio.create_task(run_scheduled_broadcasts(bot))
     digest_task = asyncio.create_task(run_weekly_digest(bot))
     backup_task = asyncio.create_task(run_backup_loop(bot))
+    nudge_task = asyncio.create_task(run_nudge_loop(bot))
 
     try:
         me = await bot.get_me()
@@ -247,6 +249,7 @@ async def main() -> None:
         sched_bc_task.cancel()
         digest_task.cancel()
         backup_task.cancel()
+        nudge_task.cancel()
         await runner.cleanup()
         await bot.session.close()
 

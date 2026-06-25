@@ -96,6 +96,10 @@ async def cmd_buy(message: Message) -> None:
 @router.callback_query(F.data == "acc_buy")
 async def cb_buy(call: CallbackQuery) -> None:
     await call.answer()
+    # stamp the "cart" so the abandoned-cart nudge can follow up if they don't pay
+    db = await MongoManager.get()
+    await db.safe_update("users", {"user_id": call.from_user.id},
+                         {"$set": {"cart_opened_at": _now(), "cart_nudged": False}})
     text, markup = await _buy_view()
     await call.message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)
 
@@ -280,6 +284,8 @@ async def _confirm_payment(doc: dict, bot, *, email_txn_id: str = "",
     cpn = await _redeem_coupon(flipped.get("coupon", ""), flipped["user_id"], base)
     total = base + bonus + fp + cpn
     await add_bgm(flipped["user_id"], total)
+    await db.safe_update("users", {"user_id": flipped["user_id"]},
+                         {"$unset": {"cart_opened_at": ""}}, upsert=False)  # cart completed
     bonus_line = f" (incl. +{fmt_amount(bonus)} bonus)" if bonus else ""
     fp_line = f"\n🥳 First-purchase bonus: <b>+{fmt_amount(fp)} BGM</b>!" if fp else ""
     cpn_line = f"\n🎟️ Coupon bonus: <b>+{fmt_amount(cpn)} BGM</b>!" if cpn else ""
@@ -416,6 +422,8 @@ async def heleket_webhook(request: web.Request) -> web.Response:
     cpn = await _redeem_coupon(order.get("coupon", ""), order["user_id"], base)
     total = base + float(order.get("bonus") or 0) + fp + cpn
     await add_bgm(order["user_id"], total)
+    await db.safe_update("users", {"user_id": order["user_id"]},
+                         {"$unset": {"cart_opened_at": ""}}, upsert=False)  # cart completed
     fp_line = f"\n🥳 First-purchase bonus: +{fmt_amount(fp)} BGM!" if fp else ""
     cpn_line = f"\n🎟️ Coupon bonus: +{fmt_amount(cpn)} BGM!" if cpn else ""
     bot = request.app["bot"]
