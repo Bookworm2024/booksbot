@@ -114,7 +114,7 @@ async def cmd_start(message: Message, command: CommandObject, state: FSMContext)
         try:
             await message.bot.send_message(
                 LOG_CHANNEL_ID,
-                f"🆕 <b>New User</b>\n👤 {message.from_user.first_name}\n"
+                f"🆕 <b>New User</b>\n👤 {escape(message.from_user.first_name or '')}\n"
                 f"🆔 <code>{uid}</code>",
             )
         except Exception:  # noqa: BLE001
@@ -138,7 +138,7 @@ async def _render_gate_or_dashboard(message: Message, *, override_user: int = 0,
     missing = await _not_joined(message.bot, uid)
     if missing:
         await message.answer(
-            f"👋 <b>Welcome, {name}!</b>\n\n"
+            f"👋 <b>Welcome, {escape(name)}!</b>\n\n"
             "To access the library, please join our official channels:",
             reply_markup=_join_kb(missing),
         )
@@ -187,7 +187,7 @@ async def _send_dashboard(message: Message, name: str) -> None:
     lang = await get_lang(message.chat.id)
     await message.answer(
         lvlup
-        + f"👋 <b>{t('welcome', lang)}, {name}!</b>\n\n"
+        + f"👋 <b>{t('welcome', lang)}, {escape(name)}!</b>\n\n"
         + (f"{promo}\n\n" if promo else "")
         + f"✨ <b>{t('ready', lang)}</b>\n\n"
         "<blockquote>📚 <b>Explore Features:</b>\n"
@@ -210,7 +210,7 @@ async def cb_home(call: CallbackQuery, state: FSMContext) -> None:
     lang = await get_lang(call.from_user.id)
     await call.message.edit_text(
         lvlup
-        + f"👋 <b>{t('welcome', lang)}, {call.from_user.first_name or 'Reader'}!</b>\n\n"
+        + f"👋 <b>{t('welcome', lang)}, {escape(call.from_user.first_name or 'Reader')}!</b>\n\n"
         f"✨ <b>{t('ready', lang)}</b>",
         reply_markup=await _dashboard_kb_with_ad(),
     )

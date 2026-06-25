@@ -9,6 +9,7 @@ Admin panel → 🧰 More Tools:
 import json
 import logging
 import re
+from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -119,9 +120,9 @@ async def cb_audit(call: CallbackQuery) -> None:
         for r in rows:
             at = r.get("at")
             ts = at.strftime("%d %b %H:%M") if hasattr(at, "strftime") else "—"
-            detail = f" · {r['detail']}" if r.get("detail") else ""
+            detail = f" · {escape(str(r['detail']))}" if r.get("detail") else ""
             lines.append(f"<code>{ts}</code> · <code>{r.get('admin_id')}</code> · "
-                         f"<b>{r.get('action')}</b>{detail}")
+                         f"<b>{escape(str(r.get('action') or ''))}</b>{detail}")
         body = "\n".join(lines)
     await call.message.edit_text(
         "📜 <b>Audit Log</b> (last 20)\n━━━━━━━━━━━━━━━━━━\n" + body,

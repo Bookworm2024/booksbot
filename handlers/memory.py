@@ -8,6 +8,7 @@ lives in the FSM (never re-shown once hidden); the reward is credited once.
 """
 import logging
 import random
+import uuid
 from datetime import datetime, timezone
 
 from aiogram import F, Router
@@ -63,10 +64,21 @@ class MemoryFSM(StatesGroup):
     repeating = State()  # sequence hidden, user tapping it back
 
 
-async def _plays_today(db, uid: int) -> int:
-    u = await db.find_one_global("users", {"user_id": uid},
-                                 {"mm_day": 1, "mm_plays": 1}) or {}
-    return int(u.get("mm_plays") or 0) if u.get("mm_day") == _today() else 0
+async def _consume_play(db, uid: int) -> bool:
+    """Atomically count one play under the daily cap. Returns False when the cap is
+    reached. The day-reset sets mm_plays=1 in the same op as the day flip, and the
+    same-day path is a conditional $inc under the cap — so concurrent _start calls
+    can never both slip past the limit (the BGM faucet for this game)."""
+    today = _today()
+    did_reset = await db.find_one_and_update_global(
+        "users", {"user_id": uid, "mm_day": {"$ne": today}},
+        {"$set": {"mm_day": today, "mm_plays": 1}})
+    if did_reset is not None:
+        return True  # first play of a new day
+    inc = await db.find_one_and_update_global(
+        "users", {"user_id": uid, "mm_day": today, "mm_plays": {"$lt": _DAILY}},
+        {"$inc": {"mm_plays": 1}})
+    return inc is not None
 
 
 async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool, length: int) -> None:
@@ -77,17 +89,15 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool, l
                    reply_markup=kb([btn("🔙 Back", "menu_home", style="danger")]))
         return
     db = await MongoManager.get()
-    prev = await _plays_today(db, uid)
-    if prev >= _DAILY:
+    if not await _consume_play(db, uid):
         await send(f"🧠 <b>Memory</b>\n\nDaily limit reached ({_DAILY}/day). Back tomorrow!",
                    reply_markup=kb([btn("🎮 Games", "menu_games", style="primary")]))
         return
-    await db.safe_update("users", {"user_id": uid},
-                         {"$set": {"mm_day": _today(), "mm_plays": prev + 1}})
     length = max(_START_LEN, min(_MAX_LEN, length))
     seq = [random.randrange(len(_PALETTE)) for _ in range(length)]
+    rt = uuid.uuid4().hex  # per-round token → atomic single-winner reward claim
     await state.set_state(MemoryFSM.showing)
-    await state.update_data(seq=seq, pos=0, length=length)
+    await state.update_data(seq=seq, pos=0, length=length, mm_round=rt)
     shown = " ".join(_PALETTE[i] for i in seq)
     await send(f"🧠 <b>Memory Match</b> · level {length - _START_LEN + 1}\n"
                "━━━━━━━━━━━━━━━━━━\n"
@@ -149,15 +159,23 @@ async def cb_tap(call: CallbackQuery, state: FSMContext) -> None:
 
     pos += 1
     if pos >= len(seq):
-        # solved → credit once (clear state first)
+        # solved → credit exactly once. state.clear() is NOT a dedup guard (FSM
+        # isolation is disabled, so a fast double-tap on the last tile runs two
+        # concurrent tasks). Gate the reward on an atomic per-round-token claim:
+        # only the task that flips mm_solved_token to this round's token pays out.
         await state.clear()
-        rwd = _reward(length)
-        await add_bgm(call.from_user.id, rwd)
         db = await MongoManager.get()
-        await db.safe_update("users", {"user_id": call.from_user.id},
-                             {"$inc": {"games_played": 1, "game_bgm": rwd}})
-        from utils.missions import mark
-        await mark(call.from_user.id, "play_game")
+        rt = data.get("mm_round") or uuid.uuid4().hex
+        won = await db.find_one_and_update_global(
+            "users", {"user_id": call.from_user.id, "mm_solved_token": {"$ne": rt}},
+            {"$set": {"mm_solved_token": rt}})
+        rwd = _reward(length)
+        if won is not None:
+            await add_bgm(call.from_user.id, rwd)
+            await db.safe_update("users", {"user_id": call.from_user.id},
+                                 {"$inc": {"games_played": 1, "game_bgm": rwd}})
+            from utils.missions import mark
+            await mark(call.from_user.id, "play_game")
         await call.answer("✅ Perfect!")
         rows = [[btn("🎮 Games", "menu_games", style="primary")]]
         if length < _MAX_LEN:
