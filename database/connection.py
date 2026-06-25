@@ -129,6 +129,10 @@ class MongoManager:
                 await db.reactions.create_index(
                     [("file_unique_id", ASCENDING), ("user_id", ASCENDING)], unique=True)
                 await db.reactions.create_index([("file_unique_id", ASCENDING)])
+                # monthly referral contest standings
+                await db.ref_contest.create_index(
+                    [("user_id", ASCENDING), ("month", ASCENDING)], unique=True)
+                await db.ref_contest.create_index([("month", ASCENDING), ("count", DESCENDING)])
                 await db.users.create_index([("game_bgm", DESCENDING)])
                 await db.users.create_index([("last_active", ASCENDING)])
                 await db.users.create_index([("downloads", DESCENDING)])

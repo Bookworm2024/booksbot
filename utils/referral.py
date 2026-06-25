@@ -61,6 +61,10 @@ async def grant_referral(bot, uid: int) -> None:
     updated = await db.find_one_and_update_global(
         "users", {"user_id": ref}, {"$inc": {"ref_count": 1}})
     new_count = int((updated or {}).get("ref_count") or 0)
+    # monthly referral contest: tally this referral + lazily settle last month
+    from utils.contests import bump as contest_bump, settle as contest_settle
+    await contest_bump(ref)
+    await contest_settle(bot)
     try:
         await bot.send_message(uid, f"🎁 <b>Referral Bonus!</b> +{fmt_amount(new_bonus)} BGM added.")
     except Exception:  # noqa: BLE001

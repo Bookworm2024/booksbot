@@ -132,7 +132,8 @@ Legend counts toward ~500 features across 14 pillars.
 ## 7. Growth & Virality
 - ✅ Referrals (+0.5/+0.25 BGM) + leaderboard
 - ✅ Referral milestone bonuses (5/10/25/50/100 → escalating BGM)
-- 🔜 Referral contests
+- ✅ Referral contests (🏁 monthly standings with BGM prizes for top 3; persistent
+  per-month counts + lazy auto-settlement, winners DM'd)
 - ✅ Share-to-earn · invite quests (🚀 Growth Quests — share + refer 1/3/7 +
   reach Level 5 + play 25, one-time BGM bounties, atomic claim) · ✅ streak rewards
 - ✅ Daily Spin-the-Wheel (free, weighted BGM prizes, once/day, atomic)
