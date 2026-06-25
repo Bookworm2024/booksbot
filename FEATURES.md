@@ -93,7 +93,8 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Sponsored/featured book slots — admin features a title for N days; ⭐ Featured
   section in Discover (paid placement)
 - 🔜 Coupons (purchase discounts)
-- 🔜 Sell ad slots inside the bot · affiliate payouts
+- ✅ Sell ad slots inside the bot (📢 weighted sponsored placements on the
+  dashboard, impression/click tracking, admin create/toggle/delete) · 🔜 affiliate payouts
 - 🔜 Abandoned-cart / win-back nudges · low-balance upsell
 - ⬜ Gift cards · tipping authors/uploaders
 - ⬜ Revenue forecasting · cohort LTV · churn alerts

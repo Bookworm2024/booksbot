@@ -34,7 +34,7 @@ it's here, it's not done yet.
 - ⬜ Boss-quiz events · seasonal themed events
 
 ## 5. Money — Admin Revenue Engine
-- 🔜 Sell ad slots inside the bot · affiliate payouts
+- 🔜 Affiliate payouts
 - 🔜 Abandoned-cart / win-back nudges · low-balance upsell
 - ⬜ Gift cards · tipping authors/uploaders
 - ⬜ Revenue forecasting · cohort LTV · churn alerts

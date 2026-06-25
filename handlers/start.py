@@ -56,6 +56,21 @@ def _dashboard_kb():
     )
 
 
+async def _dashboard_kb_with_ad():
+    """Dashboard keyboard plus a sponsored-ad button when an active ad slot
+    exists (paid placement; impressions tracked). Never fails the dashboard."""
+    markup = _dashboard_kb()
+    try:
+        from utils.ads import pick_active
+        ad = await pick_active()
+        if ad:
+            markup.inline_keyboard.append(
+                [btn(ad.get("label") or "📢 Sponsored", f"ad:{ad['ad_id']}", style="primary")])
+    except Exception:  # noqa: BLE001
+        pass
+    return markup
+
+
 def _join_kb(missing: list[str]):
     rows = []
     for i, ch in enumerate(missing, 1):
@@ -177,7 +192,7 @@ async def _send_dashboard(message: Message, name: str) -> None:
         "• Manage tokens and your library\n"
         "• Play games and earn rewards\n"
         "• Use advanced utility tools</blockquote>",
-        reply_markup=_dashboard_kb(),
+        reply_markup=await _dashboard_kb_with_ad(),
     )
 
 
@@ -192,7 +207,7 @@ async def cb_home(call: CallbackQuery, state: FSMContext) -> None:
         lvlup
         + f"👋 <b>Welcome back, {call.from_user.first_name or 'Reader'}!</b>\n\n"
         "✨ <b>Your reading companion is ready.</b>",
-        reply_markup=_dashboard_kb(),
+        reply_markup=await _dashboard_kb_with_ad(),
     )
 
 
