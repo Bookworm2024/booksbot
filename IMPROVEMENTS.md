@@ -61,7 +61,7 @@ it's here, it's not done yet.
 - ⬜ Buddy reading · shared shelves · author AMAs
 
 ## 11. Content Pipeline
-- 🔜 Metadata enrichment · cover fetch · duplicate detection · OCR for scans
+- 🔜 Metadata enrichment · cover fetch · OCR for scans
 - 🔜 Uploader rewards/leaderboard · bounty requests
 - ⬜ Auto-categorize into genres · series grouping · multi-format linking
 

@@ -179,7 +179,8 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Telethon backfill (30k archive) · real-time indexer (live channel id) ·
   forward-import for old files · watchlist
 - ✅ AI genre auto-tagging (admin batch) → 🏷 Browse-by-Genre in Discover
-- 🔜 Metadata enrichment · cover fetch · duplicate detection · OCR for scans
+- ✅ Duplicate detection (🧹 admin tool — title-duplicate groups, one-tap keep-best
+  cleanup) · 🔜 metadata enrichment · cover fetch · OCR for scans
 - 🔜 Uploader rewards/leaderboard · bounty requests
 - ⬜ Auto-categorize into genres · series grouping · multi-format linking
 
