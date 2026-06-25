@@ -29,11 +29,11 @@ from config import (
 from database.connection import MongoManager
 from handlers import (
     admin, admin_extra, admin_tools, ai_admin, anagram, broadcast, captcha,
-    channel_admin, cosmetics, coverguess, daily, discover, economy, fallback, favorites,
-    featured_admin, feed, games, gift, goals, indexer, inline, invite, hangman, payments, qadmin,
-    leaderboards, missions, notifs, profile, rate, ratings, recommend, referral,
-    report, request, requests_manual, revenue, settings_admin, speedread, spin, start, stats,
-    support, tbr, tagger, track, vip,
+    challenges, channel_admin, cosmetics, coverguess, daily, discover, economy, fallback,
+    favorites, featured_admin, feed, games, gift, goals, indexer, inline, invite, hangman,
+    payments, qadmin, leaderboards, missions, notifs, profile, rate, ratings, recommend,
+    referral, report, request, requests_manual, revenue, settings_admin, speedread, spin,
+    start, stats, support, tbr, tagger, track, vip,
 )
 from handlers.payments import heleket_webhook
 from handlers.admin_api import api_admin_overview, api_admin_ai, api_admin_ai_test
@@ -100,6 +100,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(goals.router)
     dp.include_router(feed.router)
     dp.include_router(discover.router)
+    dp.include_router(challenges.router)
     dp.include_router(games.router)
     dp.include_router(hangman.router)
     dp.include_router(anagram.router)

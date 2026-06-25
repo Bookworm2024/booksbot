@@ -21,8 +21,6 @@ it's here, it's not done yet.
 - ⬜ Adjustable playback EQ for audiobooks · chapter markers
 
 ## 2. Book Discovery & Content
-- 🔜 Author spotlight · series detector & next-in-series
-- 🔜 Genre browse hub · curated collections / shelves · reading challenges
 - ⬜ TBR reminders (nudge about saved-for-later books)
 
 ## 3. Powerful Search

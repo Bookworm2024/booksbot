@@ -32,8 +32,11 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Discover hub: 🆕 New Arrivals · 🔥 Popular (download-ranked)
 - ✅ Book of the Day (deterministic daily) · 💬 Daily literary Quote
 - ✅ "Similar to this" recommendations · mood-based picks (AI; 📚/🎭 modes)
-- 🔜 Author spotlight · series detector & next-in-series
-- 🔜 Genre browse hub · curated collections / shelves · reading challenges
+- ✅ Author spotlight (🖊 16 authors + Author of the Day, lists their archive
+  titles) · ✅ series detector & next-in-series (🔗 Series Finder + auto "next
+  volume" nudge after a download)
+- ✅ Genre browse hub · ✅ curated collections / shelves (📚 10 themed keyword
+  shelves) · ✅ reading challenges (🎯 monthly goals, progress bars, claimable BGM)
 - ✅ Ratings &amp; reviews per title (⭐ 1–5 + written reviews, average shown)
 - ✅ Personal reading goal + yearly wrap-up (progress bar, days read, top genres)
 - ✅ Wishlist / Reading List (📌 save from search; downloading clears it)

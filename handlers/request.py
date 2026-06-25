@@ -335,6 +335,17 @@ async def cb_download(call: CallbackQuery) -> None:
     await bump_download(fuid)
     from utils.missions import mark
     await mark(uid, "download")
+    # nudge the next volume if this title is part of a detected series
+    try:
+        from utils.series import next_volume
+        nxt = await next_volume(f)
+        if nxt:
+            await call.message.answer(
+                f"📚 <b>Next in series:</b> {nxt.get('name','')}",
+                reply_markup=kb([btn(f"📥 Get «{(nxt.get('name') or '')[:28]}»",
+                                     f"dl:{nxt['file_unique_id']}", style="success")]))
+    except Exception:  # noqa: BLE001 — a nudge must never break delivery
+        pass
     if LOG_CHANNEL_ID:
         try:
             await call.bot.send_message(

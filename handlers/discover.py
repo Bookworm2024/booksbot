@@ -64,10 +64,14 @@ def _hub():
         "<b>🔭 Discover</b>\n━━━━━━━━━━━━━━━━━━\nFind your next read.",
         kb([btn("⭐ Featured", "disc_feat", style="success"),
             btn("🏷 Genres", "disc_genres", style="success")],
+           [btn("📚 Collections", "disc_collections", style="success"),
+            btn("🖊 Authors", "disc_authors", style="success")],
            [btn("🆕 New Arrivals", "disc_new:0", style="success"),
             btn("🔥 Popular", "disc_pop:0", style="success")],
-           [btn("📅 Book of the Day", "disc_botd", style="primary"),
-            btn("💬 Daily Quote", "disc_quote", style="primary")],
+           [btn("🔗 Series Finder", "disc_series", style="primary"),
+            btn("📅 Book of the Day", "disc_botd", style="primary")],
+           [btn("💬 Daily Quote", "disc_quote", style="primary"),
+            btn("🎯 Challenges", "menu_challenges", style="primary")],
            [btn("🔙 Back", "menu_library", style="danger")]))
 
 
@@ -119,6 +123,192 @@ async def cb_featured(call: CallbackQuery) -> None:
     rows.append([btn("🔙 Discover", "lib_discover", style="danger")])
     await call.message.edit_text(
         "⭐ <b>Featured Books</b>\n━━━━━━━━━━━━━━━━━━\nHand-picked &amp; sponsored picks:",
+        reply_markup=kb(*rows))
+
+
+# ── Curated collections (keyword shelves over the live archive) ────────────────
+_COLLECTIONS = [
+    ("🏆", "Award Winners", ["pulitzer", "booker", "nobel", "hugo", "award", "prize"]),
+    ("🧛", "Spooky Reads", ["horror", "ghost", "vampire", "haunted", "dracula", "zombie", "witch"]),
+    ("🚀", "Space & Sci-Fi", ["space", "mars", "galaxy", "star", "robot", "alien", "cyber", "future"]),
+    ("🕵️", "Mystery & Crime", ["murder", "detective", "mystery", "crime", "sherlock", "thief", "spy"]),
+    ("💘", "Love & Romance", ["romance", "love story", "wedding", "bride", "heart"]),
+    ("👑", "Timeless Classics", ["classic", "tolstoy", "dickens", "austen", "shakespeare", "homer"]),
+    ("🧠", "Self-Improvement", ["habit", "mindset", "productivity", "atomic", "success", "discipline"]),
+    ("🐉", "Fantasy Epics", ["dragon", "magic", "kingdom", "sword", "wizard", "throne", "quest"]),
+    ("📈", "Business & Money", ["business", "money", "invest", "startup", "finance", "wealth"]),
+    ("🧒", "Kids & Young Readers", ["children", "junior", "fairy", "disney", "picture book"]),
+]
+
+
+@router.callback_query(F.data == "disc_collections")
+async def cb_collections(call: CallbackQuery) -> None:
+    await call.answer()
+    rows, row = [], []
+    for i, (emoji, name, _terms) in enumerate(_COLLECTIONS):
+        row.append(btn(f"{emoji} {name}", f"disc_c:{i}", style="primary"))
+        if len(row) == 2:
+            rows.append(row); row = []
+    if row:
+        rows.append(row)
+    rows.append([btn("🔙 Discover", "lib_discover", style="danger")])
+    await call.message.edit_text(
+        "📚 <b>Curated Collections</b>\n━━━━━━━━━━━━━━━━━━\nThemed shelves from the archive:",
+        reply_markup=kb(*rows))
+
+
+@router.callback_query(F.data.startswith("disc_c:"))
+async def cb_collection_files(call: CallbackQuery) -> None:
+    await call.answer()
+    from utils.files import search_any
+    try:
+        i = int(call.data.split(":", 1)[1])
+        emoji, name, terms = _COLLECTIONS[i]
+    except (ValueError, IndexError):
+        await call.answer(); return
+    items = await search_any(terms, limit=20)
+    if not items:
+        await call.message.edit_text(
+            f"{emoji} <b>{name}</b>\nNothing here yet — try Genres or search.",
+            reply_markup=kb([btn("🔙 Collections", "disc_collections", style="danger")]))
+        return
+    rows = [[btn(f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:36]}",
+                 f"dl:{f['file_unique_id']}", style="success")] for f in items]
+    rows.append([btn("🔙 Collections", "disc_collections", style="danger")])
+    await call.message.edit_text(
+        f"{emoji} <b>{name}</b> · 1 BCN/BGM each", reply_markup=kb(*rows))
+
+
+# ── Author spotlight ───────────────────────────────────────────────────────────
+_AUTHORS = [
+    ("J.K. Rowling", "Creator of the Harry Potter wizarding world.", ["rowling", "harry potter"]),
+    ("J.R.R. Tolkien", "Father of modern fantasy — Middle-earth.", ["tolkien", "lord of the rings", "hobbit"]),
+    ("Stephen King", "The reigning king of horror & suspense.", ["stephen king"]),
+    ("Agatha Christie", "Best-selling mystery novelist of all time.", ["agatha christie", "poirot"]),
+    ("George Orwell", "Dystopian visionary — 1984 & Animal Farm.", ["orwell", "1984", "animal farm"]),
+    ("Jane Austen", "Wit & romance of Regency England.", ["austen", "pride and prejudice"]),
+    ("Brandon Sanderson", "Epic fantasy & the Cosmere.", ["sanderson", "mistborn", "stormlight"]),
+    ("Dan Brown", "Symbology thrillers — Robert Langdon.", ["dan brown", "da vinci"]),
+    ("Paulo Coelho", "Inspirational fiction — The Alchemist.", ["coelho", "alchemist"]),
+    ("Haruki Murakami", "Surreal modern literary fiction.", ["murakami"]),
+    ("Ernest Hemingway", "Spare, powerful 20th-century prose.", ["hemingway"]),
+    ("Isaac Asimov", "Grandmaster of science fiction.", ["asimov", "foundation"]),
+    ("Roald Dahl", "Beloved children's storyteller.", ["roald dahl", "dahl", "matilda"]),
+    ("Mark Twain", "The great American humorist.", ["mark twain", "tom sawyer", "huckleberry"]),
+    ("Charles Dickens", "Victorian social novelist.", ["dickens"]),
+    ("Rick Riordan", "Mythology-fueled YA adventures.", ["riordan", "percy jackson"]),
+]
+
+
+@router.callback_query(F.data == "disc_authors")
+async def cb_authors(call: CallbackQuery) -> None:
+    await call.answer()
+    aotd = _day_index() % len(_AUTHORS)
+    rows, row = [], []
+    for i, (name, _b, _t) in enumerate(_AUTHORS):
+        label = ("⭐ " if i == aotd else "") + name
+        row.append(btn(label, f"disc_a:{i}", style="primary"))
+        if len(row) == 2:
+            rows.append(row); row = []
+    if row:
+        rows.append(row)
+    rows.append([btn("🔙 Discover", "lib_discover", style="danger")])
+    await call.message.edit_text(
+        "🖊 <b>Author Spotlight</b>\n━━━━━━━━━━━━━━━━━━\n"
+        f"⭐ <b>Author of the Day:</b> {_AUTHORS[aotd][0]}\n\nPick an author to explore:",
+        reply_markup=kb(*rows))
+
+
+@router.callback_query(F.data.startswith("disc_a:"))
+async def cb_author_files(call: CallbackQuery) -> None:
+    await call.answer()
+    from utils.files import search_any
+    try:
+        i = int(call.data.split(":", 1)[1])
+        name, blurb, terms = _AUTHORS[i]
+    except (ValueError, IndexError):
+        await call.answer(); return
+    items = await search_any(terms, limit=16)
+    head = f"🖊 <b>{name}</b>\n<i>{blurb}</i>\n━━━━━━━━━━━━━━━━━━\n"
+    if not items:
+        await call.message.edit_text(
+            head + "No titles in the archive yet — try 📚 Request to ask for one.",
+            reply_markup=kb([btn("📚 Request a Book", "menu_request", style="success")],
+                            [btn("🔙 Authors", "disc_authors", style="danger")]))
+        return
+    rows = [[btn(f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:36]}",
+                 f"dl:{f['file_unique_id']}", style="success")] for f in items]
+    rows.append([btn("🔙 Authors", "disc_authors", style="danger")])
+    await call.message.edit_text(head + "Their books in the archive:", reply_markup=kb(*rows))
+
+
+# ── Series finder ──────────────────────────────────────────────────────────────
+@router.callback_query(F.data == "disc_series")
+async def cb_series(call: CallbackQuery) -> None:
+    await call.answer()
+    from utils.series import parse_series
+    pool = (await recent_files(limit=200)) + (await popular_files(limit=200))
+    # group by normalized series base; keep the lowest-volume file as representative
+    groups: dict[str, dict] = {}
+    seen_fuid = set()
+    for f in pool:
+        if f.get("file_unique_id") in seen_fuid:
+            continue
+        seen_fuid.add(f.get("file_unique_id"))
+        parsed = parse_series(f.get("name", ""))
+        if not parsed:
+            continue
+        base, num = parsed
+        key = "".join(ch for ch in base.lower() if ch.isalnum())
+        if not key:
+            continue
+        g = groups.setdefault(key, {"base": base, "nums": set(), "rep": f, "rep_num": num})
+        g["nums"].add(num)
+        if num < g["rep_num"]:
+            g["rep"], g["rep_num"] = f, num
+    series = [g for g in groups.values() if len(g["nums"]) >= 2]
+    series.sort(key=lambda g: len(g["nums"]), reverse=True)
+    if not series:
+        await call.message.edit_text(
+            "🔗 <b>Series Finder</b>\n━━━━━━━━━━━━━━━━━━\n"
+            "No multi-volume series detected in the archive yet.\n"
+            "<i>Tip: after any download I'll suggest the next volume automatically.</i>",
+            reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
+        return
+    rows = [[btn(f"📚 {g['base'][:30]} ({len(g['nums'])} vol)",
+                 f"disc_sr:{g['rep']['file_unique_id']}", style="primary")]
+            for g in series[:12]]
+    rows.append([btn("🔙 Discover", "lib_discover", style="danger")])
+    await call.message.edit_text(
+        "🔗 <b>Series Finder</b>\n━━━━━━━━━━━━━━━━━━\nMulti-volume series in the archive:",
+        reply_markup=kb(*rows))
+
+
+@router.callback_query(F.data.startswith("disc_sr:"))
+async def cb_series_detail(call: CallbackQuery) -> None:
+    await call.answer()
+    from utils.files import get_file
+    from utils.series import find_series, parse_series
+    fuid = call.data.split(":", 1)[1]
+    f = await get_file(fuid)
+    if not f:
+        await call.message.edit_text("That title is no longer available.",
+                                     reply_markup=kb([btn("🔙 Series", "disc_series", style="danger")]))
+        return
+    vols = await find_series(f)
+    parsed = parse_series(f.get("name", ""))
+    base = parsed[0] if parsed else f.get("name", "Series")
+    if not vols:
+        vols = [f]
+    rows = []
+    for v in vols:
+        vp = parse_series(v.get("name", ""))
+        tag = f"#{vp[1]} " if vp else ""
+        rows.append([btn(f"📥 {tag}{v.get('name','Untitled')[:32]}",
+                         f"dl:{v['file_unique_id']}", style="success")])
+    rows.append([btn("🔙 Series", "disc_series", style="danger")])
+    await call.message.edit_text(
+        f"📚 <b>{base}</b> · {len(vols)} volume(s)\n━━━━━━━━━━━━━━━━━━\nRead them in order:",
         reply_markup=kb(*rows))
 
 

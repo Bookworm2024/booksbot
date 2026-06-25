@@ -55,6 +55,9 @@ async def mark(uid: int, key: str) -> None:
                                      {"$set": {"tour_week": wk, "tour_games": 1}})
             else:
                 await db.safe_update("users", {"user_id": uid}, {"$inc": {"tour_games": 1}})
+        # monthly reading-challenge counters (reset on month change)
+        from utils.challenges import bump
+        await bump(uid, key)
     except Exception:  # noqa: BLE001 — missions must never break the host action
         pass
 

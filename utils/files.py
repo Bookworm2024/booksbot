@@ -257,6 +257,28 @@ async def fuzzy_search(query: str, *, skip: int = 0, limit: int = 10,
     return ranked[skip:skip + limit], len(ranked)
 
 
+async def search_any(terms: list[str], *, limit: int = 24) -> list[dict]:
+    """OR-search: return files whose title contains ANY of `terms` (each ≥2 chars).
+    Powers curated keyword shelves / author pages over the existing archive.
+    Deduped by file_unique_id, popular-first."""
+    clean = [t.strip().lower() for t in terms if t and len(t.strip()) >= 2]
+    if not clean:
+        return []
+    ors = [{"name_lc": {"$regex": re.escape(t)}} for t in clean]
+    db = await MongoManager.get()
+    rows = await db.find_global("files", {"$or": ors}, limit=_MAX_SCAN, proj=_SEARCH_PROJ)
+    seen, out = set(), []
+    for d in sorted(rows, key=lambda x: x.get("dl_count") or 0, reverse=True):
+        fuid = d.get("file_unique_id")
+        if fuid in seen:
+            continue
+        seen.add(fuid)
+        out.append(d)
+        if len(out) >= limit:
+            break
+    return out
+
+
 async def get_file(file_unique_id: str) -> dict | None:
     db = await MongoManager.get()
     return await db.find_one_global("files", {"file_unique_id": file_unique_id})
