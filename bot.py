@@ -32,7 +32,7 @@ from handlers import (
     admin, admin_extra, admin_tools, ai_admin, anagram, broadcast, captcha,
     ads, battlepass, challenges, channel_admin, clubs, cosmetics, coverguess, crates, daily,
     dedupe_admin, discover, economy, fallback, favorites, featured_admin, feed, games, gift,
-    goals, health_admin, indexer, moderation_admin, perms_admin,
+    goals, health_admin, indexer, locale, moderation_admin, perms_admin,
     inline, invite, hangman, payments, qadmin, leaderboards, missions, notifs, profile,
     quests, rate, ratings, recommend, referral, report, request, requests_manual, revenue,
     settings_admin, shelf, speedread, spin, start, stats, support, tbr, tagger, track, vip,
@@ -128,6 +128,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(support.router)
     dp.include_router(report.router)
     dp.include_router(notifs.router)
+    dp.include_router(locale.router)
     dp.include_router(rate.router)
     dp.include_router(ratings.router)
     dp.include_router(stats.router)

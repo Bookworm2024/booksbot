@@ -207,8 +207,10 @@ Legend counts toward ~500 features across 14 pillars.
 - ⬜ Horizontal scaling · webhook mode · CDN for media
 
 ## 14. Localization & Accessibility
-- 🔜 Multi-language UI (i18n) · per-user language
-- 🔜 Currency localization · RTL support
+- ✅ Per-user language (🌐 6 languages) + i18n foundation (t() helper, fallback to
+  English, core greeting surfaces translated; deeper coverage grows by adding keys)
+- ✅ Currency localization (💱 9 currencies, BGM price shown in your currency,
+  display-only) · ✅ RTL flagged (is_rtl for Arabic)
 - ⬜ Dyslexia font · high-contrast · screen-reader friendly captions
 
 ---

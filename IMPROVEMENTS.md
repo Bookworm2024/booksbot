@@ -73,8 +73,7 @@ it's here, it's not done yet.
 - ⬜ Horizontal scaling · webhook mode · CDN for media
 
 ## 14. Localization & Accessibility
-- 🔜 Multi-language UI (i18n) · per-user language
-- 🔜 Currency localization · RTL support
+- 🔜 Deeper i18n coverage (translate more UI surfaces beyond the greeting)
 - ⬜ Dyslexia font · high-contrast · screen-reader friendly captions
 
 ---

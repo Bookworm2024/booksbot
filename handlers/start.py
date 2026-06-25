@@ -183,11 +183,13 @@ async def _send_dashboard(message: Message, name: str) -> None:
     happy = await hh_banner()
     promo = "\n".join(b for b in (deal, happy) if b)
     lvlup = await levelup_banner(message.chat.id)
+    from utils.i18n import get_lang, t
+    lang = await get_lang(message.chat.id)
     await message.answer(
         lvlup
-        + f"👋 <b>Welcome back, {name}!</b>\n\n"
+        + f"👋 <b>{t('welcome', lang)}, {name}!</b>\n\n"
         + (f"{promo}\n\n" if promo else "")
-        + "✨ <b>Your reading companion is ready.</b>\n\n"
+        + f"✨ <b>{t('ready', lang)}</b>\n\n"
         "<blockquote>📚 <b>Explore Features:</b>\n"
         "• Request any eBook or Audiobook\n"
         "• Manage tokens and your library\n"
@@ -203,11 +205,13 @@ async def cb_home(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()  # leaving to the dashboard exits any half-finished flow
     await call.answer()
     from utils.xp import levelup_banner
+    from utils.i18n import get_lang, t
     lvlup = await levelup_banner(call.from_user.id)
+    lang = await get_lang(call.from_user.id)
     await call.message.edit_text(
         lvlup
-        + f"👋 <b>Welcome back, {call.from_user.first_name or 'Reader'}!</b>\n\n"
-        "✨ <b>Your reading companion is ready.</b>",
+        + f"👋 <b>{t('welcome', lang)}, {call.from_user.first_name or 'Reader'}!</b>\n\n"
+        f"✨ <b>{t('ready', lang)}</b>",
         reply_markup=await _dashboard_kb_with_ad(),
     )
 
@@ -255,7 +259,8 @@ async def cb_account(call: CallbackQuery, state: FSMContext) -> None:
             [btn("🚨 Track Request", "acc_track", style="primary"),
              btn("🎁 Gift BGM", "acc_gift", style="success")],
             [btn("🔔 Notifications", "acc_notifs", style="primary"),
-             btn("🆘 Support", "menu_support", style="primary")],
+             btn("🌐 Language", "menu_locale", style="primary")],
+            [btn("🆘 Support", "menu_support", style="primary")],
             [btn("🔙 Back", "menu_home", style="danger")],
         ),
     )
