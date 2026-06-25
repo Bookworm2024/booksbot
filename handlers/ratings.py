@@ -34,14 +34,14 @@ async def cb_rate(call: CallbackQuery) -> None:
     mine = await user_rating(call.from_user.id, fuid)
     cur = f"\nYour current rating: {'⭐' * int(mine['stars'])}" if mine else ""
     await call.message.edit_text(
-        f"⭐ <b>Rate</b> <i>{name[:60]}</i>{cur}\n\nHow many stars?",
-        reply_markup=kb([btn(f"{n}⭐", f"rate_set:{fuid}:{n}", style="primary") for n in (1, 2, 3)],
-                        [btn(f"{n}⭐", f"rate_set:{fuid}:{n}", style="primary") for n in (4, 5)],
+        f"⭐ <b>Rate</b> <i>{escape(name[:60])}</i>{cur}\n\nHow many stars?",
+        reply_markup=kb([btn(f"{n}⭐", f"bookrate_set:{fuid}:{n}", style="primary") for n in (1, 2, 3)],
+                        [btn(f"{n}⭐", f"bookrate_set:{fuid}:{n}", style="primary") for n in (4, 5)],
                         [btn("📊 See Reviews", f"revw:{fuid}", style="primary")],
                         [btn("🔙 Favorites", "lib_favorites", style="danger")]))
 
 
-@router.callback_query(F.data.startswith("rate_set:"))
+@router.callback_query(F.data.startswith("bookrate_set:"))
 async def cb_rate_set(call: CallbackQuery) -> None:
     _, fuid, n = call.data.split(":")
     n = max(1, min(5, int(n)))

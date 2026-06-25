@@ -17,6 +17,7 @@ are wired to friendly "coming soon" stubs so navigation never dead-ends.
 """
 import logging
 from datetime import datetime, timezone
+from html import escape
 
 from aiogram import F, Router
 from aiogram.filters import CommandObject, CommandStart
@@ -166,7 +167,7 @@ async def _deeplink_download(message: Message, uid: int, fuid: str) -> None:
                              reply_markup=_dashboard_kb())
         return
     await message.answer(
-        f"📚 <b>{f.get('name','Your book')}</b>\n{icon_for(f.get('ext',''))} "
+        f"📚 <b>{escape(f.get('name') or 'Your book')}</b>\n{icon_for(f.get('ext',''))} "
         f".{(f.get('ext') or '').upper()}\n\n💸 1 BCN/BGM to download.",
         reply_markup=kb([btn("📥 Get it now", f"dl:{fuid}", style="success")],
                         [btn("🏠 Menu", "menu_home", style="primary")]))

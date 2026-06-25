@@ -9,6 +9,7 @@ leaking files for free, and turns every chat into a discovery surface.
 Requires enabling inline mode once in @BotFather (/setinline).
 """
 import logging
+from html import escape
 
 from aiogram import F, Router
 from aiogram.types import (
@@ -41,7 +42,7 @@ async def inline_search(iq: InlineQuery) -> None:
             title=f"{icon_for(f.get('ext',''))} {name[:60]}",
             description=f".{ext} · tap to get it in the bot",
             input_message_content=InputTextMessageContent(
-                message_text=f"📚 <b>{name}</b>\n📥 Get it on @{BOT_USERNAME}",
+                message_text=f"📚 <b>{escape(name)}</b>\n📥 Get it on @{BOT_USERNAME}",
                 parse_mode="HTML"),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
                 InlineKeyboardButton(text="📥 Get this book", url=link)]]),

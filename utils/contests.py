@@ -74,10 +74,11 @@ async def settle(bot) -> None:
         db = await MongoManager.get()
         month = prev_month()
         flag = f"refc_settled:{month}"
-        if await db.kv_get(flag, False):
+        # Atomic one-shot claim: only the single caller that flips the flag pays
+        # out. A plain kv_get/kv_set guard has a read-then-write window that lets
+        # two concurrent settle() calls both pay each winner twice.
+        if not await db.kv_claim(flag):
             return
-        # claim the settlement slot first so concurrent callers don't double-pay
-        await db.kv_set(flag, True)
         winners = await top_month(month, len(PRIZES))
         for i, w in enumerate(winners):
             prize = PRIZES[i]

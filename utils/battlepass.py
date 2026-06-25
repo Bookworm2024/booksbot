@@ -99,18 +99,22 @@ async def claim(uid: int, idx: int) -> float:
 
 async def buy_premium(uid: int) -> str:
     """Unlock the premium track for the current season. Returns 'ok',
-    'already', or 'insufficient'. The premium slot is claimed atomically BEFORE
-    charging so a double-tap can't double-charge; a failed charge reverts it."""
+    'already', or 'insufficient'.
+
+    Charge FIRST, then claim the season slot atomically. This avoids exposing a
+    transient 'claimed-but-unpaid' state to a concurrent reader (which would see
+    'already' for a slot that then gets reverted). A rare double-tap where the
+    second charge succeeds but the slot is already claimed is refunded, so the
+    user is never double-charged."""
     db = await MongoManager.get()
     s = season()
+    if not await charge_bgm(uid, PREMIUM_PRICE):
+        return "insufficient"
     claimed = await db.find_one_and_update_global(
         "users", {"user_id": uid, "bp_premium_season": {"$ne": s}},
         {"$set": {"bp_premium_season": s}})
     if not claimed:
+        # already premium this season (e.g. a double-tap) → refund the extra charge
+        await add_bgm(uid, PREMIUM_PRICE)
         return "already"
-    ok = await charge_bgm(uid, PREMIUM_PRICE)
-    if not ok:
-        await db.safe_update("users", {"user_id": uid},
-                             {"$set": {"bp_premium_season": None}}, upsert=False)
-        return "insufficient"
     return "ok"

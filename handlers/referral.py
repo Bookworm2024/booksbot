@@ -6,6 +6,7 @@ The actual reward logic lives in utils/referral.py and fires from start.py
 when a referred user clears the join-gate.
 """
 import logging
+from html import escape
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -71,7 +72,7 @@ async def cb_contest(call: CallbackQuery) -> None:
         for i, t in enumerate(top):
             u = await db.find_one_global("users", {"user_id": t.get("user_id")},
                                          {"first_name": 1}) or {}
-            who = (u.get("first_name") or "User")[:18]
+            who = escape((u.get("first_name") or "User")[:18])
             lines.append(f"{medals[i]} {who} — <b>{int(t.get('count') or 0)}</b>")
     mine, rank = await my_stats(call.from_user.id, month)
     if mine:
@@ -94,7 +95,7 @@ async def cb_leaderboard(call: CallbackQuery) -> None:
     else:
         medals = ["🥇", "🥈", "🥉"] + ["🏅"] * 7
         body = "\n".join(
-            f"{medals[i]} {(t.get('first_name') or 'User')[:18]} — <b>{int(t.get('ref_count',0))}</b>"
+            f"{medals[i]} {escape((t.get('first_name') or 'User')[:18])} — <b>{int(t.get('ref_count',0))}</b>"
             for i, t in enumerate(top))
     await call.message.edit_text(
         "<b>🏆 Referral Leaderboard</b>\n━━━━━━━━━━━━━━━━━━\n" + body,

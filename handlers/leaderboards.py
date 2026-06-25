@@ -5,6 +5,7 @@ handlers/leaderboards.py — unified competitive leaderboards (Social).
 medals plus the viewer's own rank.
 """
 import logging
+from html import escape
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -63,7 +64,7 @@ async def cb_board(call: CallbackQuery) -> None:
             v = t.get(field, 0)
             vs = f"{float(v):.2f}" if is_float else str(int(v))
             me = " ⬅️ <b>you</b>" if t.get("user_id") == call.from_user.id else ""
-            rows.append(f"{_MEDALS[i]} {(t.get('first_name') or 'Player')[:18]} — "
+            rows.append(f"{_MEDALS[i]} {escape((t.get('first_name') or 'Player')[:18])} — "
                         f"<b>{vs}</b> {unit}{me}")
         body = "\n".join(rows)
     # the viewer's own rank

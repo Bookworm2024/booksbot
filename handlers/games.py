@@ -6,6 +6,7 @@ Falls back to a friendly notice if BOT_PUBLIC_URL isn't configured (Mini Apps
 need an HTTPS host).
 """
 import logging
+from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -84,7 +85,7 @@ async def cb_leaderboard(call: CallbackQuery) -> None:
     else:
         medals = ["🥇", "🥈", "🥉"] + ["🏅"] * 7
         body = "\n".join(
-            f"{medals[i]} {(t.get('first_name') or 'Player')[:18]} — "
+            f"{medals[i]} {escape((t.get('first_name') or 'Player')[:18])} — "
             f"<b>{t.get('game_bgm',0):.2f} BGM</b> ({int(t.get('games_played',0))} games)"
             for i, t in enumerate(top))
     await call.message.edit_text(
@@ -111,7 +112,7 @@ async def cb_tournament(call: CallbackQuery) -> None:
     else:
         medals = ["🥇", "🥈", "🥉"] + ["🏅"] * 7
         body = "\n".join(
-            f"{medals[i]} {(t.get('first_name') or 'Player')[:18]} — "
+            f"{medals[i]} {escape((t.get('first_name') or 'Player')[:18])} — "
             f"<b>{int(t.get('tour_games') or 0)}</b> games"
             for i, t in enumerate(top))
     mine = ""

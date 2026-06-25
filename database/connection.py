@@ -255,3 +255,24 @@ class MongoManager:
 
     async def kv_set(self, key: str, value: Any) -> None:
         await self.safe_update("kv", {"k": key}, {"$set": {"k": key, "v": value}})
+
+    async def kv_claim(self, key: str) -> bool:
+        """Atomically claim a one-shot flag. Returns True for EXACTLY ONE caller
+        (the one that flips `k` from absent/non-True to True); False for everyone
+        else. Used to make 'do this exactly once' guards race-safe (e.g. paying a
+        monthly contest prize) where a plain kv_get/kv_set has a TOCTOU window."""
+        # Conditional flip on whichever cluster already holds the doc.
+        for idx in self.healthy:
+            res = await self.dbs[idx]["kv"].update_one(
+                {"k": key, "v": {"$ne": True}}, {"$set": {"k": key, "v": True}})
+            if res.modified_count == 1:
+                return True
+            if res.matched_count == 1:
+                return False  # existed and already True → already claimed
+        # No cluster had the doc → race to insert on the write cluster. The unique
+        # index on kv.k makes exactly one concurrent insert win.
+        try:
+            await self.dbs[self.write_idx]["kv"].insert_one({"k": key, "v": True})
+            return True
+        except DuplicateKeyError:
+            return False
