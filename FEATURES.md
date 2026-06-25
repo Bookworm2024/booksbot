@@ -128,9 +128,10 @@ Legend counts toward ~500 features across 14 pillars.
   with live recipient counts
 - ✅ Bulk ban (paste many IDs at once) · 🚩 feature flags (live on/off per feature)
   · 📜 audit log (admin action trail)
-- 🔜 A/B broadcast · ✅ role-based admin permissions (granular — 🔑 per-admin
-  broadcast/ban/requests/users/content/moderation toggles, super-admin panel,
-  default full-access so existing admins are unaffected)
+- ✅ A/B broadcast (🧪 two variants split ~50/50 across an audience segment, per-
+  variant delivery tracked) · ✅ role-based admin permissions (granular — 🔑 per-
+  admin broadcast/ban/requests/users/content/moderation toggles, super-admin
+  panel, default full-access so existing admins are unaffected)
 - ✅ Auto-moderation rules · spam/abuse detection (🛡 filters club posts &amp;
   reviews — links/shouting/char-spam heuristics + admin-managed blocked-term
   list, live on/off)
