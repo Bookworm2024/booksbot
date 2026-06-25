@@ -110,9 +110,14 @@ async def _reviews_view(uid: int, fuid: str):
         if emo == mine:
             label = f"• {label}"
         react_row.append(btn(label, f"rx:{fuid}:{i}", style="primary"))
+    from utils.shelf import is_finished
+    fin = await is_finished(uid, fuid)
     return text, kb(react_row,
-                    [btn("⭐ Rate it", f"rate:{fuid}", style="success")],
-                    [btn("🔙 Favorites", "lib_favorites", style="danger")])
+                    [btn("⭐ Rate it", f"rate:{fuid}", style="success"),
+                     btn("✅ Finished" if not fin else "✅ Finished ✓", f"fin_add:{fuid}",
+                         style="primary")],
+                    [btn("📝 Add Note", f"note_add:{fuid}", style="primary"),
+                     btn("🔙 Favorites", "lib_favorites", style="danger")])
 
 
 @router.callback_query(F.data.startswith("revw:"))

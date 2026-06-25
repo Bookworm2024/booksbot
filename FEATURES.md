@@ -21,7 +21,9 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ TTS read-aloud (PDF/EPUB/text, device voices) · ✅ audio sleep timer
 - ✅ Reading streaks + stats (📊 My Reading: streak/days/in-progress/bookmarks)
 - 🔜 MOBI/AZW3 support · CBR comic reader · font-family picker
-- 🔜 Per-book notes & highlights · highlight export · "books finished" shelf
+- ✅ Per-book notes (📝 add/view/delete per title) · ✅ "books finished" shelf
+  (📒 My Shelf → 📚 Finished, one-tap re-fetch) · 🔜 highlights & highlight export
+  (reader Mini-App)
 - ⬜ Sync position across devices · last-page push notification
 - ⬜ Dictionary tap-lookup · translate selection · Wikipedia lookup
 - ⬜ Adjustable playback EQ for audiobooks · chapter markers

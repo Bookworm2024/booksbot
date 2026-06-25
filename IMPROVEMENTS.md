@@ -15,7 +15,7 @@ it's here, it's not done yet.
 
 ## 1. Universal Reader & Media
 - 🔜 MOBI/AZW3 support · CBR comic reader · font-family picker
-- 🔜 Per-book notes & highlights · highlight export · "books finished" shelf
+- 🔜 Highlights & highlight export (reader Mini-App)
 - ⬜ Sync reading position across devices · last-page push notification
 - ⬜ Dictionary tap-lookup · translate selection · Wikipedia lookup
 - ⬜ Adjustable playback EQ for audiobooks · chapter markers

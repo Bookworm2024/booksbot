@@ -35,7 +35,7 @@ from handlers import (
     health_admin, indexer,
     inline, invite, hangman, payments, qadmin, leaderboards, missions, notifs, profile,
     quests, rate, ratings, recommend, referral, report, request, requests_manual, revenue,
-    settings_admin, speedread, spin, start, stats, support, tbr, tagger, track, vip,
+    settings_admin, shelf, speedread, spin, start, stats, support, tbr, tagger, track, vip,
     pricing_admin,
 )
 from handlers.payments import heleket_webhook
@@ -103,6 +103,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(vip.router)
     dp.include_router(recommend.router)
     dp.include_router(favorites.router)
+    dp.include_router(shelf.router)
     dp.include_router(tbr.router)
     dp.include_router(goals.router)
     dp.include_router(feed.router)

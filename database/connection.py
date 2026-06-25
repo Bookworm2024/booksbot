@@ -133,6 +133,12 @@ class MongoManager:
                 await db.ref_contest.create_index(
                     [("user_id", ASCENDING), ("month", ASCENDING)], unique=True)
                 await db.ref_contest.create_index([("month", ASCENDING), ("count", DESCENDING)])
+                # reader shelf: finished books (one per user+file) + per-book notes
+                await db.finished.create_index(
+                    [("user_id", ASCENDING), ("file_unique_id", ASCENDING)], unique=True)
+                await db.finished.create_index([("user_id", ASCENDING), ("at", DESCENDING)])
+                await db.notes.create_index([("user_id", ASCENDING), ("file_unique_id", ASCENDING)])
+                await db.notes.create_index([("note_id", ASCENDING)], unique=True, sparse=True)
                 await db.users.create_index([("game_bgm", DESCENDING)])
                 await db.users.create_index([("last_active", ASCENDING)])
                 await db.users.create_index([("downloads", DESCENDING)])
