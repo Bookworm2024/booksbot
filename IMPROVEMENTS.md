@@ -34,7 +34,6 @@ it's here, it's not done yet.
 - ⬜ Boss-quiz events · seasonal themed events
 
 ## 5. Money — Admin Revenue Engine
-- 🔜 Per-item dynamic surge pricing · happy-hour multipliers
 - 🔜 Sell ad slots inside the bot · affiliate payouts
 - 🔜 Abandoned-cart / win-back nudges · low-balance upsell
 - ⬜ Gift cards · tipping authors/uploaders

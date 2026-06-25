@@ -63,6 +63,8 @@ async def cb_more(call: CallbackQuery) -> None:
              btn("🚩 Feature Flags", "admin_flags", style="primary")],
             [btn("🎟️ Coupons", "admin_coupons", style="success"),
              btn("🧹 GDPR Tools", "admin_gdpr", style="danger")],
+            [btn("⚡ Happy Hour", "admin_happy", style="success"),
+             btn("📈 Surge Pricing", "admin_surge", style="primary")],
             [btn("🔙 Back", "admin_open", style="primary")]))
 
 

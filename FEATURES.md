@@ -83,7 +83,9 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ First-purchase bonus (% of base BGM, once-ever, backfill-protected)
 - ✅ Coupon / promo campaigns (% or flat BGM bonus; usage cap + once-per-user,
   atomic redeem; admin 🎟️ Coupons panel; applied under 💎 Buy BGM)
-- 🔜 Per-item dynamic surge pricing · happy-hour multipliers
+- ✅ Per-item dynamic surge pricing (hot titles cost more, tiered, admin-capped,
+  off by default) · ✅ happy-hour multipliers (⚡ timed download discount presets,
+  dashboard banner) — admin → 🧰 More Tools → ⚡ Happy Hour / 📈 Surge Pricing
 - ✅ VIP subscription tiers (Silver/Gold) — BGM-priced, 30d; perks: cheaper/free
   downloads, bigger daily claim, monthly BGM grant; badge in /balance
 - ✅ Flash sales / happy-hour (admin-fired timed bonus on all purchases;

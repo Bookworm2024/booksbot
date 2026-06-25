@@ -161,13 +161,16 @@ async def _send_dashboard(message: Message, name: str) -> None:
     # pay out referral the first time the user clears the join-gate
     await grant_referral(message.bot, message.chat.id)
     from utils.deals import banner
+    from utils.pricing import hh_banner
     from utils.xp import levelup_banner
     deal = await banner()
+    happy = await hh_banner()
+    promo = "\n".join(b for b in (deal, happy) if b)
     lvlup = await levelup_banner(message.chat.id)
     await message.answer(
         lvlup
         + f"👋 <b>Welcome back, {name}!</b>\n\n"
-        + (f"{deal}\n\n" if deal else "")
+        + (f"{promo}\n\n" if promo else "")
         + "✨ <b>Your reading companion is ready.</b>\n\n"
         "<blockquote>📚 <b>Explore Features:</b>\n"
         "• Request any eBook or Audiobook\n"

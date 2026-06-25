@@ -271,7 +271,9 @@ async def cb_download(call: CallbackQuery) -> None:
 
     from utils.settings import get_float
     from utils.vip import download_factor
-    cost = round(await get_float("download_cost") * await download_factor(uid), 4)
+    from utils.pricing import download_multiplier
+    cost = round(await get_float("download_cost") * await download_factor(uid)
+                 * await download_multiplier(f), 4)
 
     if cost <= 0:
         currency = "VIP"  # Gold VIP → free downloads
