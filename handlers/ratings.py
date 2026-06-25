@@ -84,10 +84,8 @@ async def on_review(message: Message, state: FSMContext) -> None:
                                          [btn("🔙 Favorites", "lib_favorites", style="danger")]))
 
 
-@router.callback_query(F.data.startswith("revw:"))
-async def cb_reviews(call: CallbackQuery) -> None:
-    await call.answer()
-    fuid = call.data.split(":", 1)[1]
+async def _reviews_view(uid: int, fuid: str):
+    from utils.reactions import REACTIONS, counts as react_counts, user_reaction
     f = await get_file(fuid)
     name = (f or {}).get("name", "this book")
     avg, count = await summary(fuid)
@@ -102,6 +100,41 @@ async def cb_reviews(call: CallbackQuery) -> None:
             text += "\n<i>No written reviews yet — be the first!</i>"
     else:
         text += "\n<i>No ratings yet — be the first to rate it!</i>"
-    await call.message.edit_text(
-        text, reply_markup=kb([btn("⭐ Rate it", f"rate:{fuid}", style="success")],
-                              [btn("🔙 Favorites", "lib_favorites", style="danger")]))
+    # reactions bar (toggle, one per user)
+    rc = await react_counts(fuid)
+    mine = await user_reaction(fuid, uid)
+    react_row = []
+    for i, emo in enumerate(REACTIONS):
+        n = rc.get(emo, 0)
+        label = f"{emo} {n}" if n else emo
+        if emo == mine:
+            label = f"• {label}"
+        react_row.append(btn(label, f"rx:{fuid}:{i}", style="primary"))
+    return text, kb(react_row,
+                    [btn("⭐ Rate it", f"rate:{fuid}", style="success")],
+                    [btn("🔙 Favorites", "lib_favorites", style="danger")])
+
+
+@router.callback_query(F.data.startswith("revw:"))
+async def cb_reviews(call: CallbackQuery) -> None:
+    await call.answer()
+    fuid = call.data.split(":", 1)[1]
+    text, markup = await _reviews_view(call.from_user.id, fuid)
+    await call.message.edit_text(text, reply_markup=markup)
+
+
+@router.callback_query(F.data.startswith("rx:"))
+async def cb_react(call: CallbackQuery) -> None:
+    from utils.reactions import REACTIONS, toggle
+    parts = call.data.split(":")
+    if len(parts) != 3:
+        await call.answer(); return
+    _, fuid, idx = parts
+    try:
+        emoji = REACTIONS[int(idx)]
+    except (ValueError, IndexError):
+        await call.answer(); return
+    new = await toggle(fuid, call.from_user.id, emoji)
+    await call.answer(f"Reacted {emoji}" if new else "Reaction removed")
+    text, markup = await _reviews_view(call.from_user.id, fuid)
+    await call.message.edit_text(text, reply_markup=markup)

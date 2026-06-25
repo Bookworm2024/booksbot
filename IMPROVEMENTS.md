@@ -62,7 +62,6 @@ it's here, it's not done yet.
 
 ## 10. Social & Community
 - 🔜 Group reading challenges
-- 🔜 Comments/reactions on titles · discussion threads
 - ⬜ Buddy reading · shared shelves · author AMAs
 
 ## 11. Content Pipeline

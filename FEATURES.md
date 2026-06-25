@@ -161,7 +161,8 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Leaderboards hub — Top Readers / Gamers / Referrers / Streaks (+ your rank)
 - ✅ Book clubs / reading rooms (👥 create/join clubs, async post feed, atomic
   membership) · 🔜 group reading challenges
-- 🔜 Comments/reactions on titles · discussion threads
+- ✅ Comments/reactions on titles (written reviews = comments + 👍❤️🔥😂😮 one-tap
+  reactions, toggle, counts) · discussion threads via club post feeds
 - ⬜ Buddy reading · shared shelves · author AMAs
 
 ## 11. Content Pipeline (uploaders/admins)

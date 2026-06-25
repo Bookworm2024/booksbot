@@ -125,6 +125,10 @@ class MongoManager:
                 await db.club_members.create_index([("user_id", ASCENDING)])
                 await db.club_posts.create_index([("club_id", ASCENDING), ("created_at", DESCENDING)])
                 await db.clubs.create_index([("member_count", DESCENDING)])
+                # one reaction per (file, user)
+                await db.reactions.create_index(
+                    [("file_unique_id", ASCENDING), ("user_id", ASCENDING)], unique=True)
+                await db.reactions.create_index([("file_unique_id", ASCENDING)])
                 await db.users.create_index([("game_bgm", DESCENDING)])
                 await db.users.create_index([("last_active", ASCENDING)])
                 await db.users.create_index([("downloads", DESCENDING)])
