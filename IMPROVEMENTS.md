@@ -50,8 +50,7 @@ it's here, it's not done yet.
 
 ## 7. Growth & Virality
 - 🔜 Referral contests
-- 🔜 Share-to-earn · invite quests
-- 🔜 Loot crates · battle pass
+- 🔜 Battle pass
 - ⬜ Social proof ("X downloaded today") · viral share cards
 - ⬜ Channel cross-promo swaps · partner programs
 

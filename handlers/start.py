@@ -231,6 +231,8 @@ async def cb_account(call: CallbackQuery, state: FSMContext) -> None:
              btn("👑 Premium (VIP)", "acc_vip", style="success")],
             [btn("🎟 Redeem Code", "acc_redeem", style="success"),
              btn("🎁 Refer & Earn", "acc_refer", style="primary")],
+            [btn("🎁 Loot Crates", "menu_crates", style="success"),
+             btn("🚀 Quests", "menu_quests", style="success")],
             [btn("🚨 Track Request", "acc_track", style="primary"),
              btn("🎁 Gift BGM", "acc_gift", style="success")],
             [btn("🔔 Notifications", "acc_notifs", style="primary"),

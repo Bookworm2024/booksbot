@@ -58,6 +58,9 @@ async def mark(uid: int, key: str) -> None:
         # monthly reading-challenge counters (reset on month change)
         from utils.challenges import bump
         await bump(uid, key)
+        # loot-crate key progress (every few actions earns a key)
+        from utils.crates import bump as crate_bump
+        await crate_bump(uid)
     except Exception:  # noqa: BLE001 — missions must never break the host action
         pass
 

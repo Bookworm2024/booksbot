@@ -132,12 +132,14 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Referrals (+0.5/+0.25 BGM) + leaderboard
 - ✅ Referral milestone bonuses (5/10/25/50/100 → escalating BGM)
 - 🔜 Referral contests
-- 🔜 Share-to-earn · invite quests · streak rewards
+- ✅ Share-to-earn · invite quests (🚀 Growth Quests — share + refer 1/3/7 +
+  reach Level 5 + play 25, one-time BGM bounties, atomic claim) · ✅ streak rewards
 - ✅ Daily Spin-the-Wheel (free, weighted BGM prizes, once/day, atomic)
 - ✅ Daily login-streak reward (escalating to day-7, resets on a missed day)
 - ✅ Daily missions/quests board (play/download/spin/claim → earn + claim BGM)
-- 🔜 Loot crates · battle pass
-- 🔜 Quests/missions with BGM payouts · battle pass
+- ✅ Loot crates (🎁 earn keys every 5 actions → open for weighted BGM/BCN drops,
+  6 rarity tiers, atomic open) · 🔜 battle pass
+- ✅ Quests/missions with BGM payouts · 🔜 battle pass
 - ⬜ Social proof ("X downloaded today") · viral share cards
 - ⬜ Channel cross-promo swaps · partner programs
 

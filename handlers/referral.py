@@ -32,7 +32,8 @@ async def _refer_view(uid: int):
         f"🔗 <b>Your link:</b>\n<code>{link}</code>\n\n"
         f"📊 <b>Successful referrals:</b> <b>{count}</b>"
     )
-    return text, kb([btn("🏆 Leaderboard", "ref_leaderboard", style="primary")],
+    return text, kb([btn("🏆 Leaderboard", "ref_leaderboard", style="primary"),
+                     btn("🚀 Quests", "menu_quests", style="success")],
                     [btn("🔙 Back", "menu_account", style="danger")])
 
 
