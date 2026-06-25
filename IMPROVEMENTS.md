@@ -49,7 +49,6 @@ it's here, it's not done yet.
 - ⬜ Health/metrics dashboard · error feed · uptime alerts
 
 ## 7. Growth & Virality
-- 🔜 Battle pass
 - ⬜ Social proof ("X downloaded today") · viral share cards
 - ⬜ Channel cross-promo swaps · partner programs
 

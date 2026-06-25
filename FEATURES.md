@@ -140,8 +140,9 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Daily login-streak reward (escalating to day-7, resets on a missed day)
 - ✅ Daily missions/quests board (play/download/spin/claim → earn + claim BGM)
 - ✅ Loot crates (🎁 earn keys every 5 actions → open for weighted BGM/BCN drops,
-  6 rarity tiers, atomic open) · 🔜 battle pass
-- ✅ Quests/missions with BGM payouts · 🔜 battle pass
+  6 rarity tiers, atomic open) · ✅ battle pass (🎟️ seasonal, Pass Points from
+  play, 7 free+premium tiers, BGM premium unlock, atomic claim)
+- ✅ Quests/missions with BGM payouts · ✅ battle pass
 - ⬜ Social proof ("X downloaded today") · viral share cards
 - ⬜ Channel cross-promo swaps · partner programs
 

@@ -61,6 +61,9 @@ async def mark(uid: int, key: str) -> None:
         # loot-crate key progress (every few actions earns a key)
         from utils.crates import bump as crate_bump
         await crate_bump(uid)
+        # seasonal battle-pass points
+        from utils.battlepass import bump as bp_bump
+        await bp_bump(uid, key)
     except Exception:  # noqa: BLE001 — missions must never break the host action
         pass
 
