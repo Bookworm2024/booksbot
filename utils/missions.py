@@ -29,6 +29,10 @@ async def mark(uid: int, key: str) -> None:
     if key not in MISSIONS:
         return
     try:
+        # global XP accrues per action (not once/day) — central hook for the four
+        # core actions (play_game / download / spin / claim).
+        from utils.xp import award
+        await award(uid, key)
         db = await MongoManager.get()
         today = _today()
         doc = await db.find_one_global("users", {"user_id": uid}, {"missions_day": 1})

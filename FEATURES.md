@@ -57,12 +57,15 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Games leaderboard (top earners across all games)
 - ✅ Literary Hangman (chat-based, server-side word, 6 lives, BGM reward, 3/day)
 - ✅ Word Anagram / Word-Builder (chat-based, 3 tries, free hint, BGM reward, 5/day)
-- 🔜 Cover-Guess · Speed-Reading WPM · Memory match
+- ✅ Cover-Guess (🎭 emoji → book title, chat-based, 5/day) · ✅ Speed-Reading WPM
+  (⚡ timed read + comprehension gate, 3/day) · 🔜 Memory match
 - ✅ Daily game-streak bonus (play any game daily → escalating BGM; the "daily challenge")
 - ✅ Weekly tournament (🏆 ranks most games played this ISO week + your rank)
 - 🔜 Crossword
 - ✅ Achievements (🏅 board with progress + unlock notifications)
-- 🔜 Global XP &amp; levels
+- ✅ Global XP &amp; levels — one persistent XP pool fed by downloads/games/spins/
+  claims/referrals; level titles, progress bar, level-up BGM bonus + dashboard
+  banner (📈 XP &amp; Levels view, /level)
 - ⬜ Trivia battles (1v1) · clan/guild competitions
 - ⬜ Boss-quiz events · seasonal themed events
 

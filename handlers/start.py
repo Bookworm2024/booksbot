@@ -161,9 +161,12 @@ async def _send_dashboard(message: Message, name: str) -> None:
     # pay out referral the first time the user clears the join-gate
     await grant_referral(message.bot, message.chat.id)
     from utils.deals import banner
+    from utils.xp import levelup_banner
     deal = await banner()
+    lvlup = await levelup_banner(message.chat.id)
     await message.answer(
-        f"👋 <b>Welcome back, {name}!</b>\n\n"
+        lvlup
+        + f"👋 <b>Welcome back, {name}!</b>\n\n"
         + (f"{deal}\n\n" if deal else "")
         + "✨ <b>Your reading companion is ready.</b>\n\n"
         "<blockquote>📚 <b>Explore Features:</b>\n"
@@ -180,8 +183,11 @@ async def _send_dashboard(message: Message, name: str) -> None:
 async def cb_home(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()  # leaving to the dashboard exits any half-finished flow
     await call.answer()
+    from utils.xp import levelup_banner
+    lvlup = await levelup_banner(call.from_user.id)
     await call.message.edit_text(
-        f"👋 <b>Welcome back, {call.from_user.first_name or 'Reader'}!</b>\n\n"
+        lvlup
+        + f"👋 <b>Welcome back, {call.from_user.first_name or 'Reader'}!</b>\n\n"
         "✨ <b>Your reading companion is ready.</b>",
         reply_markup=_dashboard_kb(),
     )

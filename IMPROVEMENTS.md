@@ -30,9 +30,8 @@ it's here, it's not done yet.
 - ⬜ Semantic (embedding) search
 
 ## 4. Games & Brain
-- 🔜 Cover-Guess · Speed-Reading WPM · Memory match
+- 🔜 Memory match
 - 🔜 Crossword
-- 🔜 Global XP & levels
 - ⬜ Trivia battles (1v1) · clan/guild competitions
 - ⬜ Boss-quiz events · seasonal themed events
 

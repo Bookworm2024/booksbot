@@ -40,6 +40,8 @@ async def cb_games(call: CallbackQuery) -> None:
         "📚 <b>Guess the Book</b> — name it from the blurb\n"
         "✍️ <b>First Line</b> — name it from line one\n"
         "🖋️ <b>Author Match</b> — who wrote it?\n"
+        "🎭 <b>Cover Guess</b> — name the book from emoji\n"
+        "⚡ <b>Speed Read</b> — measure your WPM + recall\n"
         "🟩 <b>Bookle</b> — the daily book-word puzzle\n\n"
         "⏱ One <b>15-minute</b> clock per round · jump between questions freely · "
         "<b>skipping is free</b>.\n"
@@ -54,9 +56,12 @@ async def cb_games(call: CallbackQuery) -> None:
              btn("🎡 Daily Spin", "daily_spin", style="success")],
             [btn("🔤 Hangman", "menu_hangman", style="success"),
              btn("🔀 Anagram", "menu_anagram", style="success")],
+            [btn("🎭 Cover Guess", "menu_coverguess", style="success"),
+             btn("⚡ Speed Read", "menu_speedread", style="success")],
             [btn("🎯 Daily Missions", "menu_missions", style="primary"),
-             btn("🏆 Leaderboard", "game_leaderboard", style="primary")],
-            [btn("🏆 Weekly Tournament", "game_tournament", style="success")],
+             btn("📈 XP & Levels", "xp_view", style="primary")],
+            [btn("🏆 Leaderboard", "game_leaderboard", style="primary"),
+             btn("🏆 Weekly Tournament", "game_tournament", style="success")],
             [btn("🔙 Back", "menu_home", style="danger")],
         ))
 

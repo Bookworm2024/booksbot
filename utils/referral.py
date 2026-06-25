@@ -53,6 +53,10 @@ async def grant_referral(bot, uid: int) -> None:
     await db.safe_update("users", {"user_id": uid}, {"$set": {"referral_rewarded": True}})
     await add_bgm(uid, new_bonus)
     await add_bgm(ref, ref_bonus)
+    # global XP for the referrer (the referred user earns XP through their own
+    # actions; the referrer's reward for growing the bot is the XP here)
+    from utils.xp import award
+    await award(ref, "referral")
     # atomic increment returns the new count → check milestone exactly once
     updated = await db.find_one_and_update_global(
         "users", {"user_id": ref}, {"$inc": {"ref_count": 1}})
