@@ -8,11 +8,16 @@ user doc; opening atomically consumes one key so it can't be double-spent.
 """
 import logging
 import random
+from datetime import datetime, timezone
 
 from database.connection import MongoManager
-from utils.wallet import add_bcn, add_bgm
+from utils.format import sanitize_amount
 
 logger = logging.getLogger(__name__)
+
+
+def _now():
+    return datetime.now(timezone.utc)
 
 ACTIONS_PER_KEY = 5
 
@@ -60,7 +65,9 @@ async def status(uid: int) -> dict:
 
 async def open_crate(uid: int) -> dict | None:
     """Consume one key and roll a reward. Returns {tier, bgm, bcn} or None if no
-    keys. The key is consumed atomically before crediting (no double-open)."""
+    keys. The key is consumed atomically before crediting; the reward (BGM + BCN +
+    opened-counter) is then credited in ONE write so consume+reward is all-or-
+    nothing — if the credit fails the key is restored rather than silently lost."""
     db = await MongoManager.get()
     used = await db.find_one_and_update_global(
         "users", {"user_id": uid, "crate_keys": {"$gte": 1}},
@@ -68,9 +75,22 @@ async def open_crate(uid: int) -> dict | None:
     if not used:
         return None
     tier, bgm, bcn, _w = random.choice(_BAG)
+    inc: dict = {"crates_opened": 1}
     if bgm > 0:
-        await add_bgm(uid, bgm)
+        inc["bookgem"] = sanitize_amount(bgm)
     if bcn > 0:
-        await add_bcn(uid, bcn)
-    await db.safe_update("users", {"user_id": uid}, {"$inc": {"crates_opened": 1}})
+        inc["bookcoin"] = sanitize_amount(bcn)
+    update: dict = {"$inc": inc}
+    if bcn > 0:
+        update["$set"] = {"bcn_claimed_at": _now()}  # mirror add_bcn 24h expiry
+    try:
+        await db.safe_update("users", {"user_id": uid}, update)
+    except Exception:  # noqa: BLE001 — never consume a key without paying out
+        logger.warning("crate reward credit failed for %s; restoring key", uid, exc_info=True)
+        try:
+            await db.find_one_and_update_global(
+                "users", {"user_id": uid}, {"$inc": {"crate_keys": 1}})
+        except Exception:  # noqa: BLE001
+            logger.error("failed to restore crate key for %s", uid, exc_info=True)
+        return None
     return {"tier": tier, "bgm": bgm, "bcn": bcn}

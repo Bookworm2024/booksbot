@@ -5,6 +5,7 @@ From a favorite's actions: ⭐ Rate → pick 1–5 stars → optionally add a wr
 review. 📊 Reviews shows the average + recent reviews for that title.
 """
 import logging
+from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -90,10 +91,9 @@ async def cb_reviews(call: CallbackQuery) -> None:
     f = await get_file(fuid)
     name = (f or {}).get("name", "this book")
     avg, count = await summary(fuid)
-    text = (f"📊 <b>Reviews</b> — <i>{name[:60]}</i>\n━━━━━━━━━━━━━━━━━━\n"
+    text = (f"📊 <b>Reviews</b> — <i>{escape(name[:60])}</i>\n━━━━━━━━━━━━━━━━━━\n"
             f"{stars_bar(avg)} <b>{avg:g}</b> from {count} rating{'s' if count != 1 else ''}\n")
     if count:
-        from html import escape
         revs = await recent_reviews(fuid, limit=5)
         for r in revs:
             who = escape((r.get("name") or "Reader")[:20])

@@ -214,3 +214,12 @@ async def cb_answer(call: CallbackQuery, state: FSMContext) -> None:
     await call.message.edit_text(
         f"⚡ <b>Speed Read — Result</b>\n━━━━━━━━━━━━━━━━━━\n{verdict}",
         reply_markup=_again_kb())
+
+
+# Stateless fallback: after a restart MemoryStorage is wiped, so a tap on an
+# already-shown ✅ Done / answer button has no FSM state and would otherwise leave
+# the button spinning forever. Scoped to sr_done + sr:N only (NOT sr_new /
+# request.py's sr_prev/sr_next). Registered last → never shadows the in-flow handlers.
+@router.callback_query((F.data == "sr_done") | F.data.startswith("sr:"))
+async def cb_sr_expired(call: CallbackQuery) -> None:
+    await call.answer("⚡ Round expired — start a new Speed Read.", show_alert=True)

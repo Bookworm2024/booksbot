@@ -11,6 +11,7 @@ Tapping a title routes through the normal token-gated download (dl:<fuid>).
 """
 import logging
 from datetime import datetime, timezone
+from html import escape
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -49,7 +50,8 @@ def _day_index() -> int:
 
 @router.message(Command("discover"))
 async def cmd_discover(message: Message) -> None:
-    await message.answer(*_hub())
+    text, markup = _hub()
+    await message.answer(text, reply_markup=markup)
 
 
 @router.callback_query(F.data == "lib_discover")
@@ -308,7 +310,7 @@ async def cb_series_detail(call: CallbackQuery) -> None:
                          f"dl:{v['file_unique_id']}", style="success")])
     rows.append([btn("🔙 Series", "disc_series", style="danger")])
     await call.message.edit_text(
-        f"📚 <b>{base}</b> · {len(vols)} volume(s)\n━━━━━━━━━━━━━━━━━━\nRead them in order:",
+        f"📚 <b>{escape(base)}</b> · {len(vols)} volume(s)\n━━━━━━━━━━━━━━━━━━\nRead them in order:",
         reply_markup=kb(*rows))
 
 

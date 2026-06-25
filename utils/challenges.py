@@ -46,14 +46,18 @@ async def bump(uid: int, key: str) -> None:
     try:
         db = await MongoManager.get()
         mkey = _month()
-        doc = await db.find_one_global("users", {"user_id": uid}, {"chal_month": 1})
-        if not doc or doc.get("chal_month") != mkey:
-            reset = {f: 0 for f in _ALL_FIELDS}
-            reset[field] = 1
-            reset["chal_month"] = mkey
-            reset["chal_claimed"] = []
-            await db.safe_update("users", {"user_id": uid}, {"$set": reset})
-        else:
+        # Atomic, self-guarding reset: only the FIRST action in a new month matches
+        # {chal_month != mkey} and resets — and it sets its own field to 1 in the
+        # SAME op so its increment isn't lost. A concurrent second action no longer
+        # matches the reset filter and falls through to a plain $inc, so a
+        # month-rollover race can never clobber a counter.
+        reset = {f: 0 for f in _ALL_FIELDS}
+        reset[field] = 1
+        reset["chal_month"] = mkey
+        reset["chal_claimed"] = []
+        did_reset = await db.find_one_and_update_global(
+            "users", {"user_id": uid, "chal_month": {"$ne": mkey}}, {"$set": reset})
+        if not did_reset:
             await db.safe_update("users", {"user_id": uid}, {"$inc": {field: 1}})
     except Exception:  # noqa: BLE001
         logger.debug("challenges.bump failed for %s/%s", uid, key, exc_info=True)

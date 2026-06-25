@@ -8,6 +8,7 @@ need an HTTPS host).
 import logging
 
 from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
 from config import BOT_PUBLIC_URL
@@ -18,7 +19,10 @@ router = Router()
 
 
 @router.callback_query(F.data == "menu_games")
-async def cb_games(call: CallbackQuery) -> None:
+async def cb_games(call: CallbackQuery, state: FSMContext) -> None:
+    # leaving to the Games hub exits any half-finished game flow (e.g. a Cover
+    # Guess round), so stray text later isn't captured as a guess.
+    await state.clear()
     await call.answer()
     from utils.flags import is_on
     if not await is_on("games"):

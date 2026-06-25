@@ -51,11 +51,13 @@ def parse_series(title: str) -> tuple[str, int] | None:
         base = _clean_base(t[:rm.start()] + " " + t[rm.end():])
         if num and len(base) >= 3 and re.search(r"[a-z]", base, re.I):
             return base, num
-    # trailing standalone number (avoid years like 1984 / 2020)
+    # trailing standalone number — only a small range, since a bare number is weak
+    # evidence: "Catch 22" / "Apollo 13" / "Slaughterhouse 5" are standalone titles,
+    # not series volumes. Explicit "Book N" / "#N" above keep their wider range.
     tm = _TRAIL_RE.search(t)
     if tm:
         num = int(tm.group(1))
-        if 1 <= num <= 50:
+        if 1 <= num <= 9:
             base = _clean_base(t[:tm.start()])
             if len(base) >= 3 and re.search(r"[a-z]", base, re.I):
                 return base, num
@@ -66,7 +68,9 @@ def _same_series(a: str, b: str) -> bool:
     na, nb = _norm(a), _norm(b)
     if not na or not nb:
         return False
-    return na == nb or na.startswith(nb) or nb.startswith(na)
+    # exact normalized equality only — a bare prefix match wrongly merged distinct
+    # series whose bases share a leading substring ("Cat 1" with "Catcher 2").
+    return na == nb
 
 
 async def find_series(file: dict) -> list[dict]:

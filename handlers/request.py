@@ -12,6 +12,7 @@ they arrive in the requests phase.
 import logging
 import re
 from datetime import datetime, timezone
+from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -227,7 +228,8 @@ async def _render_results(message: Message, state: FSMContext, query: str,
             else f"🔍 <b>Results for</b> <code>{query}</code>")
     hint = "\n<i>No exact hits — showing nearest titles.</i>" if fuzzy else ""
     text = (f"{head}\n📊 {total} match(es) · page {page + 1}/{pages}{hint}\n\n"
-            f"💸 Cost: <b>1 BCN/BGM</b> per download.")
+            "💸 Cost: from <b>1 BCN/BGM</b> per download "
+            "<i>(varies with VIP, Happy Hour &amp; surge)</i>.")
     await (message.edit_text if edit else message.answer)(text, reply_markup=kb(*rows))
 
 
@@ -294,7 +296,7 @@ async def cb_download(call: CallbackQuery) -> None:
             return
 
     await call.answer("📤 Sending…")
-    caption = (f"{icon_for(f.get('ext',''))} <b>{f.get('name','Your File')}</b>\n\n"
+    caption = (f"{icon_for(f.get('ext',''))} <b>{escape(f.get('name','Your File') or 'Your File')}</b>\n\n"
                "❤️ Presented by @bookslibraryofficial")
     fav_kb = kb([btn("⭐ Add to Favorites", f"fav_add:{fuid}", style="success")])
 
@@ -343,7 +345,7 @@ async def cb_download(call: CallbackQuery) -> None:
         nxt = await next_volume(f)
         if nxt:
             await call.message.answer(
-                f"📚 <b>Next in series:</b> {nxt.get('name','')}",
+                f"📚 <b>Next in series:</b> {escape(nxt.get('name') or '')}",
                 reply_markup=kb([btn(f"📥 Get «{(nxt.get('name') or '')[:28]}»",
                                      f"dl:{nxt['file_unique_id']}", style="success")]))
     except Exception:  # noqa: BLE001 — a nudge must never break delivery
@@ -353,7 +355,7 @@ async def cb_download(call: CallbackQuery) -> None:
             await call.bot.send_message(
                 LOG_CHANNEL_ID,
                 f"📦 <b>File Sent</b>\n👤 <code>{uid}</code>\n"
-                f"📚 {f.get('name')}\n💰 {currency}")
+                f"📚 {escape(f.get('name') or '')}\n💰 {currency}")
         except Exception:  # noqa: BLE001
             pass
 
