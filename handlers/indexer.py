@@ -1,11 +1,19 @@
 """
 handlers/indexer.py — real-time file indexing from the file channel.
 
-When a new file is posted to the live file channel, the bot (a member of it)
-receives it as a channel_post, extracts a clean title + ids, and upserts it into
-the `files` collection. Because this comes through the Bot API, file_id IS
-bot-usable — but we deliver via copy_message(msg_id) anyway so the same path
-works for Telethon-backfilled files too.
+Whatever file lands in the live file channel — a direct upload, a forward from a
+bot, an album item, a photo, an edited post, anything — the bot (an ADMIN of the
+channel, so it receives channel_post) extracts a clean title + ids and upserts it
+into the `files` collection. Both new posts (channel_post) AND edits
+(edited_channel_post) are indexed; index_file dedupes on (chan_id, msg_id) so
+re-seeing a message is a harmless no-op. Because this comes through the Bot API,
+file_id IS bot-usable — but we deliver via copy_message(msg_id) anyway so the same
+path works for Telethon-backfilled files too.
+
+NOTE (operational): the bot must be an *administrator* of the file channel to
+receive channel_post updates at all, and the live channel id must be set (Admin →
+🗂 File Channel). Neither is a code concern — this handler indexes every file once
+those hold.
 
 It also services the WATCHLIST: when a newly indexed title matches a user's
 earlier "not found" search, that user is DM'd that their book has arrived.
@@ -34,18 +42,29 @@ def _norm(text: str) -> str:
 # No constant-bound magic filter here: the file channel is now a LIVE setting, so
 # we observe every channel_post and compare against the current id at call time.
 # (The indexer router is included last and nothing else consumes channel_post.)
-@router.channel_post()
-async def on_file_post(message: Message) -> None:
+async def _index_post(message: Message) -> None:
     live = await get_file_channel()
     if not live or message.chat.id != live:
         return
     item = extract_from_message(message)
     if not item:
-        return
+        return  # not a file-bearing post (e.g. a plain text announcement)
     created = await index_file(item)
     if created:
-        logger.info("Indexed new file: %s", item["name"])
+        logger.info("Indexed new file: %s (%s)", item["name"], item.get("kind"))
         await _service_watchlist(message.bot, item["name"])
+
+
+@router.channel_post()
+async def on_file_post(message: Message) -> None:
+    await _index_post(message)
+
+
+@router.edited_channel_post()
+async def on_file_edit(message: Message) -> None:
+    # an edit can add a file/caption to a post we hadn't indexed yet; re-running is
+    # safe because index_file dedupes on (chan_id, msg_id).
+    await _index_post(message)
 
 
 async def _service_watchlist(bot, new_title: str) -> None:

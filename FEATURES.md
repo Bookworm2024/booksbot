@@ -178,8 +178,9 @@ Legend counts toward ~500 features across 14 pillars.
 - ⬜ Buddy reading · shared shelves · author AMAs
 
 ## 11. Content Pipeline (uploaders/admins)
-- ✅ Telethon backfill (30k archive) · real-time indexer (live channel id) ·
-  forward-import for old files · watchlist
+- ✅ Telethon backfill (30k archive) · real-time indexer (live channel id —
+  indexes ANY file type: document/audio/voice/video/animation/video-note/photo,
+  on both new posts AND edits) · forward-import for old files · watchlist
 - ✅ AI genre auto-tagging (admin batch) → 🏷 Browse-by-Genre in Discover
 - ✅ Duplicate detection (🧹 admin tool — title-duplicate groups, one-tap keep-best
   cleanup) · 🔜 metadata enrichment · cover fetch · OCR for scans

@@ -80,9 +80,11 @@ def trigrams(text: str) -> list[str]:
 
 def extract_from_message(message, *, msg_id: int | None = None,
                          chan_id: int | None = None) -> dict | None:
-    """Build a `files` doc from an aiogram Message carrying a document/audio/video,
-    or None if it carries no file. Shared by the live channel indexer and the
-    admin forward-import flow.
+    """Build a `files` doc from ANY file-bearing aiogram Message, or None if it
+    carries no file at all. Recognizes document, audio, voice, video, animation
+    (GIF), video-note and photo — so whatever lands in the channel (direct upload,
+    forward from a bot, album, etc.) gets stored & indexed. Shared by the live
+    channel indexer and the admin forward-import flow.
 
     `msg_id` overrides the channel message id — forward-import passes the ORIGINAL
     channel message id (from forward_origin), since message.message_id there is the
@@ -94,6 +96,7 @@ def extract_from_message(message, *, msg_id: int | None = None,
     raw_name = ""
     file_id = file_uid = None
     kind = "document"
+    ext_default = ""
     if message.document:
         d = message.document
         raw_name = d.file_name or ""
@@ -104,27 +107,49 @@ def extract_from_message(message, *, msg_id: int | None = None,
         raw_name = a.file_name or a.title or ""
         file_id, file_uid = a.file_id, a.file_unique_id
         kind = "audio"
+    elif message.voice:
+        vo = message.voice
+        file_id, file_uid = vo.file_id, vo.file_unique_id
+        kind, ext_default = "audio", "ogg"
     elif message.video:
         v = message.video
         raw_name = v.file_name or ""
         file_id, file_uid = v.file_id, v.file_unique_id
         kind = "video"
+    elif message.animation:
+        an = message.animation
+        raw_name = an.file_name or ""
+        file_id, file_uid = an.file_id, an.file_unique_id
+        kind, ext_default = "video", "gif"
+    elif message.video_note:
+        vn = message.video_note
+        file_id, file_uid = vn.file_id, vn.file_unique_id
+        kind, ext_default = "video", "mp4"
+    elif message.photo:
+        ph = message.photo[-1]   # largest available size
+        file_id, file_uid = ph.file_id, ph.file_unique_id
+        kind, ext_default = "photo", "jpg"
     else:
         return None
     if not raw_name:
-        raw_name = (message.caption or "").split("\n")[0]
-    if not raw_name:
-        return None
-    ext = raw_name.rsplit(".", 1)[-1].lower() if "." in raw_name else ""
-    name = clean_title(raw_name)
+        raw_name = (message.caption or "").split("\n")[0].strip()
     mid = msg_id if msg_id is not None else message.message_id
     cid = chan_id if chan_id is not None else (message.chat.id if message.chat else None)
+    ext = raw_name.rsplit(".", 1)[-1].lower() if "." in raw_name else ext_default
+    name = clean_title(raw_name)
+    if not name:
+        # nothing named it (e.g. a bare photo with no caption) — keep it anyway
+        # with a stable fallback label so EVERY file in the channel is indexed.
+        name = f"{kind.capitalize()} {mid}"
+    # a document may itself be audio/etc. by extension (e.g. an .mp3 sent as a
+    # document); for typed media the kind is already correct.
+    final_kind = kind_for_ext(ext) if kind == "document" else kind
     return {
         "file_unique_id": file_uid or str(mid),
         "name": name,
         "name_lc": name.lower(),
         "ext": ext,
-        "kind": "video" if message.video else kind_for_ext(ext),
+        "kind": final_kind,
         "chan_id": cid,
         "msg_id": mid,
         "file_id": file_id,
