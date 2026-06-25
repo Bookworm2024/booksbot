@@ -137,6 +137,12 @@ async def on_post(message: Message, state: FSMContext) -> None:
     club_id = data.get("club_id")
     if not club_id or not raw:
         await message.answer("Nothing posted."); return
+    from utils.moderation import check
+    ok, reason = await check(raw)
+    if not ok:
+        await message.answer(f"⚠️ <b>Message blocked</b> ({reason}). Please revise and try again.",
+                             reply_markup=kb([btn("👥 Back to Club", f"club_view:{club_id}", style="primary")]))
+        return
     await add_post(club_id, message.chat.id,
                    message.from_user.first_name or "Reader", raw[:MAX_POST_LEN])
     text, markup = await _club_view(message.chat.id, club_id)

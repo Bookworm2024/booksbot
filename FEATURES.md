@@ -126,7 +126,9 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Bulk ban (paste many IDs at once) · 🚩 feature flags (live on/off per feature)
   · 📜 audit log (admin action trail)
 - 🔜 A/B broadcast · role-based admin permissions (granular)
-- 🔜 Auto-moderation rules · spam/abuse detection
+- ✅ Auto-moderation rules · spam/abuse detection (🛡 filters club posts &amp;
+  reviews — links/shouting/char-spam heuristics + admin-managed blocked-term
+  list, live on/off)
 - ⬜ Canned replies · macro buttons · staff shifts
 - ⬜ Impersonate-view (see the bot as a user) · sandbox test mode
 - ⬜ Health/metrics dashboard · error feed · uptime alerts

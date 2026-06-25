@@ -67,6 +67,7 @@ async def cb_more(call: CallbackQuery) -> None:
              btn("📈 Surge Pricing", "admin_surge", style="primary")],
             [btn("📢 Ad Slots", "admin_ads", style="success"),
              btn("🩺 Health", "admin_health", style="primary")],
+            [btn("🛡 Auto-Mod", "admin_mod", style="primary")],
             [btn("🔙 Back", "admin_open", style="primary")]))
 
 

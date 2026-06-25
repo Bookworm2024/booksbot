@@ -78,6 +78,12 @@ async def on_review(message: Message, state: FSMContext) -> None:
     await state.clear()
     if not fuid:
         return
+    from utils.moderation import check
+    ok, reason = await check(raw)
+    if not ok:
+        await message.answer(f"⚠️ <b>Review blocked</b> ({reason}). Please keep it on-topic and "
+                             "try again from 📊 Reviews.")
+        return
     await set_review(message.chat.id, fuid, raw)
     await message.answer("✅ <b>Review saved</b> — thanks for helping other readers!",
                          reply_markup=kb([btn("📊 See Reviews", f"revw:{fuid}", style="primary")],

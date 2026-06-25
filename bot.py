@@ -32,7 +32,7 @@ from handlers import (
     admin, admin_extra, admin_tools, ai_admin, anagram, broadcast, captcha,
     ads, battlepass, challenges, channel_admin, clubs, cosmetics, coverguess, crates, daily,
     discover, economy, fallback, favorites, featured_admin, feed, games, gift, goals,
-    health_admin, indexer,
+    health_admin, indexer, moderation_admin,
     inline, invite, hangman, payments, qadmin, leaderboards, missions, notifs, profile,
     quests, rate, ratings, recommend, referral, report, request, requests_manual, revenue,
     settings_admin, shelf, speedread, spin, start, stats, support, tbr, tagger, track, vip,
@@ -146,6 +146,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(admin_extra.router)
     dp.include_router(admin_tools.router)
     dp.include_router(health_admin.router)
+    dp.include_router(moderation_admin.router)
     dp.include_router(admin.router)
     _register_error_handler(dp)
     # fallback last among message routers: catches stray non-command text only
