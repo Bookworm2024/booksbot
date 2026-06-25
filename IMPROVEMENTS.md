@@ -28,7 +28,6 @@ it's here, it's not done yet.
 - ⬜ Semantic (embedding) search
 
 ## 4. Games & Brain
-- 🔜 Memory match
 - 🔜 Crossword
 - ⬜ Trivia battles (1v1) · clan/guild competitions
 - ⬜ Boss-quiz events · seasonal themed events

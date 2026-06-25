@@ -47,6 +47,7 @@ async def cb_games(call: CallbackQuery, state: FSMContext) -> None:
         "🖋️ <b>Author Match</b> — who wrote it?\n"
         "🎭 <b>Cover Guess</b> — name the book from emoji\n"
         "⚡ <b>Speed Read</b> — measure your WPM + recall\n"
+        "🧠 <b>Memory Match</b> — repeat the tile sequence\n"
         "🟩 <b>Bookle</b> — the daily book-word puzzle\n\n"
         "⏱ One <b>15-minute</b> clock per round · jump between questions freely · "
         "<b>skipping is free</b>.\n"
@@ -63,6 +64,7 @@ async def cb_games(call: CallbackQuery, state: FSMContext) -> None:
              btn("🔀 Anagram", "menu_anagram", style="success")],
             [btn("🎭 Cover Guess", "menu_coverguess", style="success"),
              btn("⚡ Speed Read", "menu_speedread", style="success")],
+            [btn("🧠 Memory Match", "menu_memory", style="success")],
             [btn("🎯 Daily Missions", "menu_missions", style="primary"),
              btn("📈 XP & Levels", "xp_view", style="primary")],
             [btn("🎟️ Battle Pass", "menu_battlepass", style="success"),
