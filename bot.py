@@ -30,8 +30,8 @@ from config import (
 from database.connection import MongoManager
 from handlers import (
     admin, admin_extra, admin_tools, ai_admin, anagram, broadcast, captcha,
-    ads, challenges, channel_admin, cosmetics, coverguess, crates, daily, discover, economy,
-    fallback, favorites, featured_admin, feed, games, gift, goals, health_admin, indexer,
+    ads, challenges, channel_admin, clubs, cosmetics, coverguess, crates, daily, discover,
+    economy, fallback, favorites, featured_admin, feed, games, gift, goals, health_admin, indexer,
     inline, invite, hangman, payments, qadmin, leaderboards, missions, notifs, profile,
     quests, rate, ratings, recommend, referral, report, request, requests_manual, revenue,
     settings_admin, speedread, spin, start, stats, support, tbr, tagger, track, vip,
@@ -107,6 +107,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(feed.router)
     dp.include_router(discover.router)
     dp.include_router(challenges.router)
+    dp.include_router(clubs.router)
     dp.include_router(games.router)
     dp.include_router(hangman.router)
     dp.include_router(anagram.router)

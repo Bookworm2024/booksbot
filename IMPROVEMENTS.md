@@ -61,7 +61,7 @@ it's here, it's not done yet.
 - ⬜ Shareable profile cards · friends/following
 
 ## 10. Social & Community
-- 🔜 Book clubs / reading rooms · group reading challenges
+- 🔜 Group reading challenges
 - 🔜 Comments/reactions on titles · discussion threads
 - ⬜ Buddy reading · shared shelves · author AMAs
 

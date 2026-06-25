@@ -119,6 +119,12 @@ class MongoManager:
                 await db.coupon_uses.create_index([("code", ASCENDING), ("user_id", ASCENDING)], unique=True)
                 # captured errors auto-expire after 30 days (TTL on `at`)
                 await db.errors.create_index([("at", ASCENDING)], expireAfterSeconds=2592000)
+                # book clubs: atomic membership + per-club post feed
+                await db.club_members.create_index(
+                    [("club_id", ASCENDING), ("user_id", ASCENDING)], unique=True)
+                await db.club_members.create_index([("user_id", ASCENDING)])
+                await db.club_posts.create_index([("club_id", ASCENDING), ("created_at", DESCENDING)])
+                await db.clubs.create_index([("member_count", DESCENDING)])
                 await db.users.create_index([("game_bgm", DESCENDING)])
                 await db.users.create_index([("last_active", ASCENDING)])
                 await db.users.create_index([("downloads", DESCENDING)])

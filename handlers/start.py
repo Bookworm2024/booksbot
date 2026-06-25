@@ -227,6 +227,8 @@ async def cb_library(call: CallbackQuery, state: FSMContext) -> None:
              btn("📊 My Reading", "lib_stats", style="primary")],
             [btn("📌 Reading List", "lib_tbr", style="primary"),
              btn("🎯 Reading Goal", "lib_goal", style="primary")],
+            [btn("👥 Book Clubs", "menu_clubs", style="success"),
+             btn("🎯 Challenges", "menu_challenges", style="primary")],
             [btn("🔙 Back", "menu_home", style="danger")],
         ),
     )
