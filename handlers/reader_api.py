@@ -31,9 +31,14 @@ _CTYPE = {
 
 
 async def _owned(uid: int, fuid: str) -> dict | None:
-    """Return the favorite doc if the user owns (saved) this file, else None."""
+    """Return the file doc the caller is allowed to stream — one they've saved
+    (favorites) OR downloaded (library) — else None. Both store the delivery
+    fields (file_id/ext) the reader needs."""
     db = await MongoManager.get()
-    return await db.find_one_global("favorites", {"user_id": uid, "file_unique_id": fuid})
+    doc = await db.find_one_global("favorites", {"user_id": uid, "file_unique_id": fuid})
+    if doc:
+        return doc
+    return await db.find_one_global("library", {"user_id": uid, "file_unique_id": fuid})
 
 
 async def api_file(request: web.Request) -> web.Response:

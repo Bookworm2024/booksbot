@@ -103,16 +103,21 @@ function saveState(x){ fetch("/api/reader/state",{method:"POST",headers:{"Conten
 function esc(s){ return (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 async function getBytes(){ const r=await fetch(`/api/file?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`);
   if(!r.ok){ const j=await r.json().catch(()=>({})); throw j.error||r.status; } return await r.arrayBuffer(); }
+// Load a UMD library via a <script> tag. Telegram's in-app webview reliably
+// blocks/fails ESM dynamic import() of remote modules (the "Failed to fetch
+// dynamically imported module" error), so we never use import() for CDN libs.
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script");
+  s.src=src; s.onload=res; s.onerror=()=>rej(new Error("Failed to load "+src)); document.head.appendChild(s); }); }
 
 function renderBookmarks(){ const w=document.getElementById("bmwrap"); w.innerHTML="";
   (state.bookmarks||[]).forEach(b=>{ const s=document.createElement("span"); s.className="bm";
     s.textContent="🔖 "+(mode==="pdf"?("p."+b):"mark");
     s.onclick=()=> mode==="pdf"? gotoPdf(b) : rendition.display(b); w.appendChild(s); }); }
 
-/* PDF */
+/* PDF — UMD legacy build via <script> (NOT ESM import) for webview compatibility */
 async function initPdf(buf){ mode="pdf";
-  await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.mjs").then(m=>window.pdfjsLib=m);
-  pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.mjs";
+  if(!window.pdfjsLib){ await loadScript("https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"); }
+  pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js";
   pdfDoc = await pdfjsLib.getDocument({data:buf}).promise;
   pageNum = Math.min(Math.max(1, state.page||1), pdfDoc.numPages);
   document.getElementById("pdfc").style.display="block"; applyPrefs(); gotoPdf(pageNum); renderBookmarks(); }
@@ -125,8 +130,8 @@ async function gotoPdf(n){ pageNum=Math.min(Math.max(1,n), pdfDoc.numPages);
 
 /* EPUB */
 async function initEpub(buf){ mode="epub";
-  await new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
-  await new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+  if(!window.JSZip){ await loadScript("https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"); }
+  if(!window.ePub){ await loadScript("https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"); }
   document.getElementById("epub").style.display="block"; book=ePub(buf);
   rendition=book.renderTo("epub",{width:"100%",height:"100%",spread:"none"});
   applyEpubTheme(); await rendition.display(state.loc||undefined); info.textContent="EPUB";

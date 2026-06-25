@@ -19,12 +19,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import LOG_CHANNEL_ID
+from config import BOT_PUBLIC_URL, LOG_CHANNEL_ID
 from database.connection import MongoManager
 from utils.channel import get_file_channel
 from utils.files import archive_count, fuzzy_search, get_file, icon_for, search
 from utils.format import fmt_amount
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, kb, webapp_btn
 from utils.wallet import get_balances, refund, spend
 
 logger = logging.getLogger(__name__)
@@ -298,7 +298,17 @@ async def cb_download(call: CallbackQuery) -> None:
     await call.answer("📤 Sending…")
     caption = (f"{icon_for(f.get('ext',''))} <b>{escape(f.get('name','Your File') or 'Your File')}</b>\n\n"
                "❤️ Presented by @bookslibraryofficial")
-    fav_kb = kb([btn("⭐ Add to Favorites", f"fav_add:{fuid}", style="success")])
+    # Read/Listen opens the universal reader Mini App (routes by type: PDF/EPUB →
+    # reader, audio → player, etc.). Shown only when a Mini-App host is configured.
+    ext = (f.get("ext") or "").lower()
+    is_audio = f.get("kind") == "audio"
+    fav_rows = []
+    if BOT_PUBLIC_URL:
+        fav_rows.append([webapp_btn(
+            "🎧 Listen to Audio" if is_audio else "📖 Read Book",
+            "view.html", query=f"fuid={fuid}&ext={ext}", style="success")])
+    fav_rows.append([btn("⭐ Add to Favorites", f"fav_add:{fuid}", style="success")])
+    fav_kb = kb(*fav_rows)
 
     delivered = False
     # Deliver from the channel the file was INDEXED in (falls back to the live
@@ -329,9 +339,18 @@ async def cb_download(call: CallbackQuery) -> None:
 
     # success bookkeeping
     db = await MongoManager.get()
-    year = datetime.now(timezone.utc).year
+    now = datetime.now(timezone.utc)
+    year = now.year
     await db.safe_update("users", {"user_id": uid},
                          {"$inc": {"downloads": 1, f"reads.{year}": 1}})
+    # record in the user's library so the reader/player Mini App is authorized to
+    # stream it (the /api/file endpoint gates on favorites OR library).
+    await db.safe_update(
+        "library", {"user_id": uid, "file_unique_id": fuid},
+        {"$set": {"user_id": uid, "file_unique_id": fuid, "name": f.get("name"),
+                  "ext": f.get("ext"), "kind": f.get("kind"), "chan_id": f.get("chan_id"),
+                  "msg_id": f.get("msg_id"), "file_id": f.get("file_id"), "at": now}},
+        upsert=True)
     # downloading a book clears it from the Reading List (TBR)
     for idx in db.healthy:
         await db.dbs[idx]["tbr"].delete_one({"user_id": uid, "file_unique_id": fuid})

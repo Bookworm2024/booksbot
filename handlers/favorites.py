@@ -9,10 +9,12 @@ copy_message from the archive channel like the paid path.
 """
 import logging
 from datetime import datetime, timedelta, timezone
+from html import escape
 
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
+from config import BOT_PUBLIC_URL
 from utils.channel import get_file_channel
 from database.connection import MongoManager
 from utils.files import get_file, icon_for
@@ -116,13 +118,20 @@ async def cb_fav_get(call: CallbackQuery) -> None:
         await call.answer("Not in your favorites.", show_alert=True)
         return
     await call.answer("📤 Sending…")
-    caption = f"{icon_for(f.get('ext',''))} <b>{f.get('name','Your File')}</b>\n\n⭐ From your favorites"
+    caption = (f"{icon_for(f.get('ext',''))} <b>{escape(f.get('name','Your File') or 'Your File')}</b>"
+               "\n\n⭐ From your favorites")
+    ext = (f.get("ext") or "").lower()
+    is_audio = f.get("kind") == "audio" or ext in _AUDIO_EXT
+    rk = None
+    if BOT_PUBLIC_URL:
+        rk = kb([webapp_btn("🎧 Listen to Audio" if is_audio else "📖 Read Book",
+                            "view.html", query=f"fuid={fuid}&ext={ext}", style="success")])
     src_channel = f.get("chan_id") or await get_file_channel()
     try:
         if src_channel and f.get("msg_id"):
-            await call.bot.copy_message(uid, src_channel, f["msg_id"], caption=caption)
+            await call.bot.copy_message(uid, src_channel, f["msg_id"], caption=caption, reply_markup=rk)
         elif f.get("file_id"):
-            await call.bot.send_document(uid, f["file_id"], caption=caption)
+            await call.bot.send_document(uid, f["file_id"], caption=caption, reply_markup=rk)
         else:
             await call.message.answer("❌ This file is no longer retrievable.")
     except Exception as exc:  # noqa: BLE001

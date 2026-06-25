@@ -107,7 +107,7 @@ function renderImage(src){
 /* ---------- COMIC (CBZ = zip of images) ---------- */
 async function renderComic(buf){
   await new Promise((res,rej)=>{ const s=document.createElement("script");
-    s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+    s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
   let zip; try { zip = await JSZip.loadAsync(buf); } catch(e){ return showMsg("❌ Couldn't open this comic archive."); }
   const names = Object.keys(zip.files).filter(n=>/\.(jpe?g|png|gif|webp)$/i.test(n) && !zip.files[n].dir).sort();
   if(!names.length) return showMsg("📚 No images found in this comic.");

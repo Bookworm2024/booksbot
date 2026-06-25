@@ -31,7 +31,7 @@ router = Router()
 
 # collections that hold per-user data (queried by user_id OR uid)
 _USER_COLLECTIONS = [
-    "users", "favorites", "requests", "watchlist", "reader_state", "code_claims",
+    "users", "favorites", "library", "requests", "watchlist", "reader_state", "code_claims",
     "payments", "crypto_orders", "reports", "game_sessions", "game_progress",
     "bookle_sessions",
 ]
