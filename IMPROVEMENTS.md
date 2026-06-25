@@ -77,8 +77,6 @@ it's here, it's not done yet.
 
 ## 13. Platform & Reliability
 - 🔜 Redis cache layer · rate-limit store · job queue
-- 🔜 Structured logging & metrics · Sentry-style error capture
-- 🔜 Automated backups
 - ⬜ Horizontal scaling · webhook mode · CDN for media
 
 ## 14. Localization & Accessibility

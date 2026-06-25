@@ -18,6 +18,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import ErrorEvent
 from aiohttp import web
 
 from config import (
@@ -30,10 +31,11 @@ from database.connection import MongoManager
 from handlers import (
     admin, admin_extra, admin_tools, ai_admin, anagram, broadcast, captcha,
     challenges, channel_admin, cosmetics, coverguess, crates, daily, discover, economy,
-    fallback, favorites, featured_admin, feed, games, gift, goals, indexer, inline, invite,
-    hangman, payments, qadmin, leaderboards, missions, notifs, profile, quests, rate, ratings,
-    recommend, referral, report, request, requests_manual, revenue, settings_admin, speedread,
-    spin, start, stats, support, tbr, tagger, track, vip, pricing_admin,
+    fallback, favorites, featured_admin, feed, games, gift, goals, health_admin, indexer,
+    inline, invite, hangman, payments, qadmin, leaderboards, missions, notifs, profile,
+    quests, rate, ratings, recommend, referral, report, request, requests_manual, revenue,
+    settings_admin, speedread, spin, start, stats, support, tbr, tagger, track, vip,
+    pricing_admin,
 )
 from handlers.payments import heleket_webhook
 from handlers.admin_api import api_admin_overview, api_admin_ai, api_admin_ai_test
@@ -45,6 +47,7 @@ from handlers.reader_api import (
 )
 from middlewares.ban import BanMiddleware
 from middlewares.maintenance import MaintenanceMiddleware
+from middlewares.metrics import MetricsMiddleware
 from middlewares.ratelimit import RateLimitMiddleware
 from utils.admins import load_extra_admins
 from utils.email_monitor import run_email_monitor
@@ -76,8 +79,11 @@ def _build_bot() -> Bot:
 
 def _build_dispatcher() -> Dispatcher:
     dp = Dispatcher(storage=MemoryStorage())
-    # Gates run before every handler, in order: flood limiter → ban → maintenance.
-    # Rate limiting is first so floods are dropped before any DB work.
+    # Gates run before every handler, in order: metrics → flood limiter → ban →
+    # maintenance. Metrics is outermost so it counts every update (even dropped
+    # floods); rate limiting is next so floods are dropped before any DB work.
+    dp.message.middleware(MetricsMiddleware())
+    dp.callback_query.middleware(MetricsMiddleware())
     dp.message.middleware(RateLimitMiddleware())
     dp.callback_query.middleware(RateLimitMiddleware())
     dp.message.middleware(BanMiddleware())
@@ -134,13 +140,28 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(ai_admin.router)
     dp.include_router(admin_extra.router)
     dp.include_router(admin_tools.router)
+    dp.include_router(health_admin.router)
     dp.include_router(admin.router)
+    _register_error_handler(dp)
     # fallback last among message routers: catches stray non-command text only
     # when no FSM flow is active, so it can never shadow a real handler.
     dp.include_router(fallback.router)
     # indexer last — channel_post observer, no overlap with user handlers.
     dp.include_router(indexer.router)
     return dp
+
+
+def _register_error_handler(dp: Dispatcher) -> None:
+    """Capture any unhandled handler exception (utils.errors) instead of letting
+    it surface as a bare traceback — feeds the admin 🩺 Health error feed."""
+    @dp.errors()
+    async def _on_error(event: ErrorEvent) -> bool:
+        from utils.errors import capture
+        update = getattr(event, "update", None)
+        where = str(getattr(update, "event_type", "update")) if update else "update"
+        await capture(event.exception, where=where)
+        logger.exception("Unhandled handler error: %s", event.exception)
+        return True  # mark handled so polling continues
 
 
 # ── aiohttp web server (health + Mini Apps) ─────────────────────────────────────
@@ -192,15 +213,21 @@ async def main() -> None:
     await backfill_chan_id()             # stamp legacy files with their source channel
     logger.info("MongoDB ready.")
 
+    from utils.metrics import mark_start
+    from utils.backup import run_backup_loop
+    mark_start()
+
     bot = _build_bot()
     dp = _build_dispatcher()
     runner = await _start_web(bot)
 
-    # Background workers (UPI email auto-verify; comeback reminders; scheduled broadcasts).
+    # Background workers (UPI email auto-verify; comeback reminders; scheduled
+    # broadcasts; weekly digest; automated config/economy backups).
     monitor_task = asyncio.create_task(run_email_monitor(bot))
     reminder_task = asyncio.create_task(run_reminder_loop(bot))
     sched_bc_task = asyncio.create_task(run_scheduled_broadcasts(bot))
     digest_task = asyncio.create_task(run_weekly_digest(bot))
+    backup_task = asyncio.create_task(run_backup_loop(bot))
 
     try:
         me = await bot.get_me()
@@ -212,6 +239,7 @@ async def main() -> None:
         reminder_task.cancel()
         sched_bc_task.cancel()
         digest_task.cancel()
+        backup_task.cancel()
         await runner.cleanup()
         await bot.session.close()
 

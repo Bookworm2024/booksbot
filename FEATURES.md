@@ -182,9 +182,12 @@ Legend counts toward ~500 features across 14 pillars.
 ## 13. Platform & Reliability
 - ✅ Mongo multi-cluster failover · health endpoint · Dockerized
 - 🔜 Redis cache layer · rate-limit store · job queue
-- 🔜 Structured logging & metrics · Sentry-style error capture
+- ✅ Structured logging & metrics (in-process counters + uptime, 🩺 Health view) ·
+  ✅ Sentry-style error capture (global aiogram error handler → Mongo `errors`,
+  TTL-expiring, error feed)
 - ✅ Per-user data export (JSON) + erase — GDPR (🧹 GDPR Tools, super admin)
-- 🔜 Automated backups
+- ✅ Automated backups (config/economy state → JSON to backup channel on a loop +
+  📦 Backup Now)
 - ⬜ Horizontal scaling · webhook mode · CDN for media
 
 ## 14. Localization & Accessibility

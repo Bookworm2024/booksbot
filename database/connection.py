@@ -117,6 +117,8 @@ class MongoManager:
                 await db.tbr.create_index([("user_id", ASCENDING), ("file_unique_id", ASCENDING)], unique=True)
                 await db.coupons.create_index([("code", ASCENDING)], unique=True)
                 await db.coupon_uses.create_index([("code", ASCENDING), ("user_id", ASCENDING)], unique=True)
+                # captured errors auto-expire after 30 days (TTL on `at`)
+                await db.errors.create_index([("at", ASCENDING)], expireAfterSeconds=2592000)
                 await db.users.create_index([("game_bgm", DESCENDING)])
                 await db.users.create_index([("last_active", ASCENDING)])
                 await db.users.create_index([("downloads", DESCENDING)])
