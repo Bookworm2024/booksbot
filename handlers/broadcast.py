@@ -102,7 +102,8 @@ async def _progress_text(bid: str) -> tuple[str, str]:
 # ── entry ────────────────────────────────────────────────────────────────────
 @router.message(Command("broadcast"))
 async def cmd_broadcast(message: Message, state: FSMContext) -> None:
-    if message.chat.id not in ADMIN_IDS:
+    from utils.permissions import has
+    if not await has(message.chat.id, "broadcast"):
         await message.answer("🚫 Access denied.")
         return
     await _open(message, state)
@@ -110,7 +111,8 @@ async def cmd_broadcast(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "admin_broadcast")
 async def cb_broadcast(call: CallbackQuery, state: FSMContext) -> None:
-    if call.from_user.id not in ADMIN_IDS:
+    from utils.permissions import has
+    if not await has(call.from_user.id, "broadcast"):
         await call.answer("Access denied", show_alert=True)
         return
     await call.answer()

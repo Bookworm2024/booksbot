@@ -93,7 +93,8 @@ async def cb_admin_open(call: CallbackQuery) -> None:
 # ── ban / unban ───────────────────────────────────────────────────────────────
 @router.callback_query(F.data == "admin_ban")
 async def cb_ban(call: CallbackQuery, state: FSMContext) -> None:
-    if not _is_admin(call.from_user.id):
+    from utils.permissions import has
+    if not await has(call.from_user.id, "ban"):
         await call.answer("Access denied", show_alert=True)
         return
     await call.answer()
@@ -103,7 +104,8 @@ async def cb_ban(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "admin_unban")
 async def cb_unban(call: CallbackQuery, state: FSMContext) -> None:
-    if not _is_admin(call.from_user.id):
+    from utils.permissions import has
+    if not await has(call.from_user.id, "ban"):
         await call.answer("Access denied", show_alert=True)
         return
     await call.answer()
@@ -167,6 +169,7 @@ async def cb_manage(call: CallbackQuery) -> None:
         await _manage_text(),
         reply_markup=kb([btn("➕ Add Admin", "adm_add", style="success"),
                          btn("➖ Remove Admin", "adm_remove", style="danger")],
+                        [btn("🔑 Permissions", "admin_perms", style="primary")],
                         [btn("🔙 Back", "admin_open", style="primary")]))
 
 

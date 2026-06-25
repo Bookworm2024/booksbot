@@ -42,7 +42,7 @@ it's here, it's not done yet.
 - ⬜ Tax / INR↔USD reporting · CSV/Sheet export
 
 ## 6. Admin Power Tools
-- 🔜 A/B broadcast · role-based admin permissions (granular)
+- 🔜 A/B broadcast
 - ⬜ Canned replies · macro buttons · staff shifts
 - ⬜ Impersonate-view (see the bot as a user) · sandbox test mode
 - ⬜ Health/metrics dashboard · error feed · uptime alerts
