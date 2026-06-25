@@ -36,7 +36,7 @@ from handlers import (
     inline, invite, hangman, payments, qadmin, leaderboards, missions, notifs, profile,
     quests, rate, ratings, recommend, referral, report, request, requests_manual, revenue,
     settings_admin, shelf, speedread, spin, start, stats, support, tbr, tagger, track, vip,
-    pricing_admin,
+    pricing_admin, risk_admin,
 )
 from handlers.payments import heleket_webhook
 from handlers.admin_api import api_admin_overview, api_admin_ai, api_admin_ai_test
@@ -149,6 +149,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(moderation_admin.router)
     dp.include_router(perms_admin.router)
     dp.include_router(dedupe_admin.router)
+    dp.include_router(risk_admin.router)
     dp.include_router(admin.router)
     _register_error_handler(dp)
     # fallback last among message routers: catches stray non-command text only

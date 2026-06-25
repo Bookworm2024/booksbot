@@ -189,9 +189,11 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Per-user flood rate limiting (in-memory sliding window, admin-tunable via
   ⚙️ Settings → Safety, admins exempt, non-spammy warnings)
 - ✅ Content reporting (/report → admin 🚩 Reports queue with resolve)
-- 🔜 Anti-multiaccount · device fingerprint (privacy-safe)
-- 🔜 Fraud/chargeback flags · refund controls · velocity checks
-- ⬜ DMCA workflow · age-gating
+- ✅ Anti-multiaccount signals (referral-velocity auto-flag → 🚨 Risk review) ·
+  device fingerprint N/A for a bot
+- ✅ Fraud flags (🚨 Risk panel — manual + velocity auto-flag; flagged accounts
+  blocked from gifting) · ✅ velocity checks (per-day gift/referral/convert/redeem)
+- ⬜ DMCA workflow · age-gating · chargeback handling (no card rail)
 
 ## 13. Platform & Reliability
 - ✅ Mongo multi-cluster failover · health endpoint · Dockerized

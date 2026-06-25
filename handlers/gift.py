@@ -93,12 +93,20 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     await state.clear()
     sender = message.chat.id
 
+    # anti-abuse: flagged accounts can't funnel BGM out via gifts
+    from utils.risk import is_flagged, record
+    if await is_flagged(sender):
+        await message.answer("⚠️ <b>Gifting is paused on your account.</b>\n"
+                             "If you think this is a mistake, contact support.")
+        return
+
     # atomic: deduct from sender only if they still hold enough (combined across
     # clusters), then credit recipient. charge_bgm rolls back on a partial debit.
     if not await charge_bgm(sender, amount):
         await message.answer("❌ Insufficient BGM balance.")
         return
     await add_bgm(target, amount)
+    await record(sender, "gift")  # velocity check → auto-flag on abuse
     await message.answer(f"✅ Sent <b>{fmt_amount(amount)} BGM</b> to <code>{target}</code>. 🎁",
                          reply_markup=kb([btn("💼 Balance", "acc_balance", style="primary")]))
     try:

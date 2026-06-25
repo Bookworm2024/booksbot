@@ -65,6 +65,9 @@ async def grant_referral(bot, uid: int) -> None:
     from utils.contests import bump as contest_bump, settle as contest_settle
     await contest_bump(ref)
     await contest_settle(bot)
+    # anti-multiaccount: a referrer racking up referrals very fast gets flagged
+    from utils.risk import record as risk_record
+    await risk_record(ref, "referral")
     try:
         await bot.send_message(uid, f"🎁 <b>Referral Bonus!</b> +{fmt_amount(new_bonus)} BGM added.")
     except Exception:  # noqa: BLE001

@@ -66,8 +66,6 @@ it's here, it's not done yet.
 - ⬜ Auto-categorize into genres · series grouping · multi-format linking
 
 ## 12. Trust, Safety & Anti-Abuse
-- 🔜 Anti-multiaccount · device fingerprint (privacy-safe)
-- 🔜 Fraud/chargeback flags · refund controls · velocity checks
 - ⬜ DMCA workflow · age-gating
 
 ## 13. Platform & Reliability

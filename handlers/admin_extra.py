@@ -69,6 +69,7 @@ async def cb_more(call: CallbackQuery) -> None:
              btn("🩺 Health", "admin_health", style="primary")],
             [btn("🛡 Auto-Mod", "admin_mod", style="primary"),
              btn("🧹 Duplicates", "admin_dedupe", style="danger")],
+            [btn("🚨 Risk / Fraud", "admin_risk", style="danger")],
             [btn("🔙 Back", "admin_open", style="primary")]))
 
 
