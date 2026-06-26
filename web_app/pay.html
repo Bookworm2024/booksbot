@@ -184,8 +184,8 @@
       <div class="panel flex flex-col items-center text-center">
         <div class="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center mb-5 border border-amber-500/30 text-3xl">🪙</div>
         <h3 class="text-lg font-bold text-white mb-2">Crypto Checkout</h3>
-        <p class="text-xs text-slate-400 mb-6 px-2">Pay with any coin Cryptomus supports — BTC, ETH, USDT (TRC-20/ERC-20/BEP-20), BNB, SOL, TON, LTC, TRX, DOGE, USDC & more. BGM is credited automatically once the network confirms.</p>
-        <button id="crypto-open" onclick="openCheckout()" class="btn">Open Cryptomus Checkout
+        <p class="text-xs text-slate-400 mb-6 px-2">Pay with any coin enabled on OxaPay — USDT (TRC-20/ERC-20/BEP-20), BTC, ETH, USDC, BNB, TRX, LTC, DOGE & more. BGM is credited automatically once the network confirms.</p>
+        <button id="crypto-open" onclick="openCheckout()" class="btn">Open OxaPay Checkout
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m6.328-2.828a4 4 0 015.656 0l1.5 1.5a4 4 0 010 5.656l-1.5 1.5"/></svg>
         </button>
         <div id="crypto-wait" class="hide mt-5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
@@ -391,7 +391,7 @@ async function poll(){
         qr('upi-qr', 'upi://pay?pa='+encodeURIComponent(d.upi_id||'')+'&pn='+encodeURIComponent(d.merchant||'BooksBot')+'&am='+amt+'&cu=INR&tn='+encodeURIComponent('BGM '+tail));
         if(d.status==='utr_submitted'){ document.getElementById('show-utr').innerText=d.submitted_utr||'…'; goStep(3); }
       } else {
-        document.getElementById('m-badge').innerText='Crypto · Cryptomus';
+        document.getElementById('m-badge').innerText='Crypto · OxaPay';
         document.getElementById('m-dot').classList.replace('bg-slate-500','bg-amber-400');
         document.getElementById('m-dot').classList.add('animate-pulse');
         document.getElementById('flow-crypto').classList.remove('hide'); document.getElementById('flow-crypto').classList.add('flex');

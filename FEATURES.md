@@ -77,9 +77,9 @@ Legend counts toward ~500 features across 14 pillars.
 
 ## 5. Money — Admin Revenue Engine 💰
 - ✅ Revenue dashboard (UPI ₹, crypto $, BGM sold, top buyers, today)
-- ✅ UPI auto-verify (FamPay email) · ✅ crypto (Cryptomus)
+- ✅ UPI auto-verify (FamPay email) · ✅ crypto (OxaPay)
 - ✅ Secure Payment Portal Mini App (pay.html — UPI QR + in-app UTR submit +
-  live status + Cryptomus checkout); shared FamPay inbox/UPI ID with inflowads
+  live status + OxaPay checkout); shared FamPay inbox/UPI ID with inflowads
 - ✅ Live-editable pricing (⚙️ Pricing) — download/request cost, claim range,
   BGM price; applies instantly, no redeploy
 - ✅ BGM bundles (buy more, save — bonus % on UPI & crypto purchases)

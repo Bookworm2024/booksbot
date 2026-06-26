@@ -54,7 +54,7 @@ Legend: ✅ done · 🔜 next · ⬜ planned
   graceful >20MB / no-file_id fallbacks
 - ✅ **Secure Payment Portal** Mini App (pay.html): UPI QR + in-app UTR/FMPIB
   submit (/api/pay/ipaid) + live status polling (/api/pay/status) + cancel; also
-  fronts the Cryptomus crypto checkout. The chat UTR flow stays as a no-HTTPS
+  fronts the OxaPay crypto checkout. The chat UTR flow stays as a no-HTTPS
   fallback. Mirrors the inflowads unified payment portal, adapted to BGM.
 - ⬜ Admin question management + leaderboards
 
@@ -75,9 +75,9 @@ Legend: ✅ done · 🔜 next · ⬜ planned
   with the inflowads bot:** both poll the same Gmail; whichever bot the UTR was
   submitted to finds the order in its own (separate) DB and credits — no
   cross-bot double-credit (the other bot just parks the email in its ledger).
-- ✅ Payments — crypto (**Cryptomus**): pick a USD pack → unlocked invoice (pay
-  page offers every coin Cryptomus supports) → signed /cryptomus-webhook
-  auto-credits BGM (activates when CRYPTOMUS_API_KEY + CRYPTOMUS_MERCHANT_ID set)
+- ✅ Payments — crypto (**OxaPay**): pick a USD pack → USD-priced invoice (pay
+  page offers every coin you've enabled) → HMAC-signed /oxapay-webhook
+  auto-credits BGM (activates when OXAPAY_MERCHANT_API_KEY set)
 - ✅ AI recommendations — Claude-backed, 100 titles/20-batch, refund on invalid
   genre (activates when ANTHROPIC_API_KEY set)
 - ⬜ Admin dashboard Mini App (optional future polish)
@@ -85,13 +85,13 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 ## Hardening pass (post-audit)
 - ✅ Mongo client `tz_aware=True` — fixes naive/aware datetime crash across
   balance/claim/downloads/games/captcha/invite (was the one critical bug)
-- ✅ Atomic `find_one_and_update_global` → race-safe: Cryptomus webhook credit,
+- ✅ Atomic `find_one_and_update_global` → race-safe: OxaPay webhook credit,
   redeem codes (+ unique (code,user_id) index), BCN→BGM convert
 - ✅ Search result cap + sort-key projection; watchlist `matched:False` filter
 - ✅ Unique indexes: codes.code, code_claims(code,user_id), crypto_orders.order_id
 
 ## Status: feature-complete + hardened
-All TBC features rebuilt + modernized; crypto via Cryptomus.
+All TBC features rebuilt + modernized; crypto via OxaPay.
 Credential-gated features (AI, crypto) activate once their keys are set in the
 host env. Remaining work is operational: deploy to Koyeb, run the Telethon
 backfill, go live.

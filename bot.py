@@ -38,7 +38,7 @@ from handlers import (
     settings_admin, shelf, speedread, spin, start, stats, support, tbr, tagger, track, vip,
     pricing_admin, risk_admin,
 )
-from handlers.payments import cryptomus_webhook
+from handlers.payments import oxapay_webhook
 from handlers.pay_api import api_pay_cancel, api_pay_ipaid, api_pay_status
 from handlers.admin_api import api_admin_overview, api_admin_ai, api_admin_ai_test
 from handlers.broadcast import run_scheduled_broadcasts
@@ -200,8 +200,8 @@ async def _start_web(bot: Bot) -> web.AppRunner:
     app.router.add_get("/api/file", api_file)
     app.router.add_get("/api/reader/state", api_reader_state_get)
     app.router.add_post("/api/reader/state", api_reader_state_set)
-    # Cryptomus crypto payment webhook
-    app.router.add_post("/cryptomus-webhook", cryptomus_webhook)
+    # OxaPay crypto payment webhook
+    app.router.add_post("/oxapay-webhook", oxapay_webhook)
     # Payment Mini-App (web_app/pay.html) — UPI UTR submit + live status + cancel
     app.router.add_get("/api/pay/status", api_pay_status)
     app.router.add_post("/api/pay/ipaid", api_pay_ipaid)

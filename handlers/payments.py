@@ -1,5 +1,5 @@
 """
-handlers/payments.py — Buy BGM (UPI email-auto-verified + crypto via Cryptomus).
+handlers/payments.py — Buy BGM (UPI email-auto-verified + crypto via OxaPay).
 
 UPI flow (FamPay receipt auto-verify, no admin step):
   💎 Buy BGM → 💳 UPI → enter BGM amount → pay the shown UPI ID/QR →
@@ -8,12 +8,11 @@ UPI flow (FamPay receipt auto-verify, no admin step):
   The fampay_ledger absorbs emails that arrive before/after the UTR; a single
   atomic flip in _confirm_payment guarantees exactly one credit.
 
-Crypto flow (Cryptomus gateway):
-  🌐 Crypto → pick a USD pack (≥ gateway min) → Cryptomus invoice (coin NOT
-  locked, so the hosted pay page offers every coin Cryptomus supports) →
-  HMAC-verified /cryptomus-webhook credits BGM automatically once the network
-  confirms. Activates when CRYPTOMUS_API_KEY + CRYPTOMUS_MERCHANT_ID +
-  BOT_PUBLIC_URL are set.
+Crypto flow (OxaPay gateway):
+  🌐 Crypto → pick a USD pack (≥ gateway min) → OxaPay invoice (USD-priced, coin
+  NOT locked, so the hosted pay page offers every coin you've enabled) →
+  HMAC-verified /oxapay-webhook credits BGM automatically once the network
+  confirms. Activates when OXAPAY_MERCHANT_API_KEY + BOT_PUBLIC_URL are set.
 """
 import logging
 import re
@@ -28,13 +27,12 @@ from aiogram.types import CallbackQuery, Message
 from aiohttp import web
 
 from config import (
-    ADMIN_IDS, BGM_PRICE_INR, BGM_PRICE_USD, BOT_PUBLIC_URL, CRYPTOMUS_API_KEY,
-    CRYPTOMUS_MERCHANT_ID, IMAP_PASSWORD, IMAP_USER, MIN_BGM_PURCHASE,
-    PAYMENT_QR_URL, UPI_ID,
+    ADMIN_IDS, BGM_PRICE_INR, BGM_PRICE_USD, BOT_PUBLIC_URL, IMAP_PASSWORD,
+    IMAP_USER, MIN_BGM_PURCHASE, OXAPAY_MERCHANT_API_KEY, PAYMENT_QR_URL, UPI_ID,
 )
 from database.connection import MongoManager
 from utils.bundles import bonus_for, tiers_blurb
-from utils.cryptomus import (
+from utils.oxapay import (
     MIN_USD_AMOUNT, PAID_STATUSES, POPULAR_COINS, create_invoice, make_order_id,
     verify_webhook,
 )
@@ -87,7 +85,7 @@ _AMOUNT_TOLERANCE_INR = 2.0
 # The order itself stays matchable by the email monitor even after this elapses,
 # so a slightly-late UPI payment still credits.
 _UPI_TTL_SEC = 1200      # 20 min
-_CRYPTO_TTL_SEC = 3600   # 60 min (matches the Cryptomus invoice lifetime)
+_CRYPTO_TTL_SEC = 3600   # 60 min (matches the OxaPay invoice lifetime)
 
 
 def _upi_enabled() -> bool:
@@ -325,14 +323,14 @@ async def _confirm_payment(doc: dict, bot, *, email_txn_id: str = "",
         pass
 
 
-# ── crypto (Cryptomus) ───────────────────────────────────────────────────────
-# Packs are USD-denominated (BGM shown too). The invoice does NOT lock a coin,
-# so the Cryptomus pay page offers every currency Cryptomus supports.
+# ── crypto (OxaPay) ──────────────────────────────────────────────────────────
+# Packs are USD-denominated (BGM shown too). The invoice is USD-priced and does
+# NOT lock a coin, so the OxaPay pay page offers every coin you've enabled.
 _USD_PACKS = [5, 10, 25, 50, 100]
 
 
 def _crypto_enabled() -> bool:
-    return bool(CRYPTOMUS_API_KEY and CRYPTOMUS_MERCHANT_ID and BOT_PUBLIC_URL)
+    return bool(OXAPAY_MERCHANT_API_KEY and BOT_PUBLIC_URL)
 
 
 @router.callback_query(F.data == "pay_crypto")
@@ -341,7 +339,7 @@ async def cb_crypto(call: CallbackQuery) -> None:
     if not _crypto_enabled():
         await call.message.edit_text(
             "🌐 <b>Crypto payments</b> aren't enabled yet.\n"
-            "<i>Admin: set CRYPTOMUS_API_KEY, CRYPTOMUS_MERCHANT_ID and BOT_PUBLIC_URL.</i>",
+            "<i>Admin: set OXAPAY_MERCHANT_API_KEY and BOT_PUBLIC_URL.</i>",
             reply_markup=kb([btn("🔙 Back", "acc_buy", style="danger")]))
         return
     usd_price = await get_float("bgm_price_usd")
@@ -353,10 +351,10 @@ async def cb_crypto(call: CallbackQuery) -> None:
         rows.append([btn(f"💰 ${u} → {b:,} BGM{extra}", f"cm_buy:{u}", style="success")])
     rows.append([btn("🔙 Back", "acc_buy", style="danger")])
     await call.message.edit_text(
-        "🌐 <b>Crypto Payment (Cryptomus)</b>\n━━━━━━━━━━━━━━━━━━\n"
+        "🌐 <b>Crypto Payment (OxaPay)</b>\n━━━━━━━━━━━━━━━━━━\n"
         f"${fmt_amount(usd_price)}/BGM · gateway minimum ${fmt_amount(MIN_USD_AMOUNT)}.\n"
         f"💱 <b>Pay with:</b> {POPULAR_COINS}\n\n"
-        "Pick an amount — you'll get a secure Cryptomus pay page where you choose "
+        "Pick an amount — you'll get a secure OxaPay pay page where you choose "
         "your coin. BGM is credited automatically once the network confirms.",
         reply_markup=kb(*rows))
 
@@ -377,27 +375,26 @@ async def cb_cm_buy(call: CallbackQuery) -> None:
     await call.answer("Generating invoice…")
     uid = call.from_user.id
     order_id = make_order_id(uid)
-    webhook_url = f"{BOT_PUBLIC_URL}/cryptomus-webhook"
+    webhook_url = f"{BOT_PUBLIC_URL}/oxapay-webhook"
     result = await create_invoice(order_id, usd, webhook_url)
-    if not result or not (result.get("url") or result.get("address")):
+    if not result or not result.get("url"):
         await call.message.edit_text(
             "❌ Couldn't reach the payment gateway. Try again shortly.",
             reply_markup=kb([btn("🔙 Back", "pay_crypto", style="danger")]))
         return
     db = await MongoManager.get()
     pay_url = result.get("url")
-    addr = result.get("address")
     await db.safe_insert("crypto_orders", {
         "order_id": order_id, "user_id": uid, "bgm": bgm, "bonus": bonus,
-        "amount_usd": usd, "gateway": "cryptomus", "method": "crypto",
+        "amount_usd": usd, "gateway": "oxapay", "method": "crypto",
         "coupon": await _pop_active_coupon(db, uid),
-        "cryptomus_uuid": result.get("uuid"), "pay_url": pay_url or "",
+        "track_id": result.get("track_id"), "pay_url": pay_url or "",
         "status": "waiting", "created_at": _now(),
         "expires_at": (_now() + timedelta(seconds=_CRYPTO_TTL_SEC)).isoformat(),
     })
 
-    # Preferred: the unified Secure Payment Portal (Mini App) — opens the
-    # Cryptomus checkout and shows live BGM-credit status in-app.
+    # Preferred: the unified Secure Payment Portal (Mini App) — opens the OxaPay
+    # checkout and shows live BGM-credit status in-app.
     if BOT_PUBLIC_URL:
         await call.message.edit_text(
             f"🌐 <b>Pay ${usd:.2f}</b> in crypto → <b>{bgm:,} BGM</b>\n"
@@ -410,35 +407,35 @@ async def cb_cm_buy(call: CallbackQuery) -> None:
                 [btn("🔙 Back", "acc_buy", style="danger")]))
         return
 
-    # Fallback: direct Cryptomus hosted pay-page link.
-    text = (f"🌐 <b>Pay ${usd:.2f}</b> in crypto → <b>{bgm:,} BGM</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n")
-    rows = []
-    if pay_url:
-        rows.append([url_btn("💳 Open Pay Page", pay_url, style="success")])
-        text += "Tap to open the pay page (valid ~60 min) and pick your coin. "
-    if addr:
-        text += f"\n📥 <b>Address:</b>\n<code>{addr}</code>\n"
-    text += "\nBGM lands automatically after confirmation."
-    rows.append([btn("🔙 Back", "acc_buy", style="danger")])
-    await call.message.edit_text(text, reply_markup=kb(*rows))
+    # Fallback: direct OxaPay hosted pay-page link.
+    rows = [[url_btn("💳 Open Pay Page", pay_url, style="success")],
+            [btn("🔙 Back", "acc_buy", style="danger")]]
+    await call.message.edit_text(
+        f"🌐 <b>Pay ${usd:.2f}</b> in crypto → <b>{bgm:,} BGM</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "Tap to open the pay page (valid ~60 min) and pick your coin.\n"
+        "BGM lands automatically after confirmation.",
+        reply_markup=kb(*rows))
 
 
-# ── Cryptomus webhook (registered in bot.py at /cryptomus-webhook) ──────────────
-async def cryptomus_webhook(request: web.Request) -> web.Response:
+# ── OxaPay webhook (registered in bot.py at /oxapay-webhook) ────────────────────
+async def oxapay_webhook(request: web.Request) -> web.Response:
     raw = await request.read()
+    # Verify against the raw bytes BEFORE parsing (HMAC-SHA512, key = API key).
+    if not verify_webhook(raw, request.headers.get("HMAC", "")):
+        logger.warning("OxaPay webhook failed signature check")
+        return web.Response(status=403, text="bad signature")
     try:
         data = await request.json()
     except Exception:  # noqa: BLE001
         return web.Response(status=400, text="bad json")
-    if not verify_webhook(raw, str(data.get("sign", ""))):
-        logger.warning("Cryptomus webhook failed signature check")
-        return web.Response(status=403, text="bad signature")
 
     order_id = str(data.get("order_id") or "")
-    status = str(data.get("status") or data.get("payment_status") or "")
+    status = str(data.get("status") or "").lower()
+    # OxaPay sends "Paying" first, then "Paid". Acknowledge non-paid callbacks
+    # with 200/"ok" so OxaPay stops retrying; only "Paid" credits below.
     if not order_id or status not in PAID_STATUSES:
-        return web.Response(text="ignored")
+        return web.Response(text="ok")
 
     db = await MongoManager.get()
     # Atomic flip: only the FIRST callback that flips waiting/pending → paid
