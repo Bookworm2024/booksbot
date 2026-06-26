@@ -79,11 +79,12 @@ async def create_invoice(order_id: str, usd_amount: float,
         "callback_url": callback_url,
         "order_id": order_id,
         "description": f"BookGems top-up ({order_id})",
-        # fee_paid_by_payer=0 → OxaPay deducts its fee from OUR settlement, so the
-        # payer is charged EXACTLY `amount` (matches what the Mini App shows). We
-        # can't display a live OxaPay fee — their API doesn't expose the fee
-        # amount — so we never surprise the payer with an unseen surcharge.
-        "fee_paid_by_payer": 0,
+        # fee_paid_by_payer=1 → the payer covers OxaPay's processing fee on top of
+        # `amount`. OxaPay's API doesn't expose the fee figure, so the portal can't
+        # show a live number; instead it discloses that OxaPay (an independent
+        # platform) may add a small fee, and the exact total is shown on OxaPay's
+        # checkout page before the payer confirms.
+        "fee_paid_by_payer": 1,
     }
     headers = {"merchant_api_key": OXAPAY_MERCHANT_API_KEY,
                "Content-Type": "application/json"}
