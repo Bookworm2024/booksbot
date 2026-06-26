@@ -155,9 +155,10 @@ EMAIL_LOG_CHANNEL: int = _int("EMAIL_LOG_CHANNEL", 0)
 BGM_PRICE_INR: float   = _float_env("BGM_PRICE_INR", 2.0)
 BGM_PRICE_USD: float   = _float_env("BGM_PRICE_USD", 0.023)
 MIN_BGM_PURCHASE: int  = _int("MIN_BGM_PURCHASE", 10)
-# Crypto via Heleket (same gateway as inflowads).
-HELEKET_API_KEY: str   = os.getenv("HELEKET_API_KEY", "")
-HELEKET_MERCHANT_ID: str = os.getenv("HELEKET_MERCHANT_ID", "")
+# Crypto via Cryptomus (https://cryptomus.com). Accepts almost every coin.
+# Webhook: <BOT_PUBLIC_URL>/cryptomus-webhook (sent per-invoice as url_callback).
+CRYPTOMUS_API_KEY: str   = os.getenv("CRYPTOMUS_API_KEY", "")
+CRYPTOMUS_MERCHANT_ID: str = os.getenv("CRYPTOMUS_MERCHANT_ID", "")
 
 
 # ── AI recommendations (Claude) ──────────────────────────────────────────────

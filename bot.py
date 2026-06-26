@@ -38,7 +38,7 @@ from handlers import (
     settings_admin, shelf, speedread, spin, start, stats, support, tbr, tagger, track, vip,
     pricing_admin, risk_admin,
 )
-from handlers.payments import heleket_webhook
+from handlers.payments import cryptomus_webhook
 from handlers.admin_api import api_admin_overview, api_admin_ai, api_admin_ai_test
 from handlers.broadcast import run_scheduled_broadcasts
 from handlers.bookle_api import api_bookle_new, api_bookle_guess
@@ -199,8 +199,8 @@ async def _start_web(bot: Bot) -> web.AppRunner:
     app.router.add_get("/api/file", api_file)
     app.router.add_get("/api/reader/state", api_reader_state_get)
     app.router.add_post("/api/reader/state", api_reader_state_set)
-    # Heleket crypto payment webhook
-    app.router.add_post("/heleket-webhook", heleket_webhook)
+    # Cryptomus crypto payment webhook
+    app.router.add_post("/cryptomus-webhook", cryptomus_webhook)
     if os.path.isdir(WEB_APP_DIR):
         app.router.add_static("/app/", WEB_APP_DIR, show_index=False)
     runner = web.AppRunner(app)

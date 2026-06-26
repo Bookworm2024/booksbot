@@ -1,16 +1,19 @@
 """
-handlers/payments.py — Buy BGM (UPI manual + crypto via Heleket).
+handlers/payments.py — Buy BGM (UPI email-auto-verified + crypto via Cryptomus).
 
-UPI flow (no external dependency):
-  💎 Buy BGM → 💳 UPI → shows UPI ID + QR + pricing → ✅ Paid →
-  enter UTR (validated + de-duplicated) → upload screenshot →
-  admins get the proof with ✅ Approve / ❌ Decline →
-  Approve → admin enters BGM amount → credited + user notified.
+UPI flow (FamPay receipt auto-verify, no admin step):
+  💎 Buy BGM → 💳 UPI → enter BGM amount → pay the shown UPI ID/QR →
+  submit UTR (validated + de-duplicated) → the IMAP email monitor reads the
+  FamPay credit email, matches UTR + exact amount (±₹2) → auto-credits BGM.
+  The fampay_ledger absorbs emails that arrive before/after the UTR; a single
+  atomic flip in _confirm_payment guarantees exactly one credit.
 
-Crypto flow (Heleket gateway, same as inflowads):
-  🌐 Crypto → pick coin/network → pick a USD pack (≥$5 gateway min) →
-  Heleket invoice → pay page/address → HMAC-verified /heleket-webhook credits
-  BGM automatically. Activates when HELEKET_API_KEY + HELEKET_MERCHANT_ID are set.
+Crypto flow (Cryptomus gateway):
+  🌐 Crypto → pick a USD pack (≥ gateway min) → Cryptomus invoice (coin NOT
+  locked, so the hosted pay page offers every coin Cryptomus supports) →
+  HMAC-verified /cryptomus-webhook credits BGM automatically once the network
+  confirms. Activates when CRYPTOMUS_API_KEY + CRYPTOMUS_MERCHANT_ID +
+  BOT_PUBLIC_URL are set.
 """
 import logging
 import re
@@ -25,14 +28,14 @@ from aiogram.types import CallbackQuery, Message
 from aiohttp import web
 
 from config import (
-    ADMIN_IDS, BGM_PRICE_INR, BGM_PRICE_USD, BOT_PUBLIC_URL, HELEKET_API_KEY,
-    HELEKET_MERCHANT_ID, IMAP_PASSWORD, IMAP_USER, MIN_BGM_PURCHASE,
+    ADMIN_IDS, BGM_PRICE_INR, BGM_PRICE_USD, BOT_PUBLIC_URL, CRYPTOMUS_API_KEY,
+    CRYPTOMUS_MERCHANT_ID, IMAP_PASSWORD, IMAP_USER, MIN_BGM_PURCHASE,
     PAYMENT_QR_URL, UPI_ID,
 )
 from database.connection import MongoManager
 from utils.bundles import bonus_for, tiers_blurb
-from utils.heleket import (
-    CRYPTO_CHOICES, MIN_USD_AMOUNT, PAID_STATUSES, create_invoice, make_order_id,
+from utils.cryptomus import (
+    MIN_USD_AMOUNT, PAID_STATUSES, POPULAR_COINS, create_invoice, make_order_id,
     verify_webhook,
 )
 from utils.format import fmt_amount
@@ -298,13 +301,14 @@ async def _confirm_payment(doc: dict, bot, *, email_txn_id: str = "",
         pass
 
 
-# ── crypto (Heleket) ─────────────────────────────────────────────────────────
-# Heleket enforces a ~$5 minimum, so packs are USD-denominated (BGM shown too).
-_USD_PACKS = [5, 10, 25, 50]
+# ── crypto (Cryptomus) ───────────────────────────────────────────────────────
+# Packs are USD-denominated (BGM shown too). The invoice does NOT lock a coin,
+# so the Cryptomus pay page offers every currency Cryptomus supports.
+_USD_PACKS = [5, 10, 25, 50, 100]
 
 
 def _crypto_enabled() -> bool:
-    return bool(HELEKET_API_KEY and HELEKET_MERCHANT_ID and BOT_PUBLIC_URL)
+    return bool(CRYPTOMUS_API_KEY and CRYPTOMUS_MERCHANT_ID and BOT_PUBLIC_URL)
 
 
 @router.callback_query(F.data == "pay_crypto")
@@ -313,57 +317,44 @@ async def cb_crypto(call: CallbackQuery) -> None:
     if not _crypto_enabled():
         await call.message.edit_text(
             "🌐 <b>Crypto payments</b> aren't enabled yet.\n"
-            "<i>Admin: set HELEKET_API_KEY, HELEKET_MERCHANT_ID and BOT_PUBLIC_URL.</i>",
+            "<i>Admin: set CRYPTOMUS_API_KEY, CRYPTOMUS_MERCHANT_ID and BOT_PUBLIC_URL.</i>",
             reply_markup=kb([btn("🔙 Back", "acc_buy", style="danger")]))
         return
-    # pick the coin/network first
-    rows = [[btn(label, f"hk_coin:{i}", style="primary")]
-            for i, (_c, _n, label) in enumerate(CRYPTO_CHOICES)]
-    rows.append([btn("🔙 Back", "acc_buy", style="danger")])
-    await call.message.edit_text(
-        "🌐 <b>Crypto Payment</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"${fmt_amount(await get_float('bgm_price_usd'))}/BGM · gateway minimum ${fmt_amount(MIN_USD_AMOUNT)}.\n\n"
-        "Choose the coin/network you'll pay with:",
-        reply_markup=kb(*rows))
-
-
-@router.callback_query(F.data.startswith("hk_coin:"))
-async def cb_coin(call: CallbackQuery) -> None:
-    await call.answer()
-    idx = int(call.data.split(":", 1)[1])
-    if idx >= len(CRYPTO_CHOICES):
-        return
-    _c, _n, label = CRYPTO_CHOICES[idx]
     usd_price = await get_float("bgm_price_usd")
     rows = []
     for u in _USD_PACKS:
         b = round(u / usd_price)
         bn = bonus_for(b)
         extra = f" +{fmt_amount(bn)}🎁" if bn else ""
-        rows.append([btn(f"💰 ${u} → {b:,} BGM{extra}", f"hk_buy:{idx}:{u}", style="success")])
-    rows.append([btn("🔙 Back", "pay_crypto", style="danger")])
+        rows.append([btn(f"💰 ${u} → {b:,} BGM{extra}", f"cm_buy:{u}", style="success")])
+    rows.append([btn("🔙 Back", "acc_buy", style="danger")])
     await call.message.edit_text(
-        f"🌐 <b>{label}</b>\n\nPick an amount — you'll get a secure Heleket pay "
-        "page. BGM is credited automatically once the network confirms.",
+        "🌐 <b>Crypto Payment (Cryptomus)</b>\n━━━━━━━━━━━━━━━━━━\n"
+        f"${fmt_amount(usd_price)}/BGM · gateway minimum ${fmt_amount(MIN_USD_AMOUNT)}.\n"
+        f"💱 <b>Pay with:</b> {POPULAR_COINS}\n\n"
+        "Pick an amount — you'll get a secure Cryptomus pay page where you choose "
+        "your coin. BGM is credited automatically once the network confirms.",
         reply_markup=kb(*rows))
 
 
-@router.callback_query(F.data.startswith("hk_buy:"))
-async def cb_hk_buy(call: CallbackQuery) -> None:
-    _, idx_s, usd_s = call.data.split(":")
-    idx, usd = int(idx_s), float(usd_s)
-    if idx >= len(CRYPTO_CHOICES) or usd < MIN_USD_AMOUNT:
+@router.callback_query(F.data.startswith("cm_buy:"))
+async def cb_cm_buy(call: CallbackQuery) -> None:
+    try:
+        usd = float(call.data.split(":", 1)[1])
+    except (ValueError, IndexError):
         await call.answer("Invalid selection.", show_alert=True)
         return
-    crypto, network, label = CRYPTO_CHOICES[idx]
+    if usd < MIN_USD_AMOUNT:
+        await call.answer("Amount below the gateway minimum.", show_alert=True)
+        return
     bgm = round(usd / await get_float("bgm_price_usd"))
     from utils.deals import deal_bonus
     bonus = bonus_for(bgm) + await deal_bonus(bgm)
     await call.answer("Generating invoice…")
     uid = call.from_user.id
     order_id = make_order_id(uid)
-    webhook_url = f"{BOT_PUBLIC_URL}/heleket-webhook"
-    result = await create_invoice(order_id, usd, crypto, network, webhook_url)
+    webhook_url = f"{BOT_PUBLIC_URL}/cryptomus-webhook"
+    result = await create_invoice(order_id, usd, webhook_url)
     if not result or not (result.get("url") or result.get("address")):
         await call.message.edit_text(
             "❌ Couldn't reach the payment gateway. Try again shortly.",
@@ -372,18 +363,18 @@ async def cb_hk_buy(call: CallbackQuery) -> None:
     db = await MongoManager.get()
     await db.safe_insert("crypto_orders", {
         "order_id": order_id, "user_id": uid, "bgm": bgm, "bonus": bonus,
-        "amount_usd": usd, "crypto": crypto, "network": network,
+        "amount_usd": usd, "gateway": "cryptomus",
         "coupon": await _pop_active_coupon(db, uid),
-        "heleket_uuid": result.get("uuid"), "status": "waiting", "created_at": _now(),
+        "cryptomus_uuid": result.get("uuid"), "status": "waiting", "created_at": _now(),
     })
     pay_url = result.get("url")
     addr = result.get("address")
-    text = (f"🌐 <b>Pay ${usd:.2f}</b> in <b>{label}</b> → <b>{bgm:,} BGM</b>\n"
+    text = (f"🌐 <b>Pay ${usd:.2f}</b> in crypto → <b>{bgm:,} BGM</b>\n"
             "━━━━━━━━━━━━━━━━━━\n")
     rows = []
     if pay_url:
         rows.append([url_btn("💳 Open Pay Page", pay_url, style="success")])
-        text += "Tap to pay (valid ~30 min). "
+        text += "Tap to open the pay page (valid ~60 min) and pick your coin. "
     if addr:
         text += f"\n📥 <b>Address:</b>\n<code>{addr}</code>\n"
     text += "\nBGM lands automatically after confirmation."
@@ -391,15 +382,15 @@ async def cb_hk_buy(call: CallbackQuery) -> None:
     await call.message.edit_text(text, reply_markup=kb(*rows))
 
 
-# ── Heleket webhook (registered in bot.py at /heleket-webhook) ──────────────────
-async def heleket_webhook(request: web.Request) -> web.Response:
+# ── Cryptomus webhook (registered in bot.py at /cryptomus-webhook) ──────────────
+async def cryptomus_webhook(request: web.Request) -> web.Response:
     raw = await request.read()
     try:
         data = await request.json()
     except Exception:  # noqa: BLE001
         return web.Response(status=400, text="bad json")
     if not verify_webhook(raw, str(data.get("sign", ""))):
-        logger.warning("Heleket webhook failed signature check")
+        logger.warning("Cryptomus webhook failed signature check")
         return web.Response(status=403, text="bad signature")
 
     order_id = str(data.get("order_id") or "")

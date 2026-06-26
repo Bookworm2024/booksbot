@@ -3,7 +3,7 @@ handlers/revenue.py — admin money dashboard.
 
 💰 Revenue (super-admin) → totals collected (UPI ₹ + crypto $), BGM sold,
 today's take, paid-order count, and top buyers. Read-only; aggregates the
-`payments` (UPI) and `crypto_orders` (Heleket) collections across clusters.
+`payments` (UPI) and `crypto_orders` (Cryptomus) collections across clusters.
 """
 import logging
 from datetime import datetime, timezone

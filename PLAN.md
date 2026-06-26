@@ -67,9 +67,9 @@ Legend: ✅ done · 🔜 next · ⬜ planned
   pay ₹ to UPI ID → submit UTR → IMAP monitor reads the FamPay credit email,
   matches UTR + exact amount (±₹2) → auto-credits BGM. Ledger handles emails
   that arrive before/after the UTR. Atomic single-credit via _confirm_payment.
-- ✅ Payments — crypto (**Heleket**, same gateway as inflowads): coin/network →
-  USD pack (≥$5 min) → invoice → signed /heleket-webhook auto-credits BGM
-  (activates when HELEKET_API_KEY + HELEKET_MERCHANT_ID set)
+- ✅ Payments — crypto (**Cryptomus**): pick a USD pack → unlocked invoice (pay
+  page offers every coin Cryptomus supports) → signed /cryptomus-webhook
+  auto-credits BGM (activates when CRYPTOMUS_API_KEY + CRYPTOMUS_MERCHANT_ID set)
 - ✅ AI recommendations — Claude-backed, 100 titles/20-batch, refund on invalid
   genre (activates when ANTHROPIC_API_KEY set)
 - ⬜ Admin dashboard Mini App (optional future polish)
@@ -77,13 +77,13 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 ## Hardening pass (post-audit)
 - ✅ Mongo client `tz_aware=True` — fixes naive/aware datetime crash across
   balance/claim/downloads/games/captcha/invite (was the one critical bug)
-- ✅ Atomic `find_one_and_update_global` → race-safe: Heleket webhook credit,
+- ✅ Atomic `find_one_and_update_global` → race-safe: Cryptomus webhook credit,
   redeem codes (+ unique (code,user_id) index), BCN→BGM convert
 - ✅ Search result cap + sort-key projection; watchlist `matched:False` filter
 - ✅ Unique indexes: codes.code, code_claims(code,user_id), crypto_orders.order_id
 
 ## Status: feature-complete + hardened
-All TBC features rebuilt + modernized; crypto via Heleket like inflowads.
+All TBC features rebuilt + modernized; crypto via Cryptomus.
 Credential-gated features (AI, crypto) activate once their keys are set in the
 host env. Remaining work is operational: deploy to Koyeb, run the Telethon
 backfill, go live.
