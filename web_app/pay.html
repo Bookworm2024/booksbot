@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>BooksBot — Secure Payment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<style>
+  :root{
+    --bg:#0b1120; --panel:rgba(17,24,39,.72); --border:rgba(52,211,153,.16);
+    --emerald:#34d399; --teal:#22d3ee; --gold:#fbbf24; --red:#f43f5e;
+    --ui:'Outfit',sans-serif; --mono:'Space Mono',monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{background:var(--bg);color:#f8fafc;font-family:var(--ui);margin:0;min-height:100vh;overflow-x:hidden;}
+  .glow{position:fixed;width:60vw;height:60vw;border-radius:50%;filter:blur(120px);opacity:.14;z-index:0;pointer-events:none;}
+  .glow-a{top:-20%;left:-10%;background:var(--emerald);}
+  .glow-b{bottom:-20%;right:-10%;background:var(--teal);}
+  .wrap{position:relative;z-index:10;max-width:480px;margin:0 auto;padding:20px 16px 40px;min-height:100vh;display:flex;flex-direction:column;}
+  .panel{background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--border);border-radius:20px;padding:22px;position:relative;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);}
+  .panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--emerald),transparent);opacity:.5;}
+  .mono{font-family:var(--mono);}
+  .skeleton{background:linear-gradient(90deg,rgba(255,255,255,.05) 25%,rgba(255,255,255,.1) 50%,rgba(255,255,255,.05) 75%);background-size:200% 100%;animation:sk 1.5s infinite;color:transparent!important;border-radius:6px;}
+  .btn{background:linear-gradient(135deg,rgba(52,211,153,.12),rgba(34,211,238,.12));border:1px solid var(--emerald);border-radius:14px;color:var(--emerald);font-weight:700;padding:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:10px;transition:.25s;cursor:pointer;text-transform:uppercase;letter-spacing:1px;}
+  .btn:active{transform:scale(.98);background:rgba(52,211,153,.2);}
+  .btn:disabled{border-color:#334155;color:#64748b;background:transparent;pointer-events:none;}
+  .btn-d{background:rgba(244,63,94,.06);border:1px solid rgba(244,63,94,.3);color:var(--red);border-radius:14px;font-weight:600;padding:14px;width:100%;transition:.2s;cursor:pointer;}
+  .btn-d:active{background:rgba(244,63,94,.16);transform:scale(.98);}
+  .seg{display:flex;background:rgba(0,0,0,.4);border-radius:12px;padding:4px;margin-bottom:14px;border:1px solid rgba(255,255,255,.05);}
+  .seg-b{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;color:#94a3b8;border-radius:8px;transition:.25s;cursor:pointer;}
+  .seg-b.active{background:var(--panel);color:var(--emerald);border:1px solid var(--border);}
+  .inp{width:100%;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:18px;font-family:var(--mono);font-size:19px;text-align:center;color:#fff;outline:none;letter-spacing:2px;transition:.25s;}
+  .inp:focus{border-color:var(--emerald);background:rgba(52,211,153,.03);}
+  .inp.err{border-color:var(--red);animation:shake .4s;color:var(--red);}
+  .step{display:flex;justify-content:space-between;position:relative;margin-bottom:26px;}
+  .step-l{position:absolute;top:16px;left:16.5%;width:67%;height:2px;background:rgba(255,255,255,.1);z-index:0;}
+  .step-f{position:absolute;top:16px;left:16.5%;width:0%;height:2px;background:var(--emerald);z-index:0;transition:width .4s;box-shadow:0 0 10px var(--emerald);}
+  .node{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:8px;width:33.33%;}
+  .circ{width:34px;height:34px;border-radius:50%;background:var(--bg);border:2px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#64748b;transition:.4s;}
+  .nlab{font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:1px;transition:.4s;}
+  .node.active .circ{border-color:var(--emerald);background:rgba(52,211,153,.12);color:var(--emerald);box-shadow:0 0 14px rgba(52,211,153,.3);}
+  .node.active .nlab{color:var(--emerald);}
+  .node.done .circ{border-color:var(--emerald);background:var(--emerald);color:#062;}
+  .node.done .nlab{color:#f8fafc;}
+  .ovl{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(5px);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;}
+  .ovl.show{opacity:1;pointer-events:auto;}
+  .modal{background:#0f172a;border:1px solid var(--border);border-radius:24px;width:90%;max-width:380px;padding:28px 22px;text-align:center;transform:translateY(24px) scale(.96);transition:.3s;}
+  .ovl.show .modal{transform:none;}
+  .radar{position:relative;width:140px;height:140px;border-radius:50%;border:1px solid rgba(52,211,153,.3);margin:0 auto;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 30px rgba(52,211,153,.1);background:repeating-radial-gradient(transparent,transparent 15px,rgba(52,211,153,.05) 16px);}
+  .sweep{position:absolute;top:0;left:50%;width:50%;height:50%;background:linear-gradient(90deg,transparent 50%,rgba(52,211,153,.4) 100%);transform-origin:0 100%;border-radius:0 100% 0 0;animation:scan 2s linear infinite;}
+  @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-6px)}}
+  @keyframes scan{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  @keyframes up{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:none}}
+  .fade{animation:up .5s cubic-bezier(.16,1,.3,1) forwards;}
+  .hide{display:none!important;}
+</style>
+</head>
+<body>
+<div class="glow glow-a"></div>
+<div class="glow glow-b"></div>
+
+<div id="cancel-modal" class="ovl">
+  <div class="modal">
+    <div class="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    </div>
+    <h3 class="text-xl font-bold text-white mb-2">Abort Payment?</h3>
+    <p class="text-sm text-slate-400 mb-6">Cancel this order? Only do this if you have <b>not</b> paid yet.</p>
+    <div class="flex gap-3">
+      <button onclick="closeCancel()" class="flex-1 bg-slate-800 text-white rounded-xl py-3 font-semibold">Go Back</button>
+      <button onclick="doCancel()" id="confirm-cancel" class="flex-1 bg-red-500/20 text-red-400 border border-red-500/50 rounded-xl py-3 font-semibold">Yes, Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="flex justify-between items-center mb-6 fade">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl bg-[#0f172a] border border-emerald-500/30 shadow-[0_0_15px_rgba(52,211,153,.2)] flex items-center justify-center text-2xl">📚</div>
+      <div>
+        <h1 class="text-lg font-bold text-white leading-tight">BooksBot</h1>
+        <div class="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.2em] flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Secure Payment
+        </div>
+      </div>
+    </div>
+    <div id="timer" class="bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 opacity-0 transition-opacity">
+      <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span id="countdown" class="mono text-sm font-bold text-white">--:--</span>
+    </div>
+  </header>
+
+  <main id="view-main" class="flex flex-col gap-5">
+    <div class="panel text-center fade">
+      <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Amount to Pay</p>
+      <div class="flex items-baseline justify-center gap-1.5">
+        <span id="hero-sym" class="text-3xl font-medium text-slate-400 skeleton">₹</span>
+        <span id="hero-amt" class="text-5xl font-bold text-white tracking-tight skeleton">0.00</span>
+      </div>
+      <div id="hero-bgm" class="mt-2 text-sm font-bold text-emerald-300 skeleton">— BGM</div>
+      <div class="mt-3 inline-flex items-center gap-1.5 bg-slate-800/80 border border-slate-700 rounded-full px-3 py-1">
+        <div id="m-dot" class="w-2 h-2 rounded-full bg-slate-500"></div>
+        <span id="m-badge" class="text-[11px] font-bold text-slate-300 uppercase tracking-wider skeleton">Initializing…</span>
+      </div>
+    </div>
+
+    <!-- UPI flow -->
+    <div id="flow-upi" class="hide flex-col gap-5 fade">
+      <div class="step px-2">
+        <div class="step-l"></div><div class="step-f" id="upi-bar"></div>
+        <div class="node active" id="n1"><div class="circ">1</div><div class="nlab">Transfer</div></div>
+        <div class="node" id="n2"><div class="circ">2</div><div class="nlab">Submit ID</div></div>
+        <div class="node" id="n3"><div class="circ">✓</div><div class="nlab">Verify</div></div>
+      </div>
+
+      <div id="s1" class="panel flex flex-col items-center">
+        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4">Step 1 · Make Payment</h3>
+        <div class="bg-white p-3 rounded-2xl mb-5"><div id="upi-qr" class="w-44 h-44 flex items-center justify-center bg-slate-100 rounded-lg overflow-hidden"></div></div>
+        <div class="w-full bg-[#0a0f1a] border border-slate-800 rounded-xl p-4 mb-5">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-[10px] text-slate-400 uppercase tracking-widest">UPI ID</span>
+            <span class="text-[9px] text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-1.5 py-0.5 rounded">VERIFIED</span>
+          </div>
+          <div class="flex justify-between items-center cursor-pointer group" onclick="copyText('upi-id')">
+            <code id="upi-id" class="mono text-[15px] font-bold text-emerald-400 skeleton">loading@upi</code>
+            <svg class="w-5 h-5 text-slate-500 group-active:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          </div>
+        </div>
+        <ul class="w-full text-xs text-slate-400 space-y-2.5 mb-6">
+          <li class="flex items-start gap-2"><span class="text-emerald-400 font-bold">•</span> Open FamPay, GPay, PhonePe or Paytm.</li>
+          <li class="flex items-start gap-2"><span class="text-emerald-400 font-bold">•</span> Scan the QR or copy the UPI ID above.</li>
+          <li class="flex items-start gap-2"><span class="text-emerald-400 font-bold">•</span> Pay <b>exactly</b> the amount shown at the top.</li>
+        </ul>
+        <button onclick="goStep(2)" class="btn">Payment Done
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </button>
+      </div>
+
+      <div id="s2" class="hide panel flex flex-col items-center">
+        <button onclick="goStep(1)" class="absolute top-4 left-4 text-slate-400 p-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        </button>
+        <h3 class="text-lg font-bold text-white mb-2 mt-2">Submit Payment ID</h3>
+        <p class="text-xs text-slate-400 text-center mb-5 px-4">Enter the reference from your receipt so we can match your transfer.</p>
+        <div class="seg w-full">
+          <div class="seg-b active" id="tab-bank" onclick="switchTab('bank')">Bank Apps</div>
+          <div class="seg-b" id="tab-fam" onclick="switchTab('fam')">FamPay</div>
+        </div>
+        <div class="w-full relative mb-3">
+          <input type="text" id="utr" class="inp uppercase" placeholder="12-DIGIT UTR" autocomplete="off" oninput="onUtr()">
+          <div id="utr-fb" class="absolute -bottom-5 right-2 text-[10px] font-bold text-slate-500">Awaiting input</div>
+        </div>
+        <div id="help-bank" class="w-full bg-[#0a0f1a] border border-slate-800 rounded-xl p-4 mb-5 mt-4">
+          <p class="text-[11px] text-slate-400 leading-relaxed"><strong class="text-emerald-400">Where to find UTR?</strong><br>A <b>12-digit number</b> in your transaction history, labelled <i>UTR, UPI Ref No, or Transaction ID</i>.</p>
+        </div>
+        <div id="help-fam" class="hide w-full bg-[#0a0f1a] border border-slate-800 rounded-xl p-4 mb-5 mt-4">
+          <p class="text-[11px] text-slate-400 leading-relaxed"><strong class="text-emerald-400">Where to find FamPay ID?</strong><br>Open FamApp history, tap the transaction, copy the ID — it starts with <b>FMPIB…</b></p>
+        </div>
+        <button id="submit-utr" onclick="submitUtr()" disabled class="btn">Verify Payment</button>
+      </div>
+
+      <div id="s3" class="hide panel flex flex-col items-center py-8 text-center">
+        <div class="radar mb-8" id="radar"><div class="sweep"></div>
+          <svg class="w-8 h-8 text-emerald-400 relative z-10 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </div>
+        <h3 id="radar-t" class="text-sm font-bold text-emerald-400 uppercase tracking-widest mb-3">Verifying Payment</h3>
+        <p class="text-xs text-slate-400 leading-relaxed px-4 mb-6">Checking reference <b class="text-white mono" id="show-utr">…</b><br>You can safely close this — we'll credit your BGM and notify you in the bot the moment it lands.</p>
+        <div id="radar-badge" class="bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></div>
+          <span class="text-[10px] font-bold text-emerald-200 uppercase tracking-wider">Awaiting settlement</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Crypto flow -->
+    <div id="flow-crypto" class="hide flex-col gap-5 fade">
+      <div class="panel flex flex-col items-center text-center">
+        <div class="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center mb-5 border border-amber-500/30 text-3xl">🪙</div>
+        <h3 class="text-lg font-bold text-white mb-2">Crypto Checkout</h3>
+        <p class="text-xs text-slate-400 mb-6 px-2">Pay with any coin Cryptomus supports — BTC, ETH, USDT (TRC-20/ERC-20/BEP-20), BNB, SOL, TON, LTC, TRX, DOGE, USDC & more. BGM is credited automatically once the network confirms.</p>
+        <button id="crypto-open" onclick="openCheckout()" class="btn">Open Cryptomus Checkout
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m6.328-2.828a4 4 0 015.656 0l1.5 1.5a4 4 0 010 5.656l-1.5 1.5"/></svg>
+        </button>
+        <div id="crypto-wait" class="hide mt-5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></div>
+          <span class="text-[10px] font-bold text-emerald-200 uppercase tracking-wider">Waiting for confirmation</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ledger -->
+    <div class="panel fade">
+      <div class="flex items-center justify-between mb-4 pb-3 border-b border-dashed border-slate-700">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Order Summary</div>
+        <div class="text-[9px] mono text-slate-500" id="rid">ID: ——</div>
+      </div>
+      <div class="space-y-3">
+        <div class="flex justify-between items-center"><span class="text-xs text-slate-300">BookGems</span><span class="text-xs mono text-white skeleton" id="l-bgm">—</span></div>
+        <div class="flex justify-between items-center"><span class="text-xs text-slate-300">Bonus BGM</span><span class="text-xs mono text-emerald-400 skeleton" id="l-bonus">+0</span></div>
+      </div>
+      <div class="mt-4 pt-4 border-t border-slate-700 flex justify-between items-end">
+        <span class="text-sm font-bold text-white uppercase tracking-wider">Total</span>
+        <span id="l-total" class="text-xl font-bold text-emerald-400 skeleton">—</span>
+      </div>
+    </div>
+
+    <div class="flex gap-3 mt-2 fade">
+      <button onclick="openCancel()" class="btn-d flex-1">Abort</button>
+      <button onclick="tg.showAlert('If your funds are debited but BGM is not credited within ~15 minutes, contact support in the bot with your UTR / transaction ID.')" class="bg-slate-800 border border-slate-700 text-white font-semibold px-4 flex items-center justify-center rounded-[14px]">
+        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </button>
+    </div>
+  </main>
+
+  <div id="view-success" class="hide flex-grow flex-col justify-center items-center text-center px-4 fade">
+    <div class="relative w-24 h-24 mb-6 mx-auto">
+      <div class="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping"></div>
+      <div class="relative w-full h-full bg-[#0a0f1a] border-2 border-emerald-500/50 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(52,211,153,.3)]">
+        <svg class="w-12 h-12 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+      </div>
+    </div>
+    <h2 class="text-3xl font-bold text-white mb-3">Payment Verified</h2>
+    <p id="success-sub" class="text-sm text-slate-400 mb-8 max-w-[280px] mx-auto leading-relaxed">Your BookGems have been credited to your wallet.</p>
+    <button onclick="tg.close()" class="btn">Back to Bot</button>
+  </div>
+
+  <div id="view-end" class="hide flex-grow flex-col justify-center items-center text-center px-4 fade">
+    <div class="w-24 h-24 bg-[#0a0f1a] border-2 border-red-500/30 rounded-full flex items-center justify-center mb-6 mx-auto">
+      <svg class="w-12 h-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
+    </div>
+    <h2 id="end-t" class="text-3xl font-bold text-white mb-3">Order Closed</h2>
+    <p id="end-d" class="text-sm text-slate-400 mb-8 max-w-[280px] mx-auto leading-relaxed">This order was cancelled. No BGM was charged.</p>
+    <button onclick="tg.close()" class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl py-4 font-bold text-sm">Close</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.expand(); tg.ready();
+try { tg.setHeaderColor('#0b1120'); tg.setBackgroundColor('#0b1120'); } catch(e){}
+
+const q = new URLSearchParams(location.search);
+const orderId = q.get('order_id');
+const INIT = tg.initData || '';
+const H = { 'Content-Type':'application/json', 'X-Telegram-Init-Data': INIT };
+if (orderId) document.getElementById('rid').innerText = 'ID: ' + orderId;
+
+let payUrl = '';
+
+function show(view){
+  ['view-main','view-success','view-end'].forEach(id=>document.getElementById(id).classList.add('hide'));
+  document.getElementById(view).classList.remove('hide');
+  if(view!=='view-main') document.getElementById('timer').style.opacity='0';
+}
+function terminalEnd(t,d){ stopTimers(); show('view-end'); if(t)document.getElementById('end-t').innerText=t; if(d)document.getElementById('end-d').innerText=d; try{tg.HapticFeedback.notificationOccurred('error');}catch(e){} }
+function terminalSuccess(){
+  stopTimers(); show('view-success');
+  try{tg.HapticFeedback.notificationOccurred('success');}catch(e){}
+  if(window.confetti){ const f=(r,o)=>confetti(Object.assign({origin:{y:.7},disableForReducedMotion:true},o,{particleCount:Math.floor(180*r)}));
+    f(.25,{spread:26,startVelocity:55,colors:['#34d399','#22d3ee']}); f(.2,{spread:60,colors:['#10b981','#fbbf24']}); f(.35,{spread:100,decay:.91,scalar:.8,colors:['#fff','#34d399']}); }
+}
+
+function copyText(id){
+  const el=document.getElementById(id); const t=el.innerText;
+  if(!t||t.includes('loading')) return;
+  const flash=(m,c)=>{el.innerText=m;el.style.color=c;setTimeout(()=>{el.innerText=t;el.style.color='';},1400);};
+  try{ navigator.clipboard.writeText(t).then(()=>{try{tg.HapticFeedback.impactOccurred('light');}catch(e){}flash('COPIED','#34d399');}).catch(()=>flash('LONG-PRESS TO COPY','#f43f5e')); }
+  catch(e){ flash('LONG-PRESS TO COPY','#f43f5e'); }
+}
+function qr(id,data){ const c=document.getElementById(id); c.innerHTML=''; new QRCode(c,{text:data,width:176,height:176,colorDark:'#0f172a',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M}); }
+
+function goStep(s){
+  try{tg.HapticFeedback.selectionChanged();}catch(e){}
+  [1,2,3].forEach(i=>{ document.getElementById('s'+i).classList.add('hide');
+    const n=document.getElementById('n'+i); n.className = i<s?'node done':(i===s?'node active':'node'); });
+  document.getElementById('s'+s).classList.remove('hide');
+  document.getElementById('upi-bar').style.width = s===1?'0%':(s===2?'50%':'100%');
+  document.getElementById('timer').style.opacity = s===3?'0':'1';
+}
+
+let utrMode='bank';
+function switchTab(m){
+  utrMode=m; try{tg.HapticFeedback.selectionChanged();}catch(e){}
+  document.getElementById('tab-bank').classList.toggle('active',m==='bank');
+  document.getElementById('tab-fam').classList.toggle('active',m==='fam');
+  document.getElementById('help-bank').classList.toggle('hide',m!=='bank');
+  document.getElementById('help-fam').classList.toggle('hide',m!=='fam');
+  const i=document.getElementById('utr'); i.placeholder=m==='bank'?'12-DIGIT UTR':'FMPIB…'; i.value=''; onUtr();
+}
+function onUtr(){
+  const i=document.getElementById('utr'), b=document.getElementById('submit-utr'), fb=document.getElementById('utr-fb');
+  let v=i.value.toUpperCase().replace(/\s/g,'');
+  if(utrMode==='bank'){ v=v.replace(/\D/g,'').slice(0,12); }
+  i.value=v;
+  let ok=false;
+  if(utrMode==='bank'){ ok=v.length===12; fb.innerText=ok?'VALID FORMAT':v.length+'/12 DIGITS'; }
+  else { ok=/^FMPIB\d{10,25}$/.test(v); fb.innerText = v.length===0?'AWAITING INPUT':(!v.startsWith('FMPIB')?'MUST START WITH FMPIB':(ok?'VALID FAMPAY ID':'ENTER FULL ID')); }
+  fb.style.color = ok?'#34d399':'#64748b'; b.disabled=!ok;
+  if(ok&&i.dataset.last!==v){ try{tg.HapticFeedback.notificationOccurred('success');}catch(e){} i.dataset.last=v; }
+}
+async function submitUtr(){
+  const i=document.getElementById('utr'), b=document.getElementById('submit-utr'), v=i.value;
+  b.disabled=true; b.innerText='Verifying…';
+  try{
+    const r=await fetch('/api/pay/ipaid',{method:'POST',headers:H,body:JSON.stringify({order_id:orderId,utr:v})});
+    const d=await r.json().catch(()=>null);
+    if(r.ok && d && d.success){
+      try{tg.HapticFeedback.impactOccurred('heavy');}catch(e){}
+      document.getElementById('show-utr').innerText=v; goStep(3);
+      if(d.status==='paid'){ terminalSuccess(); return; }
+      schedule(0);
+    } else { throw new Error((d&&d.error)||'failed'); }
+  }catch(e){
+    try{tg.HapticFeedback.notificationOccurred('error');}catch(_){}
+    i.classList.add('err'); setTimeout(()=>i.classList.remove('err'),400);
+    b.innerText = e.message && e.message!=='failed' ? e.message : 'Error — try again';
+    setTimeout(()=>{ b.disabled=false; b.innerText='Verify Payment'; },2200);
+  }
+}
+
+function openCheckout(){
+  if(!payUrl){ tg.showAlert('Checkout link not ready yet — please wait a moment and retry.'); return; }
+  document.getElementById('crypto-wait').classList.remove('hide');
+  try{ tg.openLink(payUrl); }catch(e){ location.href=payUrl; }
+}
+
+function openCancel(){ try{tg.HapticFeedback.impactOccurred('medium');}catch(e){} document.getElementById('cancel-modal').classList.add('show'); }
+function closeCancel(){ document.getElementById('cancel-modal').classList.remove('show'); }
+async function doCancel(){
+  const b=document.getElementById('confirm-cancel'); b.disabled=true; b.innerText='Aborting…';
+  try{
+    const r=await fetch('/api/pay/cancel',{method:'POST',headers:H,body:JSON.stringify({order_id:orderId})});
+    const d=await r.json().catch(()=>null);
+    if(!r.ok||!d||!d.success) throw new Error((d&&d.error)||'Cancel failed');
+    closeCancel(); terminalEnd('Aborted','This order was cancelled. No BGM was charged.');
+  }catch(e){ b.disabled=false; b.innerText='Yes, Cancel'; try{tg.showAlert('Could not cancel: '+(e.message||'error')+'. It may already be processing — check the bot.');}catch(_){}}
+}
+
+let gTimer=null;
+function stopTimers(){ clearInterval(gTimer); clearTimeout(pollTimer); }
+function startTimer(expiresAt){
+  if(gTimer||!expiresAt) return;
+  const end=new Date(expiresAt).getTime(); const badge=document.getElementById('timer'), txt=document.getElementById('countdown');
+  badge.style.opacity='1';
+  gTimer=setInterval(()=>{
+    const diff=end-Date.now();
+    if(diff<=0){ txt.innerText='00:00'; txt.classList.add('text-red-400'); return; }
+    txt.innerText = String(Math.floor(diff/60000)).padStart(2,'0')+':'+String(Math.floor(diff%60000/1000)).padStart(2,'0');
+    if(diff<300000) txt.classList.add('text-red-400');
+  },1000);
+}
+
+let built=false, prevStatus='', pollMs=2500, pollTimer=null;
+function schedule(ms){ clearTimeout(pollTimer); pollTimer=setTimeout(poll,ms); }
+
+async function poll(){
+  try{
+    const r=await fetch('/api/pay/status?order_id='+encodeURIComponent(orderId),{headers:{'X-Telegram-Init-Data':INIT}});
+    if(!r.ok){ if(r.status===401||r.status===403||r.status===404){ terminalEnd('Invalid Link','We could not load this order. Reopen it from the bot.'); return; } schedule(4000); return; }
+    const d=await r.json();
+    if(d.status==='paid'){ terminalSuccess(); return; }
+    if(['cancelled','expired','failed'].includes(d.status)){ terminalEnd('Order Closed','This order is no longer active. No BGM was charged.'); return; }
+
+    if(!built){
+      built=true;
+      const isUpi = d.method==='upi';
+      document.querySelectorAll('.skeleton').forEach(el=>el.classList.remove('skeleton'));
+      const bgm=parseFloat(d.bgm||0), bonus=parseFloat(d.bonus||0);
+      document.getElementById('hero-sym').innerText = isUpi?'₹':'$';
+      document.getElementById('hero-amt').innerText = isUpi?parseFloat(d.total_due_inr||0).toFixed(2):parseFloat(d.amount_usd||0).toFixed(2);
+      document.getElementById('hero-bgm').innerText = (bgm+bonus).toLocaleString()+' BGM';
+      document.getElementById('l-bgm').innerText = bgm.toLocaleString();
+      document.getElementById('l-bonus').innerText = '+'+bonus.toLocaleString();
+      document.getElementById('l-total').innerText = (bgm+bonus).toLocaleString()+' BGM';
+
+      if(isUpi){
+        document.getElementById('m-badge').innerText='FamPay / UPI';
+        document.getElementById('m-dot').classList.replace('bg-slate-500','bg-emerald-400');
+        document.getElementById('m-dot').classList.add('animate-pulse');
+        document.getElementById('flow-upi').classList.remove('hide'); document.getElementById('flow-upi').classList.add('flex');
+        document.getElementById('upi-id').innerText = d.upi_id||'';
+        const amt=parseFloat(d.total_due_inr||0).toFixed(2);
+        const tail=(orderId||'').split('-').pop();
+        qr('upi-qr', 'upi://pay?pa='+encodeURIComponent(d.upi_id||'')+'&pn='+encodeURIComponent(d.merchant||'BooksBot')+'&am='+amt+'&cu=INR&tn='+encodeURIComponent('BGM '+tail));
+        if(d.status==='utr_submitted'){ document.getElementById('show-utr').innerText=d.submitted_utr||'…'; goStep(3); }
+      } else {
+        document.getElementById('m-badge').innerText='Crypto · Cryptomus';
+        document.getElementById('m-dot').classList.replace('bg-slate-500','bg-amber-400');
+        document.getElementById('m-dot').classList.add('animate-pulse');
+        document.getElementById('flow-crypto').classList.remove('hide'); document.getElementById('flow-crypto').classList.add('flex');
+        payUrl=d.pay_url||'';
+        if(!payUrl) document.getElementById('crypto-open').disabled=true;
+      }
+      if(d.expires_at) startTimer(d.expires_at);
+    } else if (d.method==='crypto' && payUrl!== (d.pay_url||'')) {
+      payUrl=d.pay_url||payUrl;
+    }
+
+    if(d.status!==prevStatus){ pollMs=2500; prevStatus=d.status; } else { pollMs=Math.min(pollMs*1.15,6000); }
+  }catch(e){ pollMs=4000; }
+  schedule(pollMs);
+}
+
+if(orderId) poll();
+else terminalEnd('Invalid Link','Missing order reference — reopen this page from the bot.');
+</script>
+</body>
+</html>

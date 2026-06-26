@@ -52,6 +52,10 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Audiobook player Mini App (seek, ±15s, 0.75–2× speed, resume position)
 - ✅ File-stream endpoint gated to the user's Favorites (initData-auth);
   graceful >20MB / no-file_id fallbacks
+- ✅ **Secure Payment Portal** Mini App (pay.html): UPI QR + in-app UTR/FMPIB
+  submit (/api/pay/ipaid) + live status polling (/api/pay/status) + cancel; also
+  fronts the Cryptomus crypto checkout. The chat UTR flow stays as a no-HTTPS
+  fallback. Mirrors the inflowads unified payment portal, adapted to BGM.
 - ⬜ Admin question management + leaderboards
 
 ## Phase 6 — Admin & growth 🔜
@@ -64,9 +68,13 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Public logs / invite link (/get_link, 24h single-use, 1/day)
 - ✅ Safe in-house captcha (CAPTCHA_ENABLED) replacing 3rd-party verification
 - ✅ Payments — UPI **email auto-verified** (ported from inflowads): pick BGM →
-  pay ₹ to UPI ID → submit UTR → IMAP monitor reads the FamPay credit email,
-  matches UTR + exact amount (±₹2) → auto-credits BGM. Ledger handles emails
-  that arrive before/after the UTR. Atomic single-credit via _confirm_payment.
+  pay ₹ to UPI ID → submit UTR (in the Payment Portal Mini App, or chat) → IMAP
+  monitor reads the FamPay credit email, matches UTR + exact amount (±₹2) →
+  auto-credits BGM. Ledger handles emails that arrive before/after the UTR.
+  Atomic single-credit via _confirm_payment. **Shares the FamPay inbox + UPI ID
+  with the inflowads bot:** both poll the same Gmail; whichever bot the UTR was
+  submitted to finds the order in its own (separate) DB and credits — no
+  cross-bot double-credit (the other bot just parks the email in its ledger).
 - ✅ Payments — crypto (**Cryptomus**): pick a USD pack → unlocked invoice (pay
   page offers every coin Cryptomus supports) → signed /cryptomus-webhook
   auto-credits BGM (activates when CRYPTOMUS_API_KEY + CRYPTOMUS_MERCHANT_ID set)

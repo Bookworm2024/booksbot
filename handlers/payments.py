@@ -17,7 +17,7 @@ Crypto flow (Cryptomus gateway):
 """
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -39,7 +39,7 @@ from utils.cryptomus import (
     verify_webhook,
 )
 from utils.format import fmt_amount
-from utils.keyboards import btn, kb, url_btn
+from utils.keyboards import btn, kb, url_btn, webapp_btn
 from utils.settings import get_float
 from utils.wallet import add_bgm
 
@@ -83,6 +83,11 @@ def _now():
 # Accept a standard 12-digit bank UTR or a FamPay FMPIB id.
 _UTR_OK = re.compile(r'^(?:\d{12}|FMPIB\d+)$', re.IGNORECASE)
 _AMOUNT_TOLERANCE_INR = 2.0
+# How long an order's pay-portal session is shown as valid (cosmetic countdown).
+# The order itself stays matchable by the email monitor even after this elapses,
+# so a slightly-late UPI payment still credits.
+_UPI_TTL_SEC = 1200      # 20 min
+_CRYPTO_TTL_SEC = 3600   # 60 min (matches the Cryptomus invoice lifetime)
 
 
 def _upi_enabled() -> bool:
@@ -208,13 +213,32 @@ async def on_amount(message: Message, state: FSMContext) -> None:
         "method": "upi", "bgm": bgm, "bonus": bonus, "total_due_inr": inr,
         "coupon": await _pop_active_coupon(db, uid),
         "status": "waiting", "submitted_utr": None, "created_at": _now(),
+        "expires_at": (_now() + timedelta(seconds=_UPI_TTL_SEC)).isoformat(),
     })
+    bonus_line = f"🎁 <b>Bonus:</b> +{fmt_amount(bonus)} BGM!\n" if bonus else ""
+
+    # Preferred: the dedicated Secure Payment Portal (Mini App) — UPI QR + in-app
+    # UTR submission + live status. Falls back to the in-chat UTR flow when no
+    # public HTTPS URL is configured (Telegram only opens web_app over HTTPS).
+    if BOT_PUBLIC_URL:
+        await state.clear()
+        await message.answer(
+            f"<b>💳 Pay ₹{inr:.2f}</b> for <b>{bgm} BGM</b>\n{bonus_line}"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "Tap below to open the <b>Secure Payment Portal</b> — scan the UPI QR, "
+            "pay, then submit your UTR right inside it. BGM is credited automatically.",
+            reply_markup=kb(
+                [webapp_btn("💳 Open Secure Payment Portal", "pay.html",
+                            query=f"order_id={order_id}", style="success")],
+                [btn("🔙 Back", "acc_buy", style="danger")]))
+        return
+
+    # Fallback: collect the UTR in chat.
     await state.update_data(order_id=order_id, total=inr)
     await state.set_state(PayFSM.awaiting_utr)
     rows = []
     if PAYMENT_QR_URL:
         rows.append([url_btn("📷 View QR", PAYMENT_QR_URL)])
-    bonus_line = f"🎁 <b>Bonus:</b> +{fmt_amount(bonus)} BGM!\n" if bonus else ""
     await message.answer(
         f"<b>💳 Pay ₹{inr:.2f}</b> for <b>{bgm} BGM</b>\n{bonus_line}"
         "━━━━━━━━━━━━━━━━━━\n"
@@ -361,14 +385,32 @@ async def cb_cm_buy(call: CallbackQuery) -> None:
             reply_markup=kb([btn("🔙 Back", "pay_crypto", style="danger")]))
         return
     db = await MongoManager.get()
-    await db.safe_insert("crypto_orders", {
-        "order_id": order_id, "user_id": uid, "bgm": bgm, "bonus": bonus,
-        "amount_usd": usd, "gateway": "cryptomus",
-        "coupon": await _pop_active_coupon(db, uid),
-        "cryptomus_uuid": result.get("uuid"), "status": "waiting", "created_at": _now(),
-    })
     pay_url = result.get("url")
     addr = result.get("address")
+    await db.safe_insert("crypto_orders", {
+        "order_id": order_id, "user_id": uid, "bgm": bgm, "bonus": bonus,
+        "amount_usd": usd, "gateway": "cryptomus", "method": "crypto",
+        "coupon": await _pop_active_coupon(db, uid),
+        "cryptomus_uuid": result.get("uuid"), "pay_url": pay_url or "",
+        "status": "waiting", "created_at": _now(),
+        "expires_at": (_now() + timedelta(seconds=_CRYPTO_TTL_SEC)).isoformat(),
+    })
+
+    # Preferred: the unified Secure Payment Portal (Mini App) — opens the
+    # Cryptomus checkout and shows live BGM-credit status in-app.
+    if BOT_PUBLIC_URL:
+        await call.message.edit_text(
+            f"🌐 <b>Pay ${usd:.2f}</b> in crypto → <b>{bgm:,} BGM</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "Open the <b>Secure Payment Portal</b> to pick your coin and pay. "
+            "BGM lands automatically once the network confirms.",
+            reply_markup=kb(
+                [webapp_btn("💳 Open Secure Payment Portal", "pay.html",
+                            query=f"order_id={order_id}", style="success")],
+                [btn("🔙 Back", "acc_buy", style="danger")]))
+        return
+
+    # Fallback: direct Cryptomus hosted pay-page link.
     text = (f"🌐 <b>Pay ${usd:.2f}</b> in crypto → <b>{bgm:,} BGM</b>\n"
             "━━━━━━━━━━━━━━━━━━\n")
     rows = []
