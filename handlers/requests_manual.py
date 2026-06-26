@@ -32,6 +32,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS, LOG_CHANNEL_ID
 from database.connection import MongoManager
+from utils.brand import CREDIT
 from utils.files import clean_title, index_file, kind_for_ext
 from utils.format import fmt_amount
 from utils.keyboards import btn, kb
@@ -323,7 +324,7 @@ async def on_admin_file(message: Message, state: FSMContext) -> None:
 
     caption = (f"📚 <b>Your requested file is ready!</b>\n\n"
                f"📖 {req.get('title')}\n✍️ {req.get('author')}\n\n"
-               "❤️ @bookslibraryofficial")
+               f"{CREDIT}")
     fav = kb([btn("⭐ Add to Favorites", f"fav_add:{fuid}", style="success")])
     try:
         await message.bot.send_document(target, file_id, caption=caption, reply_markup=fav) \

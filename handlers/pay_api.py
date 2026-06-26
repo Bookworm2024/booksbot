@@ -24,11 +24,12 @@ from aiohttp import web
 
 from config import UPI_ID
 from database.connection import MongoManager
+from utils.brand import BOT_NAME
 from utils.webapp_auth import user_id_from
 
 logger = logging.getLogger(__name__)
 
-MERCHANT_NAME = "BooksBot"
+MERCHANT_NAME = BOT_NAME
 
 
 def _init_data(request: web.Request, body: dict | None = None) -> str:

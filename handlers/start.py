@@ -25,6 +25,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS, LOG_CHANNEL_ID, REQUIRED_CHANNELS
+from utils.brand import DASHBOARD_FOOTER, about_text
 from utils.keyboards import btn, kb, url_btn
 from utils.referral import grant_referral, remember_referrer
 from utils.users import ensure_user, is_banned
@@ -194,7 +195,8 @@ async def _send_dashboard(message: Message, name: str) -> None:
         "• Request any eBook or Audiobook\n"
         "• Manage tokens and your library\n"
         "• Play games and earn rewards\n"
-        "• Use advanced utility tools</blockquote>",
+        "• Use advanced utility tools</blockquote>\n\n"
+        + DASHBOARD_FOOTER,
         reply_markup=await _dashboard_kb_with_ad(),
     )
 
@@ -275,12 +277,23 @@ async def cb_tools(call: CallbackQuery, state: FSMContext) -> None:
          btn("📊 Bot Stats", "tool_stats", style="primary")],
         [btn("⭐ Rate Us", "menu_rate", style="primary"),
          btn("📜 Public Logs", "tool_logs", style="primary")],
+        [btn("ℹ️ About Us", "menu_about", style="primary")],
     ]
     if call.from_user.id in ADMIN_IDS:
         rows.append([btn("🛠 Admin Centre", "admin_open", style="danger")])
     rows.append([btn("🔙 Back", "menu_home", style="danger")])
     await call.message.edit_text("<b>🛠️ Bot Tools</b>\n\nUtilities and system info.",
                                  reply_markup=kb(*rows))
+
+
+@router.callback_query(F.data == "menu_about")
+async def cb_about(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await call.answer()
+    await call.message.edit_text(
+        about_text(),
+        reply_markup=kb([btn("🔙 Back", "menu_tools", style="danger")]),
+    )
 
 
 # All dashboard actions now have real handlers in their own routers

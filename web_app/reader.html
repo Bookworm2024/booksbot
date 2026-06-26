@@ -2,67 +2,96 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>BooksBot Reader</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Books Provider — Reader</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   :root { color-scheme: light dark; --rbg: var(--tg-theme-bg-color,#0f1115); --rfg: var(--tg-theme-text-color,#e8e8e8); }
   :root[data-theme="sepia"] { --rbg:#f4ecd8; --rfg:#5b4636; }
   :root[data-theme="dark"]  { --rbg:#15171b; --rfg:#cfcfcf; }
   :root[data-theme="light"] { --rbg:#ffffff; --rfg:#15171b; }
-  * { box-sizing: border-box; }
-  html, body { margin:0; height:100%; background: var(--rbg); color: var(--rfg);
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; height:100%; overflow:hidden; background: var(--rbg); color: var(--rfg);
     font-family: system-ui, sans-serif; transition: background .2s, color .2s; }
-  #bar { display:flex; align-items:center; gap:8px; padding:8px 10px; position:sticky; top:0; z-index:6;
+  body { display:flex; flex-direction:column; }
+  #bar { display:flex; align-items:center; gap:8px; padding:8px 10px; z-index:6; flex:0 0 auto;
     background: var(--tg-theme-secondary-bg-color,#1c2027); color: var(--tg-theme-text-color,#e8e8e8); }
-  #bar button { border:0; border-radius:10px; padding:8px 12px; font-weight:700; cursor:pointer;
+  #bar button { border:0; border-radius:10px; padding:8px 12px; font-weight:700; cursor:pointer; line-height:1;
     background: var(--tg-theme-button-color,#3390ec); color:#fff; }
-  #bar .ghost { background:transparent; color: var(--tg-theme-text-color,#e8e8e8); }
-  #info { flex:1; text-align:center; font-size:.85rem; }
-  #panel { display:none; gap:10px; padding:10px; flex-wrap:wrap; align-items:center;
-    background: var(--tg-theme-secondary-bg-color,#1c2027); position:sticky; top:46px; z-index:5; }
+  #bar .ghost { background:transparent; color: var(--tg-theme-text-color,#e8e8e8); font-size:1.2rem; }
+  #info { flex:1; text-align:center; font-size:.85rem; font-variant-numeric:tabular-nums; }
+  #panel { display:none; gap:10px; padding:10px; flex-wrap:wrap; align-items:center; flex:0 0 auto;
+    background: var(--tg-theme-secondary-bg-color,#1c2027); z-index:5; }
   #panel .grp { display:flex; gap:6px; align-items:center; }
   #panel button { border:0; border-radius:8px; padding:7px 10px; cursor:pointer; font-weight:700;
     background:#2a2f37; color:#e8e8e8; }
   #panel button.on { background: var(--tg-theme-button-color,#3390ec); color:#fff; }
-  #stage { padding:10px; display:flex; justify-content:center; }
-  #pdfc { max-width:100%; box-shadow:0 2px 14px rgba(0,0,0,.4); border-radius:6px; }
-  #epub { width:100%; height: calc(100vh - 56px); }
-  #msg { padding:40px 20px; text-align:center; }
-  #bmwrap { padding:0 10px 10px; }
+  #bmwrap { padding:0 10px; flex:0 0 auto; max-height:64px; overflow:auto; }
   .bm { display:inline-block; margin:4px; padding:6px 10px; border-radius:10px;
     background: var(--tg-theme-secondary-bg-color,#1c2027); cursor:pointer; font-size:.85rem; }
+  /* the touch surface: pinch-zoom, pan & swipe all happen here */
+  #pane { flex:1 1 auto; min-height:0; position:relative; overflow:hidden;
+    touch-action:none; -webkit-user-select:none; user-select:none; }
+  #pdfc { position:absolute; top:0; left:0; transform-origin:0 0; will-change:transform;
+    image-rendering:auto; box-shadow:0 2px 14px rgba(0,0,0,.4); border-radius:4px; }
+  #epub { position:absolute; inset:0; width:100%; height:100%; }
+  #msg { display:none; flex:1; align-items:center; justify-content:center; flex-direction:column;
+    padding:40px 20px; text-align:center; }
+  #hint { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:4;
+    background:rgba(0,0,0,.62); color:#fff; padding:7px 13px; border-radius:20px; font-size:.78rem;
+    pointer-events:none; opacity:0; transition:opacity .3s; white-space:nowrap; }
+  #hint.show { opacity:1; }
 </style>
 </head>
 <body>
 <div id="bar">
-  <button class="ghost" id="prev">‹</button>
+  <button class="ghost" id="prev" aria-label="Previous">‹</button>
   <div id="info">Loading…</div>
-  <button class="ghost" id="next">›</button>
-  <button class="ghost" id="cog">Aa</button>
-  <button class="ghost" id="tts">🔊</button>
-  <button id="bm">🔖</button>
+  <button class="ghost" id="next" aria-label="Next">›</button>
+  <button class="ghost" id="cog" aria-label="Settings">Aa</button>
+  <button class="ghost" id="tts" aria-label="Read aloud">🔊</button>
+  <button id="bm" aria-label="Bookmark">🔖</button>
 </div>
 <div id="panel">
   <div class="grp"><b style="font-size:.8rem">Theme</b>
     <button data-theme="light">☀️</button><button data-theme="sepia">📜</button><button data-theme="dark">🌙</button></div>
-  <div class="grp"><b style="font-size:.8rem">Font</b>
+  <div class="grp" id="fontgrp"><b style="font-size:.8rem">Font</b>
     <button id="f-">A−</button><button id="f+">A+</button></div>
-  <div class="grp"><b style="font-size:.8rem">Spacing</b>
+  <div class="grp" id="spacegrp"><b style="font-size:.8rem">Spacing</b>
     <button id="s-">≣−</button><button id="s+">≣+</button></div>
+  <div class="grp" id="zoomgrp"><b style="font-size:.8rem">Zoom</b>
+    <button id="z-">−</button><button id="zfit">Fit</button><button id="z+">+</button></div>
 </div>
 <div id="bmwrap"></div>
-<div id="stage"><canvas id="pdfc" style="display:none"></canvas><div id="epub" style="display:none"></div></div>
-<div id="msg" style="display:none"></div>
+<div id="pane">
+  <canvas id="pdfc" style="display:none"></canvas>
+  <div id="epub" style="display:none"></div>
+  <div id="hint"></div>
+</div>
+<div id="msg"></div>
 
 <script>
 const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
+// Stop Telegram from closing the Mini App / pulling-to-refresh on vertical
+// drags so our swipe & pan gestures own the whole surface (Bot API 7.7+).
+try { tg?.disableVerticalSwipes?.(); } catch (e) {}
+
+const PDF_JS     = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js";
+const PDF_WORKER = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js";
+const JSZIP      = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
+const EPUBJS     = "https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js";
+
 const q = new URLSearchParams(location.search);
 const FUID = q.get("fuid"); const EXT = (q.get("ext")||"").toLowerCase();
 const INIT = tg?.initData || "";
-const info = document.getElementById("info"); const msg = document.getElementById("msg");
+const info = document.getElementById("info");
+const msg  = document.getElementById("msg");
+const pane = document.getElementById("pane");
+const pdfc = document.getElementById("pdfc");
+
 let state = { page:0, loc:"", bookmarks:[] };
 let mode = null, pdfDoc = null, pageNum = 1, rendition = null, book = null;
+const DPR = Math.min(window.devicePixelRatio || 1, 3);
 
 // ── reading preferences (localStorage; global, not per-file) ──
 const PREFS = Object.assign({theme:"light", font:18, spacing:1.6},
@@ -73,7 +102,7 @@ function applyPrefs(){
   document.documentElement.setAttribute("data-theme", PREFS.theme);
   document.querySelectorAll("#panel button[data-theme]").forEach(b=>
     b.classList.toggle("on", b.dataset.theme===PREFS.theme));
-  const c = document.getElementById("pdfc"); if(c) c.style.filter = filterFor(PREFS.theme);
+  if(pdfc) pdfc.style.filter = filterFor(PREFS.theme);
   if(rendition) applyEpubTheme();
 }
 function applyEpubTheme(){
@@ -91,58 +120,238 @@ document.getElementById("cog").onclick=()=>{ const p=document.getElementById("pa
 document.querySelectorAll("#panel button[data-theme]").forEach(b=>
   b.onclick=()=>{ PREFS.theme=b.dataset.theme; savePrefs(); applyPrefs(); });
 document.getElementById("f-").onclick=()=>{ PREFS.font=Math.max(12,PREFS.font-1); savePrefs(); applyPrefs(); };
-document.getElementById("f+").onclick=()=>{ PREFS.font=Math.min(30,PREFS.font+1); savePrefs(); applyPrefs(); };
+document.getElementById("f+").onclick=()=>{ PREFS.font=Math.min(34,PREFS.font+1); savePrefs(); applyPrefs(); };
 document.getElementById("s-").onclick=()=>{ PREFS.spacing=Math.max(1.2,+(PREFS.spacing-0.1).toFixed(1)); savePrefs(); applyPrefs(); };
 document.getElementById("s+").onclick=()=>{ PREFS.spacing=Math.min(2.4,+(PREFS.spacing+0.1).toFixed(1)); savePrefs(); applyPrefs(); };
+// Zoom buttons: PDF → real zoom (centred); the group is hidden for EPUB.
+document.getElementById("z+").onclick  =()=> pdfZoomBy(1.25);
+document.getElementById("z-").onclick  =()=> pdfZoomBy(1/1.25);
+document.getElementById("zfit").onclick=()=> animateZoomTo(1, pane.clientWidth/2, pane.clientHeight/2);
 
-function showMsg(t){ msg.style.display="block"; msg.innerHTML=t; document.getElementById("stage").style.display="none"; }
+let hintTimer=null;
+function hint(t){ const h=document.getElementById("hint"); h.textContent=t; h.classList.add("show");
+  clearTimeout(hintTimer); hintTimer=setTimeout(()=>h.classList.remove("show"), 1500); }
+function showMsg(t){ msg.style.display="flex"; msg.innerHTML=t; pane.style.display="none"; }
 async function api(p,o){ return (await fetch(p,o)).json(); }
 async function loadState(){ try{ state = await api(`/api/reader/state?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`); }catch(e){} }
 function saveState(x){ fetch("/api/reader/state",{method:"POST",headers:{"Content-Type":"application/json"},
   body: JSON.stringify({init_data:INIT, fuid:FUID, ...x})}); }
-function esc(s){ return (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 async function getBytes(){ const r=await fetch(`/api/file?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`);
   if(!r.ok){ const j=await r.json().catch(()=>({})); throw j.error||r.status; } return await r.arrayBuffer(); }
 // Load a UMD library via a <script> tag. Telegram's in-app webview reliably
-// blocks/fails ESM dynamic import() of remote modules (the "Failed to fetch
-// dynamically imported module" error), so we never use import() for CDN libs.
+// blocks/fails ESM dynamic import() of remote modules, so we never use import().
 function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script");
   s.src=src; s.onload=res; s.onerror=()=>rej(new Error("Failed to load "+src)); document.head.appendChild(s); }); }
+function haptic(k){ try{ tg?.HapticFeedback?.impactOccurred?.(k||"light"); }catch(e){} }
 
 function renderBookmarks(){ const w=document.getElementById("bmwrap"); w.innerHTML="";
   (state.bookmarks||[]).forEach(b=>{ const s=document.createElement("span"); s.className="bm";
     s.textContent="🔖 "+(mode==="pdf"?("p."+b):"mark");
-    s.onclick=()=> mode==="pdf"? gotoPdf(b) : rendition.display(b); w.appendChild(s); }); }
+    s.onclick=()=> mode==="pdf"? goPdfPage(b) : rendition?.display(b); w.appendChild(s); }); }
 
-/* PDF — UMD legacy build via <script> (NOT ESM import) for webview compatibility */
+/* ───────────────────────── PDF (canvas via pdf.js) ─────────────────────────
+   View model: the page is rendered to a backing store at the committed `zoom`,
+   then positioned/scaled live via a CSS transform for buttery pinch & pan.
+     zoom   – committed zoom baked into the bitmap (1 = fit-to-width)
+     gScale – live gesture scale on top (1 at rest), committed on gesture end
+     tx,ty  – translate of the canvas top-left within #pane (CSS px)
+   Effective zoom = zoom * gScale.                                            */
+let fitW=0, zoom=1, gScale=1, tx=0, ty=0, rendering=false, pendingRender=null;
+
+function dist(a,b){ return Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY); }
+function applyTransform(){ pdfc.style.transform = `translate3d(${tx}px,${ty}px,0) scale(${gScale})`; }
+function effZoom(){ return zoom*gScale; }
+
+function clampPan(){
+  const dispW = fitW*effZoom();
+  const dispH = pdfc.height ? (pdfc.height/pdfc.width)*dispW : 0;
+  const pw = pane.clientWidth, ph = pane.clientHeight;
+  if(dispW <= pw+0.5){ tx = (pw - dispW)/2; }
+  else { tx = Math.min(0, Math.max(pw - dispW, tx)); }
+  if(dispH <= ph+0.5){ ty = (ph - dispH)/2; }
+  else { ty = Math.min(0, Math.max(ph - dispH, ty)); }
+}
+
+async function renderPdfPage(keepPan){
+  if(rendering){ pendingRender=keepPan; return; }
+  rendering=true;
+  try{
+    const page = await pdfDoc.getPage(pageNum);
+    const base = page.getViewport({scale:1});
+    fitW = Math.min(pane.clientWidth, 1000);
+    let renderScale = (fitW/base.width) * zoom * DPR;
+    // cap the backing-store size so deep zoom can't blow up memory / crash
+    const maxDim = 4096;
+    if(base.width*renderScale > maxDim) renderScale = maxDim/base.width;
+    const vp = page.getViewport({scale:renderScale});
+    const ctx = pdfc.getContext("2d", {alpha:false});
+    pdfc.width = Math.round(vp.width); pdfc.height = Math.round(vp.height);
+    pdfc.style.width  = (fitW*zoom)+"px";
+    pdfc.style.height = (fitW*zoom*base.height/base.width)+"px";
+    await page.render({canvasContext:ctx, viewport:vp}).promise;
+    if(!keepPan){ tx=0; ty=0; }
+    gScale=1; clampPan();
+    pdfc.style.transition=""; pdfc.style.opacity="0"; applyTransform();
+    requestAnimationFrame(()=>{ pdfc.style.transition="opacity .15s ease-out"; pdfc.style.opacity="1";
+      setTimeout(()=>{ pdfc.style.transition=""; }, 170); });
+    info.textContent=`Page ${pageNum} / ${pdfDoc.numPages}`;
+    if(pageNum+1<=pdfDoc.numPages) pdfDoc.getPage(pageNum+1).catch(()=>{}); // warm cache
+  } finally {
+    rendering=false;
+    if(pendingRender!=null){ const k=pendingRender; pendingRender=null; renderPdfPage(k); }
+  }
+}
+
 async function initPdf(buf){ mode="pdf";
-  if(!window.pdfjsLib){ await loadScript("https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"); }
-  pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js";
+  document.getElementById("zoomgrp").style.display="flex";
+  document.getElementById("fontgrp").style.display="none";
+  document.getElementById("spacegrp").style.display="none";
+  if(!window.pdfjsLib){ await loadScript(PDF_JS); }
+  pdfjsLib.GlobalWorkerOptions.workerSrc=PDF_WORKER;
   pdfDoc = await pdfjsLib.getDocument({data:buf}).promise;
   pageNum = Math.min(Math.max(1, state.page||1), pdfDoc.numPages);
-  document.getElementById("pdfc").style.display="block"; applyPrefs(); gotoPdf(pageNum); renderBookmarks(); }
-async function gotoPdf(n){ pageNum=Math.min(Math.max(1,n), pdfDoc.numPages);
-  const page=await pdfDoc.getPage(pageNum); const canvas=document.getElementById("pdfc"); const ctx=canvas.getContext("2d");
-  const vw=Math.min(window.innerWidth-20,900); const scale=vw/page.getViewport({scale:1}).width;
-  const vp=page.getViewport({scale}); canvas.width=vp.width; canvas.height=vp.height;
-  await page.render({canvasContext:ctx, viewport:vp}).promise;
-  info.textContent=`Page ${pageNum} / ${pdfDoc.numPages}`; saveState({page:pageNum}); }
+  pdfc.style.display="block"; applyPrefs();
+  await renderPdfPage(false); renderBookmarks();
+  hint("Swipe to turn · pinch / double-tap to zoom");
+  window.addEventListener("resize", debounce(()=>{ if(mode==="pdf"){ zoom=1; gScale=1; renderPdfPage(false); } }, 250));
+}
 
-/* EPUB */
+function goPdfPage(n){
+  pageNum = Math.min(Math.max(1, n), pdfDoc.numPages);
+  zoom=1; gScale=1; renderPdfPage(false); saveState({page:pageNum});
+}
+function turnPdf(dir){
+  const n = pageNum + dir;
+  if(n<1 || n>pdfDoc.numPages){ haptic(); hint(dir<0?"First page":"Last page"); return; }
+  pageNum = n; zoom=1; gScale=1; renderPdfPage(false); saveState({page:pageNum}); haptic("light");
+}
+
+/* zoom helpers (focal pinch about origin 0,0) */
+function commitZoom(){
+  const eff = Math.max(1, Math.min(5, effZoom()));
+  if(Math.abs(eff-zoom) < 0.01){ gScale=1; clampPan(); applyTransform(); return; }
+  zoom = eff; renderPdfPage(true);   // re-render crisp at the new zoom, keep pan
+}
+function animateZoomTo(target, fx, fy){
+  target = Math.max(1, Math.min(5, target));
+  const g = target/zoom;                       // gScale currently assumed 1
+  const ntx = fx - (fx - tx)*g, nty = fy - (fy - ty)*g;
+  pdfc.style.transition="transform .18s ease-out";
+  gScale=g; tx=ntx; ty=nty; applyTransform();
+  setTimeout(()=>{ pdfc.style.transition=""; commitZoom(); }, 190);
+}
+function pdfZoomBy(f){ if(mode!=="pdf") return; animateZoomTo(zoom*f, pane.clientWidth/2, pane.clientHeight/2); }
+
+/* ── PDF touch gestures: swipe (turn) · drag (pan when zoomed) · pinch · 2-tap ── */
+let touchMode=null, st={}, pin={}, lastTap=0;
+pane.addEventListener("touchstart", e=>{
+  if(mode!=="pdf") return;
+  const r = pane.getBoundingClientRect();
+  if(e.touches.length===2){
+    touchMode="pinch"; const [a,b]=e.touches;
+    pin.dist=dist(a,b); pin.fx=((a.clientX+b.clientX)/2)-r.left; pin.fy=((a.clientY+b.clientY)/2)-r.top;
+    pin.tx=tx; pin.ty=ty; pin.startG=gScale;
+  } else if(e.touches.length===1){
+    const t=e.touches[0];
+    st={x:t.clientX-r.left, y:t.clientY-r.top, tx:tx, ty:ty, t:Date.now(), moved:false};
+    touchMode = effZoom()>1.01 ? "pan" : "swipe";
+  }
+}, {passive:false});
+
+pane.addEventListener("touchmove", e=>{
+  if(mode!=="pdf") return;
+  const r = pane.getBoundingClientRect();
+  if(touchMode==="pinch" && e.touches.length>=2){
+    e.preventDefault();
+    const [a,b]=e.touches; const d=dist(a,b);
+    let g = pin.startG * (d/pin.dist);
+    g = Math.max(1/zoom, Math.min(5/zoom, g));    // clamp effective zoom to [1,5]
+    const k = g/pin.startG;
+    tx = pin.fx - (pin.fx - pin.tx)*k;
+    ty = pin.fy - (pin.fy - pin.ty)*k;
+    gScale=g; applyTransform();
+  } else if(touchMode==="pan"){
+    e.preventDefault();
+    const t=e.touches[0]; tx = st.tx + ((t.clientX-r.left)-st.x); ty = st.ty + ((t.clientY-r.top)-st.y);
+    clampPan(); applyTransform();
+  } else if(touchMode==="swipe"){
+    const t=e.touches[0]; const dx=(t.clientX-r.left)-st.x, dy=(t.clientY-r.top)-st.y;
+    if(Math.abs(dx)>6 || Math.abs(dy)>6) st.moved=true;
+    if(Math.abs(dx) > Math.abs(dy)){ e.preventDefault(); tx = st.tx + dx*0.5; applyTransform(); } // rubber-band
+  }
+}, {passive:false});
+
+pane.addEventListener("touchend", e=>{
+  if(mode!=="pdf") return;
+  if(touchMode==="pinch"){ commitZoom(); touchMode=null; return; }
+  if(touchMode==="pan"){ clampPan(); applyTransform(); touchMode=null; return; }
+  if(touchMode==="swipe"){
+    const r = pane.getBoundingClientRect(); const t=e.changedTouches[0];
+    const dx=(t.clientX-r.left)-st.x, dy=(t.clientY-r.top)-st.y, dt=Date.now()-st.t;
+    tx = st.tx; applyTransform();                 // snap rubber-band back
+    const fast = dt<400 && Math.abs(dx)>50;
+    if((Math.abs(dx)>pane.clientWidth*0.20 || fast) && Math.abs(dx)>Math.abs(dy)){
+      turnPdf(dx<0 ? 1 : -1);
+    } else if(!st.moved){
+      const now=Date.now();
+      if(now-lastTap < 300){ lastTap=0; animateZoomTo(effZoom()>1.05?1:2, st.x, st.y); }
+      else lastTap=now;
+    }
+  }
+  touchMode=null;
+}, {passive:false});
+
+/* ───────────────────────── EPUB (epub.js) ─────────────────────────────────
+   Reflowable text: swipe turns the page, pinch scales the font (its "zoom").  */
 async function initEpub(buf){ mode="epub";
-  if(!window.JSZip){ await loadScript("https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"); }
-  if(!window.ePub){ await loadScript("https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"); }
-  document.getElementById("epub").style.display="block"; book=ePub(buf);
-  rendition=book.renderTo("epub",{width:"100%",height:"100%",spread:"none"});
-  applyEpubTheme(); await rendition.display(state.loc||undefined); info.textContent="EPUB";
+  document.getElementById("zoomgrp").style.display="none";
+  document.getElementById("fontgrp").style.display="flex";
+  document.getElementById("spacegrp").style.display="flex";
+  if(!window.JSZip){ await loadScript(JSZIP); }
+  if(!window.ePub){ await loadScript(EPUBJS); }
+  document.getElementById("epub").style.display="block";
+  book = ePub(buf);
+  rendition = book.renderTo("epub", {width:"100%", height:"100%", spread:"none", flow:"paginated"});
+  applyEpubTheme();
+  rendition.hooks.content.register(c=>attachEpubGestures(c));
+  await rendition.display(state.loc||undefined);
+  info.textContent="EPUB";
   rendition.on("relocated",(loc)=>{ state.loc=loc.start.cfi; saveState({loc:state.loc});
-    info.textContent=`${Math.round((loc.start.percentage||0)*100)}%`; }); renderBookmarks(); }
+    info.textContent=`${Math.round((loc.start.percentage||0)*100)}%`; });
+  renderBookmarks();
+  hint("Swipe to turn · pinch to resize text");
+}
+function attachEpubGestures(contents){
+  try{
+    const d = contents.document; let sx=0, sy=0, pd=0, pinching=false, swipeBlocked=false, startFont=PREFS.font;
+    d.addEventListener("touchstart", ev=>{
+      if(ev.touches.length===2){ pinching=true; swipeBlocked=true; pd=dist(ev.touches[0],ev.touches[1]); startFont=PREFS.font; }
+      else if(ev.touches.length===1){ sx=ev.touches[0].clientX; sy=ev.touches[0].clientY; swipeBlocked=false; }
+    }, {passive:true});
+    d.addEventListener("touchmove", ev=>{
+      if(pinching && ev.touches.length>=2){
+        swipeBlocked=true;
+        const nf = Math.max(12, Math.min(34, Math.round(startFont*(dist(ev.touches[0],ev.touches[1])/pd))));
+        if(nf!==PREFS.font){ PREFS.font=nf; savePrefs(); applyEpubTheme(); }
+      }
+    }, {passive:true});
+    d.addEventListener("touchend", ev=>{
+      // While any finger is still down — or this lift is the tail of a pinch —
+      // never treat it as a swipe (that caused a spurious page turn after a resize).
+      if(pinching){ if(ev.touches.length<2) pinching=false; return; }
+      if(ev.touches.length>0 || swipeBlocked){ if(ev.touches.length===0) swipeBlocked=false; return; }
+      const t=ev.changedTouches[0]; const dx=t.clientX-sx, dy=t.clientY-sy;
+      if(Math.abs(dx)>40 && Math.abs(dx)>Math.abs(dy)){ dx<0 ? rendition.next() : rendition.prev(); haptic("light"); }
+    }, {passive:true});
+  }catch(e){}
+}
 
-document.getElementById("prev").onclick=()=> mode==="pdf"? gotoPdf(pageNum-1) : rendition?.prev();
-document.getElementById("next").onclick=()=> mode==="pdf"? gotoPdf(pageNum+1) : rendition?.next();
+/* bar buttons */
+document.getElementById("prev").onclick=()=> mode==="pdf"? turnPdf(-1) : rendition?.prev();
+document.getElementById("next").onclick=()=> mode==="pdf"? turnPdf(1)  : rendition?.next();
 document.getElementById("bm").onclick=()=>{ const mark=mode==="pdf"?pageNum:state.loc;
   if(mark && !(state.bookmarks||[]).includes(mark)){ (state.bookmarks=state.bookmarks||[]).push(mark);
-    saveState({bookmarks:state.bookmarks}); renderBookmarks(); tg?.HapticFeedback?.impactOccurred?.("light"); } };
+    saveState({bookmarks:state.bookmarks}); renderBookmarks(); haptic("light"); hint("Bookmarked"); } };
 
 /* TTS read-aloud (device voices via Web Speech API) */
 const tts = document.getElementById("tts");
@@ -160,6 +369,8 @@ tts.onclick=async()=>{
   speechSynthesis.speak(u); tts.textContent="⏹";
 };
 window.addEventListener("pagehide", ()=>{ try{ speechSynthesis.cancel(); }catch(e){} });
+
+function debounce(fn,ms){ let h; return (...a)=>{ clearTimeout(h); h=setTimeout(()=>fn(...a),ms); }; }
 
 (async ()=>{
   if(!FUID){ return showMsg("⚠️ No file specified."); }

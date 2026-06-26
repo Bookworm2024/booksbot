@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>BooksBot — Secure Payment</title>
+<title>Books Provider — Secure Payment</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -85,7 +85,7 @@
     <div class="flex items-center gap-3">
       <div class="w-11 h-11 rounded-xl bg-[#0f172a] border border-emerald-500/30 shadow-[0_0_15px_rgba(52,211,153,.2)] flex items-center justify-center text-2xl">📚</div>
       <div>
-        <h1 class="text-lg font-bold text-white leading-tight">BooksBot</h1>
+        <h1 class="text-lg font-bold text-white leading-tight">Books Provider</h1>
         <div class="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.2em] flex items-center gap-1">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Secure Payment
         </div>
@@ -391,7 +391,7 @@ async function poll(){
         document.getElementById('upi-id').innerText = d.upi_id||'';
         const amt=parseFloat(d.total_due_inr||0).toFixed(2);
         const tail=(orderId||'').split('-').pop();
-        qr('upi-qr', 'upi://pay?pa='+encodeURIComponent(d.upi_id||'')+'&pn='+encodeURIComponent(d.merchant||'BooksBot')+'&am='+amt+'&cu=INR&tn='+encodeURIComponent('BGM '+tail));
+        qr('upi-qr', 'upi://pay?pa='+encodeURIComponent(d.upi_id||'')+'&pn='+encodeURIComponent(d.merchant||'Books Provider')+'&am='+amt+'&cu=INR&tn='+encodeURIComponent('BGM '+tail));
         if(d.status==='utr_submitted'){ document.getElementById('show-utr').innerText=d.submitted_utr||'…'; goStep(3); }
       } else {
         document.getElementById('m-badge').innerText='Crypto · OxaPay';

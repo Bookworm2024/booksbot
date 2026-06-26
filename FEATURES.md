@@ -9,8 +9,10 @@ Legend counts toward ~500 features across 14 pillars.
 ---
 
 ## 1. Universal Reader & Media (any file, type-aware UI)
-- ✅ PDF reader (pdf.js): pagination, bookmarks, page memory
-- ✅ EPUB reader (epub.js): CFI location memory, bookmarks
+- ✅ PDF reader (pdf.js): single-swipe paging, pinch + double-tap zoom & pan,
+  bookmarks, page memory
+- ✅ EPUB reader (epub.js): single-swipe paging, pinch-to-resize text, CFI
+  location memory, bookmarks
 - ✅ Audiobook player: seek, ±15s, 0.75–2× speed, resume
 - ✅ Universal viewer dispatcher (`view.html`) — routes by file type
 - ✅ Video player (mp4/webm/mov): speed, resume, fullscreen

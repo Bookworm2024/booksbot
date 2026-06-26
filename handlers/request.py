@@ -21,6 +21,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import BOT_PUBLIC_URL, LOG_CHANNEL_ID
 from database.connection import MongoManager
+from utils.brand import CREDIT
 from utils.channel import get_file_channel
 from utils.files import archive_count, fuzzy_search, get_file, icon_for, search
 from utils.format import fmt_amount
@@ -297,7 +298,7 @@ async def cb_download(call: CallbackQuery) -> None:
 
     await call.answer("📤 Sending…")
     caption = (f"{icon_for(f.get('ext',''))} <b>{escape(f.get('name','Your File') or 'Your File')}</b>\n\n"
-               "❤️ Presented by @bookslibraryofficial")
+               f"{CREDIT}")
     # Read/Listen opens the universal reader Mini App (routes by type: PDF/EPUB →
     # reader, audio → player, etc.). Shown only when a Mini-App host is configured.
     ext = (f.get("ext") or "").lower()

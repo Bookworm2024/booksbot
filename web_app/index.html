@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>BooksBot Mini App</title>
+  <title>Books Provider — Mini App</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root { color-scheme: light dark; }
@@ -16,13 +16,18 @@
     .card { padding: 2rem; max-width: 22rem; }
     h1 { font-size: 1.4rem; margin: 0 0 .5rem; }
     p  { opacity: .75; line-height: 1.5; }
+    .credit { font-size: .8rem; opacity: .6; margin-top: 1.25rem; }
+    .credit a { color: var(--tg-theme-link-color, #6ab3f3); text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>📚 BooksBot Mini Apps</h1>
-    <p>This is the Mini-App host. The eBook reader, audiobook player and games
-       will live here in upcoming phases.</p>
+    <h1>📚 Books Provider</h1>
+    <p>The home of the eBook reader, audiobook player and games — free books,
+       audiobooks &amp; rewards, right inside Telegram.</p>
+    <p class="credit">👑 Owned &amp; managed by
+       <a href="https://t.me/bookslibraryofficial">@bookslibraryofficial</a> &amp;
+       <a href="https://t.me/trinityXmods">@trinityXmods</a> and their team.</p>
   </div>
   <script>
     const tg = window.Telegram?.WebApp;

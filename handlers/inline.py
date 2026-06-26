@@ -21,6 +21,7 @@ from aiogram.types import (
 )
 
 from config import BOT_USERNAME
+from utils.brand import BOT_NAME
 from utils.files import icon_for, search
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ async def inline_search(iq: InlineQuery) -> None:
                 InlineKeyboardButton(text="📥 Get this book", url=link)]]),
         ))
     await iq.answer(articles, cache_time=10, is_personal=True,
-                    switch_pm_text="🔍 Open BooksBot", switch_pm_parameter="start")
+                    switch_pm_text=f"🔍 Open {BOT_NAME}", switch_pm_parameter="start")
 
 
 @router.inline_query()  # empty query → prompt
