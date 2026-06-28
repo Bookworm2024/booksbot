@@ -1,8 +1,9 @@
 """
 handlers/admin_api.py — JSON for the admin Mini-App dashboard.
 
-Double-gated: valid Telegram initData AND the user must be in ADMIN_IDS.
-Aggregates users / archive / requests / economy / revenue across clusters.
+Auth: valid Telegram initData. The revenue/economy overview and the AI config
+endpoints are SUPER-ADMIN ONLY (they expose money / spend AI budget) — a normal
+admin is rejected. Aggregates users / archive / requests / economy / revenue.
 """
 import logging
 from datetime import datetime, timezone
@@ -61,8 +62,10 @@ async def api_admin_overview(request: web.Request) -> web.Response:
     uid = user_id_from(request.query.get("init_data", ""))
     if not uid:
         return web.json_response({"error": "auth_failed"}, status=401)
-    if uid not in ADMIN_IDS:
-        return web.json_response({"error": "forbidden"}, status=403)
+    # Revenue / economy analytics are owner-only — never expose money to a
+    # delegated (normal) admin, even though they can reach the rest of /admin.
+    if uid != SUPER_ADMIN_ID:
+        return web.json_response({"error": "super_admin_only"}, status=403)
 
     db = await MongoManager.get()
     sod = _sod()
@@ -98,14 +101,13 @@ async def api_admin_overview(request: web.Request) -> web.Response:
 
 # ── AI provider config (super-admin only) ───────────────────────────────────────
 async def api_admin_ai(request: web.Request) -> web.Response:
-    """GET → current AI config (key masked). POST → update fields."""
+    """GET → current AI config (key masked). POST → update fields. Owner-only:
+    the AI provider/key is sensitive and costs money to run."""
     uid = await _admin_uid(request)
-    if not uid:
-        return web.json_response({"error": "forbidden"}, status=403)
+    if not uid or uid != SUPER_ADMIN_ID:
+        return web.json_response({"error": "super_admin_only"}, status=403)
 
     if request.method == "POST":
-        if uid != SUPER_ADMIN_ID:
-            return web.json_response({"error": "super_admin_only"}, status=403)
         body = request.get("_body") or {}
         if body.get("provider") in ("free", "anthropic", "off"):
             await set_ai_config("provider", body["provider"])
@@ -130,9 +132,10 @@ async def api_admin_ai(request: web.Request) -> web.Response:
 
 
 async def api_admin_ai_test(request: web.Request) -> web.Response:
-    """POST → run a tiny live completion through the current provider."""
+    """POST → run a tiny live completion through the current provider. Owner-only
+    (it spends real AI budget)."""
     uid = await _admin_uid(request)
-    if not uid:
-        return web.json_response({"error": "forbidden"}, status=403)
+    if not uid or uid != SUPER_ADMIN_ID:
+        return web.json_response({"error": "super_admin_only"}, status=403)
     out = await ai_complete("Reply with exactly: PONG", max_tokens=20)
     return web.json_response({"ok": bool(out), "sample": (out or "")[:200]})

@@ -14,9 +14,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS
 from database.connection import MongoManager
 from utils.keyboards import btn, kb
+from utils.permissions import has
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -40,8 +40,8 @@ def _menu():
 
 @router.callback_query(F.data == "admin_qbank")
 async def cb_qbank(call: CallbackQuery) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("This panel is reserved for the admin team.", show_alert=True)
+    if not await has(call.from_user.id, "content"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     await call.answer()
     await call.message.edit_text(
@@ -78,8 +78,8 @@ async def cb_counts(call: CallbackQuery) -> None:
 # ── add quiz ─────────────────────────────────────────────────────────────────
 @router.callback_query(F.data == "qa_addquiz")
 async def cb_addquiz(call: CallbackQuery) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("This panel is reserved for the admin team.", show_alert=True)
+    if not await has(call.from_user.id, "content"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     await call.answer()
     await call.message.edit_text(
@@ -191,8 +191,8 @@ async def cb_correct(call: CallbackQuery, state: FSMContext) -> None:
 # ── add true/false ─────────────────────────────────────────────────────────────
 @router.callback_query(F.data == "qa_addtf")
 async def cb_addtf(call: CallbackQuery, state: FSMContext) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("This panel is reserved for the admin team.", show_alert=True)
+    if not await has(call.from_user.id, "content"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     await call.answer()
     await state.set_state(QAdminFSM.tf_q)

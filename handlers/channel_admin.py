@@ -29,6 +29,7 @@ from utils.audit import log_action
 from utils.channel import get_file_channel, set_file_channel
 from utils.files import archive_count, extract_from_message, index_file
 from utils.keyboards import btn, kb
+from utils.permissions import has
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -231,8 +232,8 @@ async def on_channel_id(message: Message, state: FSMContext) -> None:
 # ── import old files (forward-to-index) ──────────────────────────────────────
 @router.callback_query(F.data == "admin_import")
 async def cb_import(call: CallbackQuery, state: FSMContext) -> None:
-    if not _is_super(call.from_user.id):
-        await call.answer("👑 This tool is reserved for the super admin.", show_alert=True)
+    if not await has(call.from_user.id, "content"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     live = await get_file_channel()
     if not live:

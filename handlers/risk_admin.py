@@ -12,9 +12,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS
 from utils.audit import log_action
 from utils.keyboards import btn, kb
+from utils.permissions import has
 from utils.risk import flag_user, flagged_users, is_flagged, unflag_user
 
 logger = logging.getLogger(__name__)
@@ -23,10 +23,6 @@ router = Router()
 
 class RiskFSM(StatesGroup):
     flag_id = State()
-
-
-def _is_admin(uid: int) -> bool:
-    return uid in ADMIN_IDS
 
 
 async def _panel():
@@ -57,8 +53,8 @@ async def _panel():
 
 @router.callback_query(F.data == "admin_risk")
 async def cb_risk(call: CallbackQuery) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("This area is for admins only.", show_alert=True)
+    if not await has(call.from_user.id, "moderation"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     await call.answer()
     text, markup = await _panel()
@@ -67,8 +63,8 @@ async def cb_risk(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("risk_unflag:"))
 async def cb_unflag(call: CallbackQuery) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("This area is for admins only.", show_alert=True)
+    if not await has(call.from_user.id, "moderation"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     try:
         uid = int(call.data.split(":", 1)[1])
@@ -83,8 +79,8 @@ async def cb_unflag(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "risk_flag")
 async def cb_flag(call: CallbackQuery, state: FSMContext) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("This area is for admins only.", show_alert=True)
+    if not await has(call.from_user.id, "moderation"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     await call.answer()
     await state.set_state(RiskFSM.flag_id)

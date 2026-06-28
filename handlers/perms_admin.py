@@ -40,12 +40,15 @@ async def cb_perms(call: CallbackQuery) -> None:
     await call.message.edit_text(
         "🛡 <b>Admin Permissions</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "<i>Decide exactly what each member of your team can touch.</i>\n\n"
-        "<blockquote>Choose an admin below to fine-tune their capabilities — "
-        "broadcasts, pricing, the file channel and more — one switch at a time.\n\n"
-        "👑 The <b>super admin</b> always holds every key.\n"
-        "🔑 A standard admin with nothing turned off keeps <b>full access</b> "
-        "by default, so existing helpers keep working until you narrow them.</blockquote>\n"
+        "<i>Decide exactly what each helper on your team can do.</i>\n\n"
+        "<blockquote>Choose an admin below to fine-tune their <b>helper</b> "
+        "capabilities — handling requests, moderation, content and bans — one "
+        "switch at a time.\n\n"
+        "👑 The <b>super admin</b> (you) always holds every key — including all the "
+        "owner-only tools: payments, broadcasts, pricing, the economy, branding "
+        "and bot settings. Those can <b>never</b> be handed to a normal admin.\n"
+        "🔑 A new admin starts with just <b>Handle Requests</b> (send books) and "
+        "nothing else, until you grant more here.</blockquote>\n"
         "<i>💡 Tip: grant the least you need, then add more as trust grows.</i>",
         reply_markup=kb(*rows))
 

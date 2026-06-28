@@ -12,7 +12,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS, SUPER_ADMIN_ID
+from config import SUPER_ADMIN_ID
 from database.connection import MongoManager
 from utils.format import fmt_amount
 from utils.keyboards import btn, kb
@@ -92,19 +92,19 @@ async def _build() -> str:
 
 @router.message(Command("revenue"))
 async def cmd_revenue(message: Message) -> None:
-    if message.chat.id != SUPER_ADMIN_ID and message.chat.id not in ADMIN_IDS:
+    if message.chat.id != SUPER_ADMIN_ID:
         await message.answer(
-            "🔒 <b>Admins only</b>\n"
+            "🔒 <b>Owner only</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "<i>The revenue ledger is reserved for the team — your account doesn't have access here.</i>")
+            "<i>The revenue ledger is reserved for the super admin.</i>")
         return
     await message.answer(await _build())
 
 
 @router.callback_query(F.data == "admin_revenue")
 async def cb_revenue(call: CallbackQuery) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("🔒 Admins only — the revenue ledger is reserved for the team.", show_alert=True)
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     await call.message.edit_text(

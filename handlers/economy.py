@@ -17,10 +17,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS, BCN_EXPIRY_SECONDS
+from config import BCN_EXPIRY_SECONDS
 from database.connection import MongoManager
 from utils.format import fmt_amount
 from utils.keyboards import btn, kb
+from utils.permissions import is_super
 from utils.settings import get_float
 from utils.wallet import (
     add_bcn, add_bgm, drain_bcn, get_balances, seconds_until_claim, set_daily_bcn,
@@ -375,8 +376,8 @@ async def cb_convert_do(call: CallbackQuery) -> None:
 # ── /create (admin) ────────────────────────────────────────────────────────────
 @router.message(Command("create"))
 async def cmd_create(message: Message, command: CommandObject) -> None:
-    if message.chat.id not in ADMIN_IDS:
-        await message.answer("🛡 <b>Admins Only</b>\n<i>This command mints redeem codes and is restricted to the team.</i>")
+    if not is_super(message.chat.id):
+        await message.answer("🔒 <b>Owner only</b>\n<i>Minting redeem codes is reserved for the super admin.</i>")
         return
     parts = (command.args or "").split()
     if len(parts) != 2 or not all(p.replace(".", "").isdigit() for p in parts):
@@ -409,8 +410,8 @@ async def cmd_create(message: Message, command: CommandObject) -> None:
 # ── 🎟️ Create Code (admin panel — interactive) ─────────────────────────────────
 @router.callback_query(F.data == "admin_create")
 async def cb_admin_create(call: CallbackQuery, state: FSMContext) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Admins only — this tool mints redeem codes for the team.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     await state.set_state(RedeemFSM.cc_max)

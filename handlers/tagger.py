@@ -11,10 +11,10 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS
 from utils.ai import ai_enabled, classify_genre
 from utils.files import set_genre, untagged_count, untagged_files
 from utils.keyboards import btn, kb
+from utils.permissions import is_super
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -70,16 +70,16 @@ async def _run_batch(message: Message) -> None:
 
 @router.message(Command("tag_genres"))
 async def cmd_tag(message: Message) -> None:
-    if message.chat.id not in ADMIN_IDS:
-        await message.answer("🔒 <b>Admins only.</b>\n<i>The genre tagger is part of the admin toolkit.</i>")
+    if not is_super(message.chat.id):
+        await message.answer("🔒 <b>Owner only.</b>\n<i>The genre tagger spends the AI budget — reserved for the super admin.</i>")
         return
     await _run_batch(message)
 
 
 @router.callback_query(F.data == "admin_tag")
 async def cb_tag(call: CallbackQuery) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("🔒 Admins only — the genre tagger is part of the admin toolkit.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — the genre tagger spends the AI budget, reserved for the super admin.", show_alert=True)
         return
     await call.answer("🏷 Sorting the next batch by genre…")
     await _run_batch(call.message)

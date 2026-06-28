@@ -13,10 +13,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS
 from database.connection import MongoManager
 from utils.format import fmt_amount
 from utils.keyboards import btn, kb
+from utils.permissions import has
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -154,12 +154,13 @@ async def _render_history(call: CallbackQuery, page: int) -> None:
 # ── admin track ────────────────────────────────────────────────────────────────
 @router.message(Command("track_request"))
 async def cmd_track_admin(message: Message, state: FSMContext) -> None:
-    if message.chat.id not in ADMIN_IDS:
+    if not await has(message.chat.id, "requests"):
         await message.answer(
-            "🛡 <b>Admin Access Required</b>\n"
+            "🔒 <b>Permission Needed</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "<blockquote>This lookup is reserved for the team. To check your own orders, "
-            "use <b>🔭 Track Request</b> or <b>📜 My History</b> instead.</blockquote>")
+            "<blockquote>You don't have permission for this — ask the owner to enable it. "
+            "To check your own orders, use <b>🔭 Track Request</b> or <b>📜 My History</b> "
+            "instead.</blockquote>")
         return
     await state.set_state(TrackFSM.awaiting_admin_id)
     await message.answer(

@@ -20,9 +20,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS
 from database.connection import MongoManager
 from utils.keyboards import btn, kb
+from utils.permissions import has
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -186,8 +186,8 @@ async def on_content(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("bc_aud:"))
 async def cb_audience(call: CallbackQuery, state: FSMContext) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("This control is admin-only. Ask a super admin if you need broadcast access.", show_alert=True)
+    if not await has(call.from_user.id, "broadcast"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     seg = call.data.split(":", 1)[1]
     if seg not in SEG_LABELS:
@@ -218,8 +218,8 @@ async def cb_audience(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("bc_when:"))
 async def cb_when(call: CallbackQuery, state: FSMContext) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("This control is admin-only. Ask a super admin if you need broadcast access.", show_alert=True)
+    if not await has(call.from_user.id, "broadcast"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     try:
         hours = int(call.data.split(":", 1)[1])
@@ -308,8 +308,8 @@ async def _run(bot, bid: str) -> None:
 
 @router.callback_query(F.data.startswith("bc_act:"))
 async def cb_action(call: CallbackQuery) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("This control is admin-only. Ask a super admin if you need broadcast access.", show_alert=True)
+    if not await has(call.from_user.id, "broadcast"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     _, action, bid = call.data.split(":")
     new = {"pause": "paused", "resume": "running", "stop": "stopped"}.get(action)
@@ -326,6 +326,9 @@ async def cb_action(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("bc_refresh:"))
 async def cb_refresh(call: CallbackQuery) -> None:
+    if not await has(call.from_user.id, "broadcast"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
+        return
     await call.answer()
     bid = call.data.split(":", 1)[1]
     text, status = await _progress_text(bid)

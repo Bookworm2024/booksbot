@@ -17,13 +17,14 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from pymongo import DESCENDING
 
-from config import ADMIN_IDS, SUPER_ADMIN_ID
+from config import SUPER_ADMIN_ID
 from database.connection import MongoManager
 from utils.audit import log_action, recent
 from utils.coupons import active_coupons, create_coupon
 from utils.flags import FLAGS, all_flags, is_on, set_flag
 from utils.format import fmt_amount, valid_amount
 from utils.keyboards import btn, kb
+from utils.permissions import is_super, has
 from utils.users import set_ban
 
 logger = logging.getLogger(__name__)
@@ -45,14 +46,10 @@ class ExtraFSM(StatesGroup):
     cpn_days = State()
 
 
-def _is_admin(uid: int) -> bool:
-    return uid in ADMIN_IDS
-
-
 @router.callback_query(F.data == "admin_more")
 async def cb_more(call: CallbackQuery) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("This area is for administrators only.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     await call.message.edit_text(
@@ -85,8 +82,8 @@ async def cb_more(call: CallbackQuery) -> None:
 # ── bulk ban ─────────────────────────────────────────────────────────────────
 @router.callback_query(F.data == "admin_bulkban")
 async def cb_bulkban(call: CallbackQuery, state: FSMContext) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("This area is for administrators only.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     await state.set_state(ExtraFSM.bulk_ban)
@@ -128,8 +125,8 @@ async def on_bulkban(message: Message, state: FSMContext) -> None:
 # ── audit log ────────────────────────────────────────────────────────────────
 @router.callback_query(F.data == "admin_audit")
 async def cb_audit(call: CallbackQuery) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("This area is for administrators only.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     rows = await recent(20)
@@ -196,8 +193,8 @@ async def cb_flag_toggle(call: CallbackQuery) -> None:
 # ── content reports ──────────────────────────────────────────────────────────
 @router.callback_query(F.data == "admin_reports")
 async def cb_reports(call: CallbackQuery) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("This area is for administrators only.", show_alert=True)
+    if not await has(call.from_user.id, "moderation"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     await call.answer()
     db = await MongoManager.get()
@@ -226,8 +223,8 @@ async def cb_reports(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("rpt_done:"))
 async def cb_report_done(call: CallbackQuery) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("This area is for administrators only.", show_alert=True)
+    if not await has(call.from_user.id, "moderation"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     rid = call.data.split(":", 1)[1]
     db = await MongoManager.get()

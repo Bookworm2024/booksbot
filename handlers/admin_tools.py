@@ -13,10 +13,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS
 from database.connection import MongoManager
 from utils.format import MAX_AMOUNT, fmt_amount, valid_amount
 from utils.keyboards import btn, kb
+from utils.permissions import is_super
 from utils.vip import badge
 from utils.wallet import add_bgm, get_balances, set_bgm
 
@@ -32,15 +32,15 @@ class ToolsFSM(StatesGroup):
     setbgm_amount = State()
 
 
-def _is_admin(uid: int) -> bool:
-    return uid in ADMIN_IDS
+def _is_super(uid: int) -> bool:
+    return is_super(uid)
 
 
 # ── Add BGM ──────────────────────────────────────────────────────────────────
 @router.callback_query(F.data == "admin_addbgm")
 async def cb_addbgm(call: CallbackQuery, state: FSMContext) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
+    if not _is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     await state.set_state(ToolsFSM.addbgm_user)
@@ -103,8 +103,8 @@ async def on_addbgm_amount(message: Message, state: FSMContext) -> None:
 # ── User lookup ──────────────────────────────────────────────────────────────
 @router.message(Command("user"))
 async def cmd_user(message: Message, state: FSMContext) -> None:
-    if not _is_admin(message.chat.id):
-        await message.answer("🛡 <b>Admins only</b>\n<i>This lookup is restricted to the team.</i>"); return
+    if not _is_super(message.chat.id):
+        await message.answer("🔒 <b>Owner only</b>\n<i>This tool is reserved for the super admin.</i>"); return
     await state.set_state(ToolsFSM.lookup)
     await message.answer(
         "👤 <b>User Lookup</b>\n"
@@ -116,8 +116,8 @@ async def cmd_user(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "admin_userinfo")
 async def cb_userinfo(call: CallbackQuery, state: FSMContext) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
+    if not _is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     await state.set_state(ToolsFSM.lookup)
@@ -178,8 +178,8 @@ async def on_lookup(message: Message, state: FSMContext) -> None:
 # ── Set / fix BGM (repair a corrupted balance) ───────────────────────────────────
 @router.callback_query(F.data.startswith("admin_setbgm:"))
 async def cb_setbgm(call: CallbackQuery, state: FSMContext) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
+    if not _is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     try:
         target = int(call.data.split(":", 1)[1])
@@ -224,8 +224,8 @@ async def on_setbgm_amount(message: Message, state: FSMContext) -> None:
 # ── Bulk BGM grant (to ALL users) ───────────────────────────────────────────────
 @router.callback_query(F.data == "admin_bulk")
 async def cb_bulk(call: CallbackQuery, state: FSMContext) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
+    if not _is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     await state.set_state(ToolsFSM.bulk_amount)
@@ -263,8 +263,8 @@ async def on_bulk_amount(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("bulk_do:"))
 async def cb_bulk_do(call: CallbackQuery) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
+    if not _is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     ok, amount = valid_amount(call.data.split(":", 1)[1])
     if not ok:
@@ -286,8 +286,8 @@ async def cb_bulk_do(call: CallbackQuery) -> None:
 # ── Maintenance mode ─────────────────────────────────────────────────────────
 @router.callback_query(F.data == "admin_maint")
 async def cb_maint(call: CallbackQuery) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
+    if not _is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     db = await MongoManager.get()
@@ -307,8 +307,8 @@ async def cb_maint(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.in_({"maint_on", "maint_off"}))
 async def cb_maint_toggle(call: CallbackQuery) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
+    if not _is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     db = await MongoManager.get()
     on = call.data == "maint_on"

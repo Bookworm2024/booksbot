@@ -13,10 +13,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS
 from utils.featured import add_featured, featured_files, remove_featured
 from utils.files import icon_for, search
 from utils.keyboards import btn, kb
+from utils.permissions import is_super
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -57,8 +57,8 @@ async def _panel():
 
 @router.callback_query(F.data == "admin_featured")
 async def cb_featured_admin(call: CallbackQuery) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Admins only — this panel is restricted.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     text, markup = await _panel()
@@ -67,8 +67,8 @@ async def cb_featured_admin(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "feat_add")
 async def cb_feat_add(call: CallbackQuery, state: FSMContext) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Admins only — this panel is restricted.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     await state.set_state(FeatFSM.awaiting_query)
@@ -111,8 +111,8 @@ async def on_feat_query(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("feat_set:"))
 async def cb_feat_set(call: CallbackQuery) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Admins only — this panel is restricted.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     fuid = call.data.split(":", 1)[1]
     await add_featured(fuid, _FEATURE_DAYS)
@@ -129,8 +129,8 @@ async def cb_feat_set(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("feat_del:"))
 async def cb_feat_del(call: CallbackQuery) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Admins only — this panel is restricted.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await remove_featured(call.data.split(":", 1)[1])
     await call.answer("Slot cleared — that title is no longer featured.")

@@ -15,6 +15,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS
 from utils.keyboards import btn, kb
+from utils.permissions import has
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -94,8 +95,8 @@ async def on_support_msg(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("sup_reply:"))
 async def cb_reply(call: CallbackQuery, state: FSMContext) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("This reply tool is for the support team only.", show_alert=True)
+    if not await has(call.from_user.id, "requests"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     target = int(call.data.split(":", 1)[1])
     await call.answer()

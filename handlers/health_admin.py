@@ -12,18 +12,14 @@ from html import escape
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
-from config import ADMIN_IDS
 from utils.audit import log_action
 from utils.errors import count as error_count, recent as recent_errors
 from utils.keyboards import btn, kb
 from utils.metrics import snapshot
+from utils.permissions import is_super
 
 logger = logging.getLogger(__name__)
 router = Router()
-
-
-def _is_admin(uid: int) -> bool:
-    return uid in ADMIN_IDS
 
 
 async def _health_text() -> str:
@@ -63,8 +59,8 @@ async def _health_text() -> str:
 
 @router.callback_query(F.data == "admin_health")
 async def cb_health(call: CallbackQuery) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("This area is for admins only.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     await call.message.edit_text(
@@ -76,8 +72,8 @@ async def cb_health(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "admin_backup")
 async def cb_backup(call: CallbackQuery) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("This area is for admins only.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer("Packaging your latest backup…")
     from utils.backup import backup_channel, backup_now

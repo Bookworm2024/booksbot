@@ -11,18 +11,14 @@ from html import escape
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
-from config import ADMIN_IDS
 from utils.audit import log_action
 from utils.dedupe import clean_group, duplicate_groups
 from utils.files import get_file
 from utils.keyboards import btn, kb
+from utils.permissions import is_super
 
 logger = logging.getLogger(__name__)
 router = Router()
-
-
-def _is_admin(uid: int) -> bool:
-    return uid in ADMIN_IDS
 
 
 async def _panel():
@@ -57,8 +53,8 @@ async def _panel():
 
 @router.callback_query(F.data == "admin_dedupe")
 async def cb_dedupe(call: CallbackQuery) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("🛡 Admins only — this area is locked.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     text, markup = await _panel()
@@ -67,8 +63,8 @@ async def cb_dedupe(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("dd_clean:"))
 async def cb_clean(call: CallbackQuery) -> None:
-    if not _is_admin(call.from_user.id):
-        await call.answer("🛡 Admins only — this area is locked.", show_alert=True)
+    if not is_super(call.from_user.id):
+        await call.answer("🔒 Owner only — this tool is reserved for the super admin.", show_alert=True)
         return
     fuid = call.data.split(":", 1)[1]
     f = await get_file(fuid)

@@ -36,6 +36,7 @@ from utils.brand import CREDIT
 from utils.files import clean_title, index_file, kind_for_ext
 from utils.format import fmt_amount
 from utils.keyboards import btn, kb
+from utils.permissions import has
 from utils.wallet import get_balances, refund, spend
 
 logger = logging.getLogger(__name__)
@@ -332,8 +333,8 @@ async def _render_queue(bot, admin_id: int) -> None:
 
 @router.callback_query(F.data == "admin_requests")
 async def cb_admin_requests(call: CallbackQuery) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("This is an admin-only action.", show_alert=True)
+    if not await has(call.from_user.id, "requests"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     await call.answer()
     await _render_queue(call.bot, call.from_user.id)
@@ -341,12 +342,9 @@ async def cb_admin_requests(call: CallbackQuery) -> None:
 
 @router.message(Command("requests"))
 async def cmd_requests(message: Message) -> None:
-    if message.chat.id not in ADMIN_IDS:
+    if not await has(message.chat.id, "requests"):
         await message.answer(
-            "🔒 <b>Admins only</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "<blockquote>The request queue is part of the admin desk and isn't "
-            "available on this account.</blockquote>")
+            "🔒 You don't have permission for this — ask the owner to enable it.")
         return
     await _render_queue(message.bot, message.chat.id)
 
@@ -359,8 +357,8 @@ async def _get_req(rid: str):
 # ── send file ──────────────────────────────────────────────────────────────────
 @router.callback_query(F.data.startswith("areq_send:"))
 async def cb_send_init(call: CallbackQuery, state: FSMContext) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("This is an admin-only action.", show_alert=True)
+    if not await has(call.from_user.id, "requests"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     rid = call.data.split(":", 1)[1]
     req = await _get_req(rid)
@@ -439,8 +437,8 @@ async def on_admin_file(message: Message, state: FSMContext) -> None:
 # ── mark completed ───────────────────────────────────────────────────────────
 @router.callback_query(F.data.startswith("areq_done:"))
 async def cb_done(call: CallbackQuery) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("This is an admin-only action.", show_alert=True)
+    if not await has(call.from_user.id, "requests"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     rid = call.data.split(":", 1)[1]
     db = await MongoManager.get()
@@ -469,8 +467,8 @@ async def cb_done(call: CallbackQuery) -> None:
 # ── cancel + refund ────────────────────────────────────────────────────────────
 @router.callback_query(F.data.startswith("areq_cancel:"))
 async def cb_cancel_init(call: CallbackQuery, state: FSMContext) -> None:
-    if call.from_user.id not in ADMIN_IDS:
-        await call.answer("This is an admin-only action.", show_alert=True)
+    if not await has(call.from_user.id, "requests"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
         return
     rid = call.data.split(":", 1)[1]
     req = await _get_req(rid)

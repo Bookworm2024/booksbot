@@ -22,6 +22,7 @@ from config import ADMIN_IDS, SUPER_ADMIN_ID
 from utils.admins import add_admin, get_extra_admins, remove_admin
 from utils.audit import log_action
 from utils.keyboards import btn, kb, webapp_btn
+from utils.permissions import is_admin, is_super, perms_for
 from utils.users import set_ban
 
 logger = logging.getLogger(__name__)
@@ -36,18 +37,32 @@ class AdminFSM(StatesGroup):
 
 
 def _is_admin(uid: int) -> bool:
-    return uid in ADMIN_IDS
+    return is_admin(uid)
 
 
-def _panel_kb(is_super: bool):
-    rows = [
-        [webapp_btn("📊 Revenue Dashboard", "admin.html", style="success", fallback_cb="admin_open")],
-        [btn("🚫 Ban User", "admin_ban", style="danger"),
-         btn("✅ Unban User", "admin_unban", style="success")],
-        [btn("📬 Request Queue", "admin_requests", style="primary"),
-         btn("📡 Broadcast", "admin_broadcast", style="primary")],
-    ]
-    if is_super:
+async def _panel_kb(uid: int):
+    """Permission-driven panel: a normal admin sees ONLY the tools delegated to
+    them; every owner-only control (payments, broadcast, economy, branding,
+    settings) is shown to the super admin alone."""
+    sup = is_super(uid)
+    perms = await perms_for(uid)
+    rows = []
+    if sup:
+        rows.append([webapp_btn("📊 Revenue Dashboard", "admin.html", style="success", fallback_cb="admin_open")])
+    if sup or "requests" in perms:
+        rows.append([btn("📬 Request Queue", "admin_requests", style="primary")])
+    if sup or "ban" in perms:
+        rows.append([btn("🚫 Ban User", "admin_ban", style="danger"),
+                     btn("✅ Unban User", "admin_unban", style="success")])
+    if sup or "moderation" in perms:
+        rows.append([btn("🚩 Reports", "admin_reports", style="primary"),
+                     btn("🚨 Risk Review", "admin_risk", style="primary")])
+    if sup or "content" in perms:
+        rows.append([btn("📥 Import Files", "admin_import", style="success"),
+                     btn("🎮 Question Bank", "admin_qbank", style="primary")])
+    if sup:
+        rows.append([btn("📡 Broadcast", "admin_broadcast", style="primary"),
+                     btn("🧪 A/B Test", "admin_abtest", style="primary")])
         rows.append([btn("💰 Revenue", "admin_revenue", style="success"),
                      btn("⚙️ Live Pricing", "admin_pricing", style="success")])
         rows.append([btn("🔥 Flash Sale", "admin_deal", style="success"),
@@ -55,20 +70,18 @@ def _panel_kb(is_super: bool):
         rows.append([btn("➕ Add BGM", "admin_addbgm", style="success"),
                      btn("👤 User Lookup", "admin_userinfo", style="primary")])
         rows.append([btn("🎟️ Create Code", "admin_create", style="success"),
-                     btn("🎮 Question Bank", "admin_qbank", style="primary")])
-        rows.append([btn("🛠 Maintenance", "admin_maint", style="danger"),
                      btn("🎁 Bulk Grant", "admin_bulk", style="success")])
-        rows.append([btn("🏷 Tag Genres", "admin_tag", style="primary"),
-                     btn("🛡 Manage Admins", "admin_manage", style="primary")])
+        rows.append([btn("🛠 Maintenance", "admin_maint", style="danger"),
+                     btn("🏷 Tag Genres", "admin_tag", style="primary")])
         rows.append([btn("🗂 File Channel", "admin_filechan", style="primary"),
-                     btn("📥 Import Old Files", "admin_import", style="success")])
+                     btn("🛡 Manage Admins", "admin_manage", style="primary")])
         rows.append([btn("🤖 AI Settings", "admin_ai", style="primary"),
                      btn("🧰 More Tools", "admin_more", style="primary")])
     return kb(*rows)
 
 
-def _panel_text(is_super: bool) -> str:
-    if is_super:
+async def _panel_text(uid: int) -> str:
+    if is_super(uid):
         return (
             "👑 <b>Owner Control Centre</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
@@ -80,14 +93,25 @@ def _panel_text(is_super: bool) -> str:
             "🗂 <b>Content</b> — manage the file channel, import archives and tag genres.</blockquote>\n"
             "<i>💡 Pick a tool below — every action is logged to your audit trail.</i>"
         )
+    perms = await perms_for(uid)
+    tools = []
+    if "requests" in perms:
+        tools.append("📬 <b>Request Queue</b> — fulfil member book requests and send files.")
+    if "ban" in perms:
+        tools.append("🚫 <b>Ban / Unban</b> — remove or restore a member when needed.")
+    if "moderation" in perms:
+        tools.append("🚩 <b>Reports &amp; Risk</b> — review reports and flagged accounts.")
+    if "content" in perms:
+        tools.append("🗂 <b>Content</b> — import book files and manage quiz questions.")
+    body = "\n".join(tools) or ("You don't have any tools enabled yet — ask the owner "
+                                "to grant you access from 🔑 Permissions.")
     return (
-        "🛡 <b>Admin Console</b>\n"
+        "🛡 <b>Helper Console</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "<i>Your day-to-day toolkit for keeping Books Provider running smoothly.</i>\n"
-        "<blockquote>📊 <b>Dashboard</b> — see how the bot is performing.\n"
-        "🛡 <b>Moderation</b> — ban or unban members when needed.\n"
-        "📬 <b>Requests</b> — clear the queue and broadcast to members.</blockquote>\n"
-        "<i>💡 Choose a tool below to get started.</i>"
+        "<i>Your delegated toolkit. Payments, broadcasts, pricing and bot settings "
+        "stay with the owner.</i>\n"
+        f"<blockquote>{body}</blockquote>\n"
+        "<i>💡 Need more access? Only the owner can grant it, from 🔑 Permissions.</i>"
     )
 
 
@@ -101,8 +125,7 @@ async def cmd_admin(message: Message) -> None:
             "<i>This is the staff control centre — it's reserved for the Books Provider team.</i>\n"
             "<blockquote>If you're looking for books, games or your wallet, tap /start and the full member menu is yours.</blockquote>")
         return
-    is_super = uid == SUPER_ADMIN_ID
-    await message.answer(_panel_text(is_super), reply_markup=_panel_kb(is_super))
+    await message.answer(await _panel_text(uid), reply_markup=await _panel_kb(uid))
 
 
 @router.callback_query(F.data == "admin_open")
@@ -111,9 +134,9 @@ async def cb_admin_open(call: CallbackQuery) -> None:
         await call.answer("This area is reserved for the Books Provider team.", show_alert=True)
         return
     await call.answer()
-    is_super = call.from_user.id == SUPER_ADMIN_ID
-    await call.message.edit_text(_panel_text(is_super),
-                                 reply_markup=_panel_kb(is_super))
+    uid = call.from_user.id
+    await call.message.edit_text(await _panel_text(uid),
+                                 reply_markup=await _panel_kb(uid))
 
 
 # ── ban / unban ───────────────────────────────────────────────────────────────
