@@ -216,7 +216,7 @@ function renderBookmarks(){ const w=document.getElementById("bmwrap"); w.innerHT
      gScale – live gesture scale on top (1 at rest), committed on gesture end
      tx,ty  – translate of the canvas top-left within #pane (CSS px)
    Effective zoom = zoom * gScale.                                            */
-let fitW=0, zoom=1, gScale=1, tx=0, ty=0, rendering=false, pendingRender=null;
+let fitW=0, zoom=1, gScale=1, tx=0, ty=0, rendering=false, pendingRender=null, pageTextCache="";
 
 function dist(a,b){ return Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY); }
 function applyTransform(){ pdfc.style.transform = `translate3d(${tx}px,${ty}px,0) scale(${gScale})`; }
@@ -235,6 +235,7 @@ function clampPan(){
 async function renderPdfPage(keepPan){
   if(rendering){ pendingRender=keepPan; return; }
   rendering=true;
+  if(!keepPan) pageTextCache="";   // page changed — drop stale read-aloud text
   try{
     const page = await pdfDoc.getPage(pageNum);
     const base = page.getViewport({scale:1});
@@ -255,6 +256,8 @@ async function renderPdfPage(keepPan){
     requestAnimationFrame(()=>{ pdfc.style.transition="opacity .15s ease-out"; pdfc.style.opacity="1";
       setTimeout(()=>{ pdfc.style.transition=""; }, 170); });
     info.textContent=`Page ${pageNum} of ${pdfDoc.numPages}`;
+    const _capN=pageNum;   // cache this page's text so read-aloud can start inside the tap (iOS)
+    page.getTextContent().then(tc=>{ if(pageNum===_capN) pageTextCache=tc.items.map(i=>i.str).join(" "); }).catch(()=>{});
     if(pageNum+1<=pdfDoc.numPages) pdfDoc.getPage(pageNum+1).catch(()=>{}); // warm cache
   } finally {
     rendering=false;
@@ -413,22 +416,103 @@ document.getElementById("bm").onclick=()=>{ const mark=mode==="pdf"?pageNum:stat
   if(mark && !(state.bookmarks||[]).includes(mark)){ (state.bookmarks=state.bookmarks||[]).push(mark);
     saveState({bookmarks:state.bookmarks}); renderBookmarks(); haptic("light"); hint("Bookmark saved — pick up right here"); } };
 
-/* TTS read-aloud (device voices via Web Speech API) */
+/* ── TTS read-aloud — device voices via the Web Speech API.
+   Made to work on mobile WebViews (iOS/WKWebView + Android), not just desktop:
+   • iOS refuses any speak() that isn't started SYNCHRONOUSLY from the tap, so we
+     never await before the first speak — EPUB text is read synchronously, and for
+     PDF (whose text load is async) we fire a silent primer inside the tap to
+     unlock the engine, then stream the page in.
+   • iOS drops over-long utterances and Chrome/Android silently pause after ~15s,
+     so we split the page into short sentence chunks and queue them.
+   • a periodic resume() keep-alive defeats the Android/Chrome auto-pause bug. */
 const tts = document.getElementById("tts");
-async function currentText(){
-  if(mode==="pdf" && pdfDoc){ const p=await pdfDoc.getPage(pageNum); const tc=await p.getTextContent();
-    return tc.items.map(i=>i.str).join(" "); }
-  if(mode==="epub" && rendition){ const cs=rendition.getContents(); if(cs&&cs[0]) return cs[0].document.body.innerText||""; }
-  return "";
+const synth = window.speechSynthesis;
+let ttsOn = false, ttsChunks = [], ttsIdx = 0, ttsKeepAlive = 0, ttsVoice = null;
+
+function pickVoice(){
+  if(!synth) return;
+  const vs = synth.getVoices() || [];
+  if(!vs.length) return;
+  const want = (document.documentElement.lang || "en").slice(0,2).toLowerCase();
+  ttsVoice = vs.find(v => (v.lang||"").toLowerCase().startsWith(want))
+          || vs.find(v => (v.lang||"").toLowerCase().startsWith("en"))
+          || vs[0];
 }
-tts.onclick=async()=>{
-  if(!window.speechSynthesis){ return; }
-  if(speechSynthesis.speaking){ speechSynthesis.cancel(); tts.textContent="🔊"; return; }
-  const t=(await currentText()).slice(0,9000); if(!t) return;
-  const u=new SpeechSynthesisUtterance(t); u.rate=1; u.onend=()=>tts.textContent="🔊";
-  speechSynthesis.speak(u); tts.textContent="⏹";
+if(synth){ pickVoice(); try{ synth.onvoiceschanged = pickVoice; }catch(e){} }
+
+function currentTextSync(){   // EPUB text is available synchronously (iOS-safe)
+  if(mode==="epub" && rendition){
+    try{ const cs=rendition.getContents(); if(cs&&cs[0]) return cs[0].document.body.innerText||""; }catch(e){}
+  }
+  return null;
+}
+async function currentText(){ // async path (PDF needs getTextContent)
+  if(mode==="pdf" && pdfDoc){
+    const p=await pdfDoc.getPage(pageNum); const tc=await p.getTextContent();
+    return tc.items.map(i=>i.str).join(" ");
+  }
+  const s=currentTextSync(); return s==null ? "" : s;
+}
+
+function chunkText(t){
+  const out=[];
+  (t.replace(/\s+/g," ").match(/[^.!?。！？]+[.!?。！？]*/g) || [t]).forEach(s=>{
+    s=s.trim(); if(!s) return;
+    while(s.length>180){ let cut=s.lastIndexOf(" ",180); if(cut<60) cut=180;
+      out.push(s.slice(0,cut)); s=s.slice(cut).trim(); }
+    if(s) out.push(s);
+  });
+  return out;
+}
+function speakNext(){
+  if(!ttsOn || ttsIdx>=ttsChunks.length){ stopTTS(); return; }
+  const u=new SpeechSynthesisUtterance(ttsChunks[ttsIdx++]);
+  u.rate=1; u.pitch=1; if(ttsVoice){ u.voice=ttsVoice; u.lang=ttsVoice.lang; }
+  u.onend=()=>{ if(ttsOn) speakNext(); };
+  u.onerror=()=>{ if(ttsOn) speakNext(); };
+  try{ synth.speak(u); }catch(e){ stopTTS(); }
+}
+function stopTTS(){
+  ttsOn=false; ttsChunks=[]; ttsIdx=0;
+  if(ttsKeepAlive){ clearInterval(ttsKeepAlive); ttsKeepAlive=0; }
+  try{ synth && synth.cancel(); }catch(e){}
+  tts.textContent="🔊";
+}
+function beginTTS(t){
+  if(!ttsOn) return;                                  // user already stopped
+  t=(t||"").replace(/ /g," ").slice(0,12000).trim();
+  if(!t){ stopTTS(); hint("There's no readable text to narrate on this page."); return; }
+  ttsChunks=chunkText(t); ttsIdx=0; speakNext();
+}
+
+tts.onclick=()=>{
+  if(!synth){ hint("Read-aloud isn't supported on this device."); return; }
+  if(ttsOn || synth.speaking || synth.pending){ stopTTS(); return; }   // toggle off
+  ttsOn=true; tts.textContent="⏹";
+  try{ synth.cancel(); }catch(e){}
+  if(!ttsVoice) pickVoice();
+  // resume() is a no-op while playing, so this safely unsticks the ~15s pause bug
+  ttsKeepAlive=setInterval(()=>{ if(synth.speaking){ try{ synth.resume(); }catch(e){} } }, 5000);
+  const sync=currentTextSync();
+  const ready = (sync!=null && sync.trim()) ? sync
+              : (pageTextCache && pageTextCache.trim()) ? pageTextCache
+              : null;
+  if(ready!=null){
+    beginTTS(ready);                                  // text in hand → speak inside the tap (iOS-safe)
+  }else{
+    // text not ready (e.g. a big PDF page still extracting): unlock the engine
+    // synchronously with a silent primer, then load the text and stream it
+    const primer=new SpeechSynthesisUtterance(" "); primer.volume=0;
+    try{ synth.speak(primer); }catch(e){}
+    currentText().then(beginTTS).catch(()=>stopTTS());
+  }
 };
-window.addEventListener("pagehide", ()=>{ try{ speechSynthesis.cancel(); }catch(e){} });
+
+/* stop narration when the reader leaves the page or the user turns the page */
+["prev","next"].forEach(id=>{ const el=document.getElementById(id);
+  if(el) el.addEventListener("click", stopTTS); });
+window.addEventListener("pagehide", stopTTS);
+document.addEventListener("visibilitychange", ()=>{ if(document.hidden) stopTTS(); });
 
 function debounce(fn,ms){ let h; return (...a)=>{ clearTimeout(h); h=setTimeout(()=>fn(...a),ms); }; }
 

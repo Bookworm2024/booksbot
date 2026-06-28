@@ -174,12 +174,38 @@ async function renderText(content){
   let fs = st.position && st.position>=12 ? st.position : 16; pre.style.fontSize=fs+"px";
   document.getElementById("a-").onclick=()=>{ fs=Math.max(12,fs-2); pre.style.fontSize=fs+"px"; saveState({position:fs}); };
   document.getElementById("a+").onclick=()=>{ fs=Math.min(30,fs+2); pre.style.fontSize=fs+"px"; saveState({position:fs}); };
+  /* Read-aloud — robust on mobile WebViews (iOS/Android): speak inside the tap
+     gesture, split into short chunks (iOS drops long utterances, Chrome/Android
+     pause after ~15s), and keep-alive with resume(). */
   const say=document.getElementById("say");
-  say.onclick=()=>{ if(!window.speechSynthesis) return;
-    if(speechSynthesis.speaking){ speechSynthesis.cancel(); say.textContent="🔊 Read"; return; }
-    const u=new SpeechSynthesisUtterance(content.slice(0,9000)); u.onend=()=>say.textContent="🔊 Read";
-    speechSynthesis.speak(u); say.textContent="⏹ Stop"; };
-  window.addEventListener("pagehide", ()=>{ try{ speechSynthesis.cancel(); }catch(e){} });
+  const synth=window.speechSynthesis;
+  let sayOn=false, sayChunks=[], sayIdx=0, sayKeep=0, sayVoice=null;
+  function sayPick(){ if(!synth) return; const vs=synth.getVoices()||[]; if(!vs.length) return;
+    const want=(document.documentElement.lang||"en").slice(0,2).toLowerCase();
+    sayVoice=vs.find(v=>(v.lang||"").toLowerCase().startsWith(want))
+           ||vs.find(v=>(v.lang||"").toLowerCase().startsWith("en"))||vs[0]; }
+  if(synth){ sayPick(); try{ synth.onvoiceschanged=sayPick; }catch(e){} }
+  function sayChunk(t){ const out=[];
+    (t.replace(/\s+/g," ").match(/[^.!?。！？]+[.!?。！？]*/g)||[t]).forEach(s=>{ s=s.trim(); if(!s) return;
+      while(s.length>180){ let c=s.lastIndexOf(" ",180); if(c<60)c=180; out.push(s.slice(0,c)); s=s.slice(c).trim(); }
+      if(s) out.push(s); }); return out; }
+  function sayStop(){ sayOn=false; sayChunks=[]; sayIdx=0; if(sayKeep){clearInterval(sayKeep); sayKeep=0;}
+    try{ synth&&synth.cancel(); }catch(e){} say.textContent="🔊 Read"; }
+  function sayNext(){ if(!sayOn||sayIdx>=sayChunks.length){ sayStop(); return; }
+    const u=new SpeechSynthesisUtterance(sayChunks[sayIdx++]); u.rate=1;
+    if(sayVoice){ u.voice=sayVoice; u.lang=sayVoice.lang; }
+    u.onend=()=>{ if(sayOn) sayNext(); }; u.onerror=()=>{ if(sayOn) sayNext(); };
+    try{ synth.speak(u); }catch(e){ sayStop(); } }
+  say.onclick=()=>{
+    if(!synth){ return; }
+    if(sayOn||synth.speaking||synth.pending){ sayStop(); return; }
+    sayOn=true; say.textContent="⏹ Stop"; try{ synth.cancel(); }catch(e){}
+    if(!sayVoice) sayPick();
+    sayKeep=setInterval(()=>{ if(synth.speaking){ try{ synth.resume(); }catch(e){} } }, 5000);
+    sayChunks=sayChunk((content||"").slice(0,12000)); sayIdx=0; sayNext();   // content is in scope → speaks inside the gesture (iOS-safe)
+  };
+  window.addEventListener("pagehide", sayStop);
+  document.addEventListener("visibilitychange", ()=>{ if(document.hidden) sayStop(); });
 }
 </script>
 </body>
