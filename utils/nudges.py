@@ -24,12 +24,28 @@ _SLEEP = 0.05             # ~20 msgs/sec
 _CART_MIN_AGE_H = 2       # nudge a cart this many hours after it was opened
 _CART_MAX_AGE_H = 48      # …but not older than this (stale)
 
-_CART_TEXT = ("🛒 <b>Still thinking it over?</b>\n"
-              "Your BookGems are one tap away — permanent tokens that never "
-              "expire. Finish up and start downloading instantly!")
-_LOWBAL_TEXT = ("💎 <b>You're out of tokens!</b>\n"
-                "🎁 Grab your free daily BCN with /claim, 🎡 take a free spin, "
-                "or top up BGM to keep reading without limits.")
+_CART_TEXT = ("🛒 <b>Your top-up is still waiting</b>\n"
+              "<i>Right where you left it — ready whenever you are.</i>\n"
+              "<blockquote>"
+              "💎 <b>BookGems</b> are your permanent currency — buy once and they "
+              "never expire.\n"
+              "⚡ <b>Instant unlock</b> — finish checkout and your next read is one "
+              "tap away.\n"
+              "🎁 <b>Buy more, save more</b> — larger top-ups earn a bigger bonus on "
+              "the house."
+              "</blockquote>"
+              "<i>💡 Pick up where you left off — we'll have your library ready in "
+              "seconds.</i>")
+_LOWBAL_TEXT = ("💼 <b>Your wallet's running low</b>\n"
+                "<i>A quick refill and you're back to reading — no limits.</i>\n"
+                "<blockquote>"
+                "🎁 <b>Claim free 🪙 BCN</b> with /claim — a fresh daily reward, "
+                "on us.\n"
+                "🎡 <b>Take a free spin</b> for a shot at bonus tokens and perks.\n"
+                "💎 <b>Top up 💎 BGM</b> for permanent credit that never expires."
+                "</blockquote>"
+                "<i>💡 Free tokens cover most reads — start with your daily claim "
+                "below.</i>")
 
 
 def _now():
@@ -42,8 +58,8 @@ def _today() -> str:
 
 async def _buy_kb():
     from utils.keyboards import btn, kb
-    return kb([btn("💎 Buy BGM", "acc_buy", style="success"),
-               btn("🎁 Daily Reward", "daily_reward", style="primary")])
+    return kb([btn("💎 Top Up BGM", "acc_buy", style="success"),
+               btn("🎁 Claim Daily Reward", "daily_reward", style="primary")])
 
 
 async def _abandoned_cart(bot, db) -> int:

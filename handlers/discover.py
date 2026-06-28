@@ -63,7 +63,14 @@ async def cb_discover(call: CallbackQuery) -> None:
 
 def _hub():
     return (
-        "<b>🔭 Discover</b>\n━━━━━━━━━━━━━━━━━━\nFind your next read.",
+        "🔭 <b>Discover</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Your storefront for the next great read — curated, fresh and waiting.</i>\n"
+        "<blockquote>⭐ <b>Featured</b> &amp; 📚 <b>Collections</b> — hand-picked shelves\n"
+        "🆕 <b>New Arrivals</b> &amp; 🔥 <b>Popular</b> — what's fresh and what's loved\n"
+        "🖊 <b>Authors</b> &amp; 🔗 <b>Series</b> — explore by name, read in order\n"
+        "📅 <b>Book of the Day</b> &amp; 💬 <b>Daily Quote</b> — a new spark each morning</blockquote>\n"
+        "<i>💡 Tap any shelf below to start browsing — we'll take it from here.</i>",
         kb([btn("⭐ Featured", "disc_feat", style="success"),
             btn("🏷 Genres", "disc_genres", style="success")],
            [btn("📚 Collections", "disc_collections", style="success"),
@@ -74,7 +81,7 @@ def _hub():
             btn("📅 Book of the Day", "disc_botd", style="primary")],
            [btn("💬 Daily Quote", "disc_quote", style="primary"),
             btn("🎯 Challenges", "menu_challenges", style="primary")],
-           [btn("🔙 Back", "menu_library", style="danger")]))
+           [btn("🔙 Back to Library", "menu_library", style="danger")]))
 
 
 @router.callback_query(F.data == "disc_genres")
@@ -89,7 +96,12 @@ async def cb_genres(call: CallbackQuery) -> None:
     if row:
         rows.append(row)
     rows.append([btn("🔙 Discover", "lib_discover", style="danger")])
-    await call.message.edit_text("🏷 <b>Browse by Genre</b>\nPick a genre:", reply_markup=kb(*rows))
+    await call.message.edit_text(
+        "🏷 <b>Browse by Genre</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Tell us the mood — we'll line up the shelf.</i>\n"
+        "<blockquote>Pick a genre below to see every matching title in the archive.</blockquote>",
+        reply_markup=kb(*rows))
 
 
 @router.callback_query(F.data.startswith("disc_g:"))
@@ -100,14 +112,22 @@ async def cb_genre_files(call: CallbackQuery) -> None:
     items = await files_by_genre(genre, limit=20)
     if not items:
         await call.message.edit_text(
-            f"🏷 <b>{genre}</b>\nNo books tagged here yet.",
+            f"🏷 <b>{genre}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>📭 This shelf is still being stocked — nothing tagged here just yet.\n\n"
+            "Try another genre, or search a title and we'll fetch it for you.</blockquote>",
             reply_markup=kb([btn("🔙 Genres", "disc_genres", style="danger")]))
         return
     rows = [[btn(f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:36]}",
                  f"dl:{f['file_unique_id']}", style="success")] for f in items]
     rows.append([btn("🔙 Genres", "disc_genres", style="danger")])
     await call.message.edit_text(
-        f"🏷 <b>{genre}</b> · 1 BCN/BGM each", reply_markup=kb(*rows))
+        f"🏷 <b>{genre}</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Every title on this shelf, ready to read.</i>\n"
+        "<blockquote>💎 Each download costs just <code>1</code> token — 🪙 BCN or 💎 BGM.\n"
+        "Tap a cover to add it to your library.</blockquote>",
+        reply_markup=kb(*rows))
 
 
 @router.callback_query(F.data == "disc_feat")
@@ -117,14 +137,21 @@ async def cb_featured(call: CallbackQuery) -> None:
     items = await featured_files(limit=10)
     if not items:
         await call.message.edit_text(
-            "⭐ <b>No featured books right now.</b>",
+            "⭐ <b>Featured</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>🪄 No spotlight titles right now — the marquee is being refreshed.\n\n"
+            "Check back soon, or explore 📚 Collections and 🔥 Popular in the meantime.</blockquote>",
             reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
         return
     rows = [[btn(f"⭐ {icon_for(f.get('ext',''))} {f.get('name','Untitled')[:36]}",
                  f"dl:{f['file_unique_id']}", style="success")] for f in items]
     rows.append([btn("🔙 Discover", "lib_discover", style="danger")])
     await call.message.edit_text(
-        "⭐ <b>Featured Books</b>\n━━━━━━━━━━━━━━━━━━\nHand-picked &amp; sponsored picks:",
+        "⭐ <b>Featured</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>The marquee — hand-picked and sponsored standouts.</i>\n"
+        "<blockquote>These are the titles worth a look first.\n"
+        "💎 Each one is just <code>1</code> token to add to your library — tap to read.</blockquote>",
         reply_markup=kb(*rows))
 
 
@@ -155,7 +182,12 @@ async def cb_collections(call: CallbackQuery) -> None:
         rows.append(row)
     rows.append([btn("🔙 Discover", "lib_discover", style="danger")])
     await call.message.edit_text(
-        "📚 <b>Curated Collections</b>\n━━━━━━━━━━━━━━━━━━\nThemed shelves from the archive:",
+        "📚 <b>Curated Collections</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Themed shelves, gathered by hand from across the archive.</i>\n"
+        "<blockquote>From award winners to spooky reads to fantasy epics — each shelf "
+        "pulls the best matching titles together so you can browse by feeling, not just by name.</blockquote>\n"
+        "<i>💡 Pick a shelf to see what's inside.</i>",
         reply_markup=kb(*rows))
 
 
@@ -171,14 +203,22 @@ async def cb_collection_files(call: CallbackQuery) -> None:
     items = await search_any(terms, limit=20)
     if not items:
         await call.message.edit_text(
-            f"{emoji} <b>{name}</b>\nNothing here yet — try Genres or search.",
+            f"{emoji} <b>{name}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>📭 This shelf is still filling up — nothing matched just yet.\n\n"
+            "Try another collection, browse 🏷 Genres, or search a title directly.</blockquote>",
             reply_markup=kb([btn("🔙 Collections", "disc_collections", style="danger")]))
         return
     rows = [[btn(f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:36]}",
                  f"dl:{f['file_unique_id']}", style="success")] for f in items]
     rows.append([btn("🔙 Collections", "disc_collections", style="danger")])
     await call.message.edit_text(
-        f"{emoji} <b>{name}</b> · 1 BCN/BGM each", reply_markup=kb(*rows))
+        f"{emoji} <b>{name}</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>A shelf curated around this theme — picked just for the mood.</i>\n"
+        "<blockquote>💎 Each title is <code>1</code> token — 🪙 BCN or 💎 BGM.\n"
+        "Tap any one to add it to your library.</blockquote>",
+        reply_markup=kb(*rows))
 
 
 # ── Author spotlight ───────────────────────────────────────────────────────────
@@ -216,8 +256,12 @@ async def cb_authors(call: CallbackQuery) -> None:
         rows.append(row)
     rows.append([btn("🔙 Discover", "lib_discover", style="danger")])
     await call.message.edit_text(
-        "🖊 <b>Author Spotlight</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"⭐ <b>Author of the Day:</b> {_AUTHORS[aotd][0]}\n\nPick an author to explore:",
+        "🖊 <b>Author Spotlight</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Explore the storytellers behind your favourites.</i>\n"
+        f"<blockquote>⭐ <b>Author of the Day:</b> {_AUTHORS[aotd][0]}\n"
+        "A fresh name is featured every day — today's is starred below.</blockquote>\n"
+        "<i>💡 Tap an author to see their books in the archive.</i>",
         reply_markup=kb(*rows))
 
 
@@ -231,17 +275,21 @@ async def cb_author_files(call: CallbackQuery) -> None:
     except (ValueError, IndexError):
         await call.answer(); return
     items = await search_any(terms, limit=16)
-    head = f"🖊 <b>{name}</b>\n<i>{blurb}</i>\n━━━━━━━━━━━━━━━━━━\n"
+    head = f"🖊 <b>{name}</b>\n<i>{blurb}</i>\n━━━━━━━━━━━━━━━━━━━━\n"
     if not items:
         await call.message.edit_text(
-            head + "No titles in the archive yet — try 📚 Request to ask for one.",
+            head + "<blockquote>📭 None of their titles are in the archive just yet.\n\n"
+            "Want one? Tap <b>Request a Book</b> below and our team will hunt it down for you.</blockquote>",
             reply_markup=kb([btn("📚 Request a Book", "menu_request", style="success")],
                             [btn("🔙 Authors", "disc_authors", style="danger")]))
         return
     rows = [[btn(f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:36]}",
                  f"dl:{f['file_unique_id']}", style="success")] for f in items]
     rows.append([btn("🔙 Authors", "disc_authors", style="danger")])
-    await call.message.edit_text(head + "Their books in the archive:", reply_markup=kb(*rows))
+    await call.message.edit_text(
+        head + "<blockquote>📚 Every title from this author in our archive.\n"
+        "💎 Just <code>1</code> token each — tap to add it to your library.</blockquote>",
+        reply_markup=kb(*rows))
 
 
 # ── Series finder ──────────────────────────────────────────────────────────────
@@ -272,9 +320,11 @@ async def cb_series(call: CallbackQuery) -> None:
     series.sort(key=lambda g: len(g["nums"]), reverse=True)
     if not series:
         await call.message.edit_text(
-            "🔗 <b>Series Finder</b>\n━━━━━━━━━━━━━━━━━━\n"
-            "No multi-volume series detected in the archive yet.\n"
-            "<i>Tip: after any download I'll suggest the next volume automatically.</i>",
+            "🔗 <b>Series Finder</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>📭 No multi-volume series have surfaced in the archive yet.\n\n"
+            "💡 No need to hunt — after any download we'll automatically point you to the next "
+            "volume, so a series always keeps flowing.</blockquote>",
             reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
         return
     rows = [[btn(f"📚 {g['base'][:30]} ({len(g['nums'])} vol)",
@@ -282,7 +332,11 @@ async def cb_series(call: CallbackQuery) -> None:
             for g in series[:12]]
     rows.append([btn("🔙 Discover", "lib_discover", style="danger")])
     await call.message.edit_text(
-        "🔗 <b>Series Finder</b>\n━━━━━━━━━━━━━━━━━━\nMulti-volume series in the archive:",
+        "🔗 <b>Series Finder</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Found a saga you love? Read it in order, start to finish.</i>\n"
+        "<blockquote>📚 Every multi-volume series we've spotted in the archive, grouped for you.\n"
+        "Tap a series to see all its volumes lined up in sequence.</blockquote>",
         reply_markup=kb(*rows))
 
 
@@ -294,8 +348,12 @@ async def cb_series_detail(call: CallbackQuery) -> None:
     fuid = call.data.split(":", 1)[1]
     f = await get_file(fuid)
     if not f:
-        await call.message.edit_text("That title is no longer available.",
-                                     reply_markup=kb([btn("🔙 Series", "disc_series", style="danger")]))
+        await call.message.edit_text(
+            "⚠️ <b>Title Unavailable</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>This title has moved out of the archive and can't be opened right now.\n\n"
+            "Head back to <b>Series</b> to pick another saga.</blockquote>",
+            reply_markup=kb([btn("🔙 Series", "disc_series", style="danger")]))
         return
     vols = await find_series(f)
     parsed = parse_series(f.get("name", ""))
@@ -310,7 +368,11 @@ async def cb_series_detail(call: CallbackQuery) -> None:
                          f"dl:{v['file_unique_id']}", style="success")])
     rows.append([btn("🔙 Series", "disc_series", style="danger")])
     await call.message.edit_text(
-        f"📚 <b>{escape(base)}</b> · {len(vols)} volume(s)\n━━━━━━━━━━━━━━━━━━\nRead them in order:",
+        f"📚 <b>{escape(base)}</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>{len(vols)} volume(s) — the full run, in sequence.</i>\n"
+        "<blockquote>📖 Tap each volume in order for the way the story was meant to unfold.\n"
+        "💎 Every volume is just <code>1</code> token to add to your library.</blockquote>",
         reply_markup=kb(*rows))
 
 
@@ -336,12 +398,20 @@ async def cb_new(call: CallbackQuery) -> None:
     page = int(call.data.split(":", 1)[1])
     items = await recent_files(limit=48)
     if not items:
-        await call.message.edit_text("🆕 No files indexed yet.",
-                                     reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
+        await call.message.edit_text(
+            "🆕 <b>New Arrivals</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>📭 The shelves are still being stocked — nothing new indexed just yet.\n\n"
+            "Check back soon, or search a title and we'll fetch it for you.</blockquote>",
+            reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
         return
     chunk = items[page * _PER:(page + 1) * _PER]
     await call.message.edit_text(
-        f"🆕 <b>New Arrivals</b> · 1 BCN/BGM each\nPage {page+1}",
+        "🆕 <b>New Arrivals</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Hot off the shelf — the freshest additions to the archive.</i>\n"
+        f"<blockquote>💎 Each title is just <code>1</code> token — 🪙 BCN or 💎 BGM.\n"
+        f"📄 Page <code>{page+1}</code> — tap a cover to add it to your library.</blockquote>",
         reply_markup=kb(*_file_rows(chunk, page, len(items), "disc_new")))
 
 
@@ -351,12 +421,20 @@ async def cb_pop(call: CallbackQuery) -> None:
     page = int(call.data.split(":", 1)[1])
     items = await popular_files(limit=48)
     if not items:
-        await call.message.edit_text("🔥 No downloads yet — be the first!",
-                                     reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
+        await call.message.edit_text(
+            "🔥 <b>Popular</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>📭 No downloads have landed yet — the charts are wide open.\n\n"
+            "Be the first to grab a title and set the trend.</blockquote>",
+            reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
         return
     chunk = items[page * _PER:(page + 1) * _PER]
     await call.message.edit_text(
-        f"🔥 <b>Popular</b> · most downloaded\nPage {page+1}",
+        "🔥 <b>Popular</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>The crowd favourites — most downloaded of all time.</i>\n"
+        f"<blockquote>🏆 If everyone's reading it, there's a reason.\n"
+        f"💎 Just <code>1</code> token each · 📄 Page <code>{page+1}</code> — tap to add it to your library.</blockquote>",
         reply_markup=kb(*_file_rows(chunk, page, len(items), "disc_pop")))
 
 
@@ -365,13 +443,20 @@ async def cb_botd(call: CallbackQuery) -> None:
     await call.answer()
     f = await book_of_the_day(_day_index())
     if not f:
-        await call.message.edit_text("📅 No book to feature yet.",
-                                     reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
+        await call.message.edit_text(
+            "📅 <b>Book of the Day</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>📭 Today's pick is still being chosen — the spotlight isn't lit yet.\n\n"
+            "Check back shortly, or explore 🔥 Popular and ⭐ Featured for a great read now.</blockquote>",
+            reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
         return
     await call.message.edit_text(
-        f"📅 <b>Book of the Day</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"{icon_for(f.get('ext',''))} <b>{f.get('name','Untitled')}</b>",
-        reply_markup=kb([btn("📥 Get it (1 token)", f"dl:{f['file_unique_id']}", style="success")],
+        "📅 <b>Book of the Day</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>One handpicked read, refreshed every morning — just for today.</i>\n"
+        f"<blockquote>{icon_for(f.get('ext',''))} <b>{f.get('name','Untitled')}</b>\n\n"
+        "💎 Yours for a single token. Tap below and it's in your library.</blockquote>",
+        reply_markup=kb([btn("📥 Claim Today's Pick (1 token)", f"dl:{f['file_unique_id']}", style="success")],
                         [btn("🔙 Discover", "lib_discover", style="danger")]))
 
 
@@ -380,6 +465,9 @@ async def cb_quote(call: CallbackQuery) -> None:
     await call.answer()
     quote, author = _QUOTES[_day_index() % len(_QUOTES)]
     await call.message.edit_text(
-        f"💬 <b>Quote of the Day</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"<i>“{quote}”</i>\n\n— <b>{author}</b>",
+        "💬 <b>Quote of the Day</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>A little literary spark to carry into your day.</i>\n"
+        f"<blockquote>“{quote}”\n\n— <b>{author}</b></blockquote>\n"
+        "<i>💡 A fresh quote lands here every morning.</i>",
         reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))

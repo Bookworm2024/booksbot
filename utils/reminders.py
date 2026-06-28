@@ -19,9 +19,14 @@ _INACTIVE_HOURS = 20      # only nudge users idle ≥ this long
 _PER_TICK = 200           # cap users handled per tick (memory/flood safety)
 _SLEEP = 0.05             # ~20 msgs/sec
 
-_TEXT = ("📚 <b>Your daily rewards are waiting!</b>\n"
-         "🎁 Claim your daily bonus, 🎡 take a free spin, and pick up where you "
-         "left off. See you inside!")
+_TEXT = ("📖 <b>Your library missed you</b>\n"
+         "<i>A few rewards have been saved up while you were away.</i>\n"
+         "<blockquote>"
+         "🎁 <b>Daily bonus</b> — claim your free 🪙 BCN, refreshed and ready.\n"
+         "🎡 <b>Free spin</b> — one turn for a shot at bonus tokens and perks.\n"
+         "📚 <b>Continue reading</b> — your shelf is right where you left it."
+         "</blockquote>"
+         "<i>💡 Tap below to claim your reward — it only takes a moment.</i>")
 
 
 def _today() -> str:

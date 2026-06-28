@@ -19,16 +19,31 @@ router = Router()
 
 async def _board(uid: int):
     st = await status(uid)
-    lines = ["<b>🎯 Daily Missions</b>", "━━━━━━━━━━━━━━━━━━"]
+    done_n = len(st["done"])
+    total_n = len(MISSIONS)
+    lines = ["🎯 <b>Daily Missions</b>",
+             "━━━━━━━━━━━━━━━━━━━━",
+             "<i>Four quick wins, refreshed every day. Tick them off as you read, "
+             "play and claim — then collect the 💎 BGM you've earned.</i>",
+             ""]
+    body = []
     for key, (label, reward) in MISSIONS.items():
         mark = "✅" if key in st["done"] else "⬜"
-        tag = " (claimed)" if key in st["claimed"] else ""
-        lines.append(f"{mark} {label} — <b>+{fmt_amount(reward)} BGM</b>{tag}")
-    lines.append(f"\n💎 <b>Claimable now:</b> {fmt_amount(st['claimable'])} BGM")
+        tag = " · <i>🎁 claimed</i>" if key in st["claimed"] else ""
+        body.append(f"{mark} {label} — <b>+{fmt_amount(reward)} 💎 BGM</b>{tag}")
+    lines.append("<blockquote>" + "\n".join(body) + "</blockquote>")
+    lines.append(f"📊 <i>Today's progress:</i> <code>{done_n}/{total_n}</code> done")
+    if st["claimable"] > 0:
+        lines.append(f"✨ <b>Ready to bank:</b> <code>{fmt_amount(st['claimable'])}</code> 💎 BGM "
+                     "— tap <b>Claim</b> below.")
+    else:
+        lines.append("💡 <i>Complete a mission to unlock your reward — it lands the "
+                     "moment you claim.</i>")
     rows = []
     if st["claimable"] > 0:
-        rows.append([btn("🎁 Claim Rewards", "missions_claim", style="success")])
-    rows.append([btn("🎮 Play", "menu_games", style="primary"),
+        rows.append([btn(f"🎁 Claim {fmt_amount(st['claimable'])} BGM",
+                         "missions_claim", style="success")])
+    rows.append([btn("🎮 Play a Game", "menu_games", style="primary"),
                  btn("🔙 Back", "menu_home", style="danger")])
     return "\n".join(lines), kb(*rows)
 
@@ -49,6 +64,9 @@ async def cb_missions(call: CallbackQuery) -> None:
 @router.callback_query(F.data == "missions_claim")
 async def cb_claim(call: CallbackQuery) -> None:
     got = await claim(call.from_user.id)
-    await call.answer(f"+{fmt_amount(got)} BGM!" if got else "Nothing to claim yet.", show_alert=bool(got))
+    await call.answer(
+        f"✨ Nice work! +{fmt_amount(got)} BGM added to your wallet."
+        if got else "⏳ Nothing to claim yet — complete a mission first, then come back.",
+        show_alert=bool(got))
     text, markup = await _board(call.from_user.id)
     await call.message.edit_text(text, reply_markup=markup)

@@ -109,13 +109,13 @@ def _matches(guess: str, accepts: set[str]) -> bool:
 
 
 def _kbd():
-    return kb([btn("💡 Hint", "cg_hint", style="primary"),
-               btn("⏭ Skip", "cg_skip", style="danger")])
+    return kb([btn("💡 Reveal Hint", "cg_hint", style="primary"),
+               btn("⏭ Skip & Reveal", "cg_skip", style="danger")])
 
 
 def _again_kb():
-    return kb([btn("🎭 Play Again", "cg_new", style="success"),
-               btn("🎮 Games", "menu_games", style="primary")])
+    return kb([btn("🎭 Play Another", "cg_new", style="success"),
+               btn("🎮 Games Lounge", "menu_games", style="primary")])
 
 
 class CoverFSM(StatesGroup):
@@ -132,14 +132,27 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
     from utils.flags import is_on
     send = message.edit_text if edit else message.answer
     if not await is_on("games"):
-        await send("🎮 <b>Games are paused</b> — check back soon!",
-                   reply_markup=kb([btn("🔙 Back", "menu_home", style="danger")]))
+        await send(
+            "🎮 <b>Games Lounge — Resting</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>Our games are taking a short intermission while we polish "
+            "them up. Your library stays open in the meantime — search a title, open "
+            "the reader, or check Discover for something new.</blockquote>\n"
+            "<i>💡 Do check back soon — the tables reopen shortly.</i>",
+            reply_markup=kb([btn("🔙 Back to Menu", "menu_home", style="danger")]))
         return
     db = await MongoManager.get()
     prev = await _plays_today(db, uid)
     if prev >= _DAILY:
-        await send(f"🎭 <b>Cover Guess</b>\n\nDaily limit reached ({_DAILY}/day). Back tomorrow!",
-                   reply_markup=kb([btn("🎮 Games", "menu_games", style="primary")]))
+        await send(
+            "🎭 <b>Cover Guess — Come Back Tomorrow</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>You've played all <code>{_DAILY}</code> rounds for today — "
+            "nicely done. Your free plays refresh at midnight, ready for another run "
+            "at the shelf.</blockquote>\n"
+            "<i>💡 In the meantime, the other games are open — pick one from the "
+            "lounge.</i>",
+            reply_markup=kb([btn("🎮 Games Lounge", "menu_games", style="primary")]))
         return
     await db.safe_update("users", {"user_id": uid},
                          {"$set": {"cg_day": _today(), "cg_plays": prev + 1}})
@@ -147,9 +160,16 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
     await state.set_state(CoverFSM.answering)
     await state.update_data(title=title, hint=hint, emojis=emojis,
                             accepts=list(_accepts(title, aliases)), tries=0)
-    await send(f"🎭 <b>Cover Guess</b>\n━━━━━━━━━━━━━━━━━━\n"
-               f"Which book is this?\n\n<b>{emojis}</b>\n\n"
-               "✍️ Type the title below.", reply_markup=_kbd())
+    await send(
+        "🎭 <b>Cover Guess</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>One famous book, dressed up in emoji. Can you name it?</i>\n\n"
+        f"<b>{emojis}</b>\n"
+        "<blockquote>You have <code>3</code> guesses. Stuck? Tap 💡 for a free hint "
+        "(author and year), or ⏭ to reveal the answer. Crack it on the first try "
+        "for the biggest 💎 BGM reward.</blockquote>\n"
+        "<i>✍️ Type the title below to make your guess.</i>",
+        reply_markup=_kbd())
 
 
 @router.message(Command("coverguess"))
@@ -174,9 +194,11 @@ async def cb_hint(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     hint = data.get("hint")
     if not hint:
-        await call.answer("Start a new round.", show_alert=True)
+        await call.answer(
+            "This round has wrapped up. Tap Play Another to start a fresh cover.",
+            show_alert=True)
         return
-    await call.answer(f"✍️ {hint}", show_alert=True)
+    await call.answer(f"💡 Here's your hint — {hint}", show_alert=True)
 
 
 @router.callback_query(F.data == "cg_skip")
@@ -186,14 +208,25 @@ async def cb_skip(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await call.answer()
     await call.message.edit_text(
-        f"⏭ <b>Skipped.</b> It was <b>{title or '—'}</b>.", reply_markup=_again_kb())
+        "🎭 <b>Cover Guess — Revealed</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>The cover was hiding <b>{title or '—'}</b>. One to add to "
+        "your reading list, perhaps.</blockquote>\n"
+        "<i>💡 Ready for another? A fresh cover is waiting.</i>",
+        reply_markup=_again_kb())
 
 
 @router.message(CoverFSM.answering, F.text)
 async def on_answer(message: Message, state: FSMContext) -> None:
     guess = (message.text or "").strip()
     if guess.lower() == "/cancel":
-        await state.clear(); await message.answer("❌ Cancelled."); return
+        await state.clear()
+        await message.answer(
+            "🎭 <b>Cover Guess — Closed</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<i>No worries — this round is set aside. The lounge is here whenever "
+            "you'd like another go.</i>")
+        return
     data = await state.get_data()
     title = data.get("title", "")
     accepts = set(data.get("accepts") or [])
@@ -209,7 +242,11 @@ async def on_answer(message: Message, state: FSMContext) -> None:
         from utils.missions import mark
         await mark(message.chat.id, "play_game")
         await message.answer(
-            f"🎉 <b>Correct — {title}!</b>\n💎 <b>+{fmt_amount(rwd)} BGM</b>",
+            "✨ <b>Spot On!</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>That cover was <b>{title}</b> — beautifully read.\n"
+            f"💎 <b>+{fmt_amount(rwd)} BGM</b> has landed in your wallet.</blockquote>\n"
+            "<i>💡 On a roll? Line up the next cover.</i>",
             reply_markup=_again_kb())
         return
 
@@ -217,8 +254,19 @@ async def on_answer(message: Message, state: FSMContext) -> None:
     if tries >= _MAX_TRIES:
         await state.clear()
         await message.answer(
-            f"❌ <b>Out of tries.</b> It was <b>{title}</b>.", reply_markup=_again_kb())
+            "🎭 <b>Cover Guess — Revealed</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>That's your last guess for this one — it was "
+            f"<b>{title}</b>. A worthy addition to any shelf.</blockquote>\n"
+            "<i>💡 Shake it off — a brand-new cover is one tap away.</i>",
+            reply_markup=_again_kb())
         return
     await state.update_data(tries=tries)
-    await message.answer(f"❌ Not quite — try again ({tries}/{_MAX_TRIES}).",
-                         reply_markup=_kbd())
+    await message.answer(
+        "❌ <b>Not this one</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>Close, but not the title we're after. You have "
+        f"<code>{_MAX_TRIES - tries}</code> guess(es) left.</blockquote>\n"
+        "<i>💡 Need a nudge? Tap 💡 for a free hint, then ✍️ type your next "
+        "guess.</i>",
+        reply_markup=_kbd())

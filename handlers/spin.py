@@ -45,7 +45,12 @@ async def _spin(message: Message, uid: int) -> None:
     doc = await db.find_one_global("users", {"user_id": uid}, {"last_spin": 1}) or {}
     if doc.get("last_spin") == _today():
         await message.answer(
-            "🎡 <b>Already spun today!</b>\nCome back tomorrow for another free spin.",
+            "🎡 <b>Spin the Wheel — Already Spun</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>You've taken today's free spin — nicely done. The wheel "
+            "resets every day, so there's always another prize waiting.\n"
+            "🎮 In the meantime, our games pay out 💎 BGM too — well worth a round.</blockquote>\n"
+            "<i>💡 Come back tomorrow for your next free spin.</i>",
             reply_markup=kb([btn("🎮 Play Games", "menu_games", style="success")]))
         return
     # claim the spin atomically (only first call today wins)
@@ -53,15 +58,19 @@ async def _spin(message: Message, uid: int) -> None:
         "users", {"user_id": uid, "last_spin": {"$ne": _today()}},
         {"$set": {"last_spin": _today()}})
     if not claimed:
-        await message.answer("🎡 Already spun today — see you tomorrow!")
+        await message.answer(
+            "🎡 <b>Spin the Wheel — Already Spun</b>\n"
+            "<i>Today's free spin is already in. See you tomorrow for the next one.</i>")
         return
     prize = random.choice(_BAG)
     await add_bgm(uid, prize)
     from utils.missions import mark
     await mark(uid, "spin")
-    jackpot = "🎉 <b>JACKPOT!</b>\n" if prize >= 5 else ""
+    jackpot = "🎉 <b>JACKPOT — the wheel landed on the top prize!</b>\n" if prize >= 5 else ""
     await message.answer(
-        f"🎡 <b>Daily Spin</b>\n━━━━━━━━━━━━━━━━━━\n{jackpot}"
-        f"You won <b>+{fmt_amount(prize)} BGM</b>! 💎\n\n<i>Spin again tomorrow.</i>",
-        reply_markup=kb([btn("💼 Balance", "acc_balance", style="primary"),
-                         btn("🎮 Games", "menu_games", style="success")]))
+        f"🎡 <b>Spin the Wheel — You Won!</b>\n━━━━━━━━━━━━━━━━━━\n{jackpot}"
+        f"<blockquote>The wheel spun in your favour and dropped "
+        f"<b>+{fmt_amount(prize)}</b> 💎 BGM straight into your wallet.</blockquote>\n"
+        "<i>💡 The wheel refreshes daily — one free spin every day, every prize on the house.</i>",
+        reply_markup=kb([btn("💼 My Wallet", "acc_balance", style="primary"),
+                         btn("🎮 Play Games", "menu_games", style="success")]))

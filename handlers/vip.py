@@ -23,21 +23,29 @@ router = Router()
 async def _view(uid: int):
     st = await get_status(uid)
     bgm, _ = await get_balances(uid)
-    lines = ["<b>💎 Premium (VIP)</b>", "━━━━━━━━━━━━━━━━━━"]
+    lines = ["👑 <b>Premium Membership</b>",
+             "<i>Read more, pay less — the best of the library, curated for you.</i>",
+             "━━━━━━━━━━━━━━━━━━"]
     if st["active"]:
         cfg = TIERS[st["tier"]]
-        lines.append(f"✅ Active: <b>{cfg['emoji']} {cfg['name']}</b> "
-                     f"until {st['until'].strftime('%d %b %Y')}")
-    lines.append(f"💎 Your balance: <b>{fmt_amount(bgm)} BGM</b>\n")
+        lines.append(f"<blockquote>✅ <b>You're a member.</b>\n"
+                     f"{cfg['emoji']} <b>{cfg['name']}</b> — active through "
+                     f"<b>{st['until'].strftime('%d %b %Y')}</b>.\n"
+                     f"<i>Every perk below is already working for you.</i></blockquote>")
+    lines.append(f"💼 <b>Your wallet</b> — <code>{fmt_amount(bgm)} BGM</code> ready to spend.\n")
+    lines.append("<i>Choose your tier — each one pays for itself the more you read.</i>\n")
     for t, cfg in TIERS.items():
-        dl = "free downloads" if cfg["dl_discount"] >= 1 else f"{int(cfg['dl_discount']*100)}% off downloads"
+        dl = "Free downloads — every book, no token cost" if cfg["dl_discount"] >= 1 else f"{int(cfg['dl_discount']*100)}% off every download"
         lines.append(
-            f"{cfg['emoji']} <b>{cfg['name']}</b> — {cfg['price']} BGM / {cfg['days']}d\n"
-            f"   • {dl}\n   • {cfg['claim_mult']}× daily claim\n"
-            f"   • +{cfg['monthly_bgm']} BGM now")
-    rows = [[btn(f"{cfg['emoji']} Get {cfg['name']} ({cfg['price']} BGM)",
+            f"{cfg['emoji']} <b>{cfg['name']}</b> · <code>{cfg['price']} BGM</code> / {cfg['days']} days\n"
+            f"<blockquote>📚 {dl}\n"
+            f"🪙 <b>{cfg['claim_mult']}×</b> on your daily claim — more free tokens, every day\n"
+            f"🎁 <code>+{cfg['monthly_bgm']} BGM</code> credited instantly on joining\n"
+            f"{cfg['emoji']} A {cfg['name']} badge on your profile</blockquote>")
+    lines.append("<i>💡 Membership extends if you re-subscribe — your time never resets to zero.</i>")
+    rows = [[btn(f"{cfg['emoji']} Join {cfg['name']} · {cfg['price']} BGM",
                  f"vip_buy:{t}", style="success")] for t, cfg in TIERS.items()]
-    rows.append([btn("💎 Buy BGM", "acc_buy", style="primary"),
+    rows.append([btn("💎 Top up BGM", "acc_buy", style="primary"),
                  btn("🔙 Back", "menu_account", style="danger")])
     return "\n".join(lines), kb(*rows)
 
@@ -62,6 +70,6 @@ async def cb_buy(call: CallbackQuery) -> None:
     if not ok:
         await call.answer(msg.replace("<b>", "").replace("</b>", ""), show_alert=True)
         return
-    await call.answer("Activated 🎉")
+    await call.answer("👑 You're in — welcome to Premium! Enjoy every perk.")
     text, markup = await _view(call.from_user.id)
     await call.message.edit_text(f"{msg}\n\n" + text, reply_markup=markup)

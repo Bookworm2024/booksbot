@@ -80,14 +80,14 @@ def qhash(game: str, q: str) -> str:
 def _grade(accuracy: float) -> tuple[str, str]:
     """Map accuracy (0..1) to a (key, friendly message) performance tag."""
     if accuracy >= 0.9:
-        return "legendary", "Absolutely legendary!"
+        return "legendary", "Legendary run — a near-flawless performance. Your shelf salutes you."
     if accuracy >= 0.75:
-        return "great", "You did great!"
+        return "great", "Brilliantly played — that was a genuinely sharp round."
     if accuracy >= 0.5:
-        return "good", "Solid run!"
+        return "good", "Solid run — more right than wrong, and the rewards prove it."
     if accuracy >= 0.25:
-        return "meh", "Could've been better, tho."
-    return "low", "Keep practising — you'll level up!"
+        return "meh", "A respectable effort — a little more practice and the top scores are yours."
+    return "low", "Every reader starts here — play again and watch your score climb."
 
 
 # ── starter bank (tiny inline fallback so games work on a brand-new DB) ──────────
@@ -288,7 +288,7 @@ async def new_session(uid: int, game: str, level: str = "beginner") -> dict:
     cfg = CONFIG[game]
     db = await MongoManager.get()
     if await plays_today(uid, game) >= cfg["daily"]:
-        return {"error": f"Daily limit reached ({cfg['daily']}/day). Come back tomorrow!"}
+        return {"error": f"You've enjoyed all {cfg['daily']} plays for today — nicely done. Your free rounds refresh in the morning, so come back tomorrow to keep earning."}
 
     if cfg["levels"]:
         if level not in QUIZ_REWARD:
@@ -322,7 +322,7 @@ async def new_session(uid: int, game: str, level: str = "beginner") -> dict:
         chosen = await db.sample_global("questions", base, cfg["count"])
         reset = True
     if not chosen:
-        return {"error": "No questions in the bank yet — it's being filled. Try again soon!"}
+        return {"error": "We're curating fresh questions for this game right now — the library is being stocked as we speak. Please check back in a little while."}
 
     chosen_ids = [str(q["_id"]) for q in chosen]
     new_served = chosen_ids if reset else (served + chosen_ids)
@@ -364,9 +364,9 @@ async def submit(uid: int, session_id: str, client_answers: list) -> dict:
     db = await MongoManager.get()
     sess = await db.find_one_global("game_sessions", {"session_id": session_id})
     if not sess or sess.get("uid") != uid:
-        return {"error": "Invalid session."}
+        return {"error": "We couldn't find this game session — it may have expired. Head back and start a fresh round to keep playing."}
     if sess.get("status") != "active":
-        return {"error": "This session is already finished."}
+        return {"error": "This round has already been scored and your rewards are safely banked. Start a new game whenever you're ready for the next one."}
 
     game = sess["game"]
     cfg = CONFIG[game]

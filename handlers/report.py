@@ -45,8 +45,14 @@ async def cb_report(call: CallbackQuery, state: FSMContext) -> None:
 async def _start(message: Message, state: FSMContext) -> None:
     await state.set_state(ReportFSM.text)
     await message.answer(
-        "🚩 <b>Report a problem</b>\n\nDescribe the issue — a bad or broken file, "
-        "wrong content, or abuse. /cancel to abort.")
+        "🛡 <b>Report a problem</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>You're doing the right thing — we'll take it from here.</i>\n\n"
+        "<blockquote>Tell us what's wrong in your own words — a broken or corrupt "
+        "file, the wrong content, a mislabelled title, or anything abusive.\n\n"
+        "Your report is <b>private</b> and goes straight to our team. The more detail "
+        "you share, the faster we can put it right.</blockquote>\n\n"
+        "<i>Send your message below, or tap <code>/cancel</code> to step away.</i>")
 
 
 @router.message(ReportFSM.text, F.text)
@@ -54,7 +60,10 @@ async def on_report(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     if raw.lower() == "/cancel":
         await state.clear()
-        await message.answer("❌ Cancelled.")
+        await message.answer(
+            "❌ <b>Report cancelled</b>\n"
+            "<i>Nothing was sent. If something still isn't right, /report is here "
+            "whenever you need it.</i>")
         return
     await state.clear()
     db = await MongoManager.get()
@@ -64,7 +73,12 @@ async def on_report(message: Message, state: FSMContext) -> None:
         "status": "open", "created_at": datetime.now(timezone.utc),
     })
     await message.answer(
-        f"✅ <b>Report received</b> (<code>{rid}</code>). Thanks — our team will review it.")
+        "✅ <b>Report received</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Thank you for flagging this — we've got it from here.</i>\n\n"
+        f"<blockquote>Your reference: <code>{rid}</code>\n\n"
+        "Our team reviews every report personally and acts on what we find. Keep "
+        "this code in case you'd like to follow up.</blockquote>")
     if LOG_CHANNEL_ID:
         try:
             await message.bot.send_message(

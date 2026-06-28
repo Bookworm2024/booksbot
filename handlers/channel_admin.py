@@ -63,39 +63,48 @@ def _forward_channel(message: Message) -> tuple[int | None, int | None]:
 # ── panel ────────────────────────────────────────────────────────────────────
 async def _panel_text() -> str:
     cur = await get_file_channel()
-    cur_s = f"<code>{cur}</code>" if cur else "<i>not set</i>"
+    cur_s = f"<code>{cur}</code>" if cur else "<i>not yet connected</i>"
     return (
-        "🗂 <b>File / Database Channel</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"Current: {cur_s}\n\n"
-        "All file delivery and indexing route through this channel. The bot must "
-        "be a <b>member/admin</b> there.\n\n"
-        "• <b>Change Channel ID</b> — send the new chat id (e.g. "
-        "<code>-1001234567890</code>) or forward any message from the channel.\n"
-        "• <b>Import Old Files</b> — forward existing files so they get indexed "
-        "(new uploads are indexed automatically)."
+        "🗂 <b>File &amp; Database Channel</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>The vault behind your library — every download flows through here.</i>\n\n"
+        f"🔗 <b>Connected channel</b> · {cur_s}\n\n"
+        "<blockquote>Every search result, paid delivery and saved favourite is "
+        "served from this channel, so the bot must sit inside it as a "
+        "<b>member or admin</b>. Keep it healthy and the whole archive stays "
+        "fast and reliable.</blockquote>\n\n"
+        "<blockquote>✏️ <b>Change Channel ID</b> — point the bot at a new archive. "
+        "Send its chat id (e.g. <code>-1001234567890</code>) or simply forward any "
+        "message from it.\n"
+        "📥 <b>Import Old Files</b> — bring legacy uploads into the index so they "
+        "become searchable and deliverable. Fresh uploads index themselves "
+        "automatically.\n"
+        "🔎 <b>Diagnostics</b> — a quick health check on access and coverage.</blockquote>\n\n"
+        "<i>💡 New here? Connect the channel first, then run Diagnostics to confirm "
+        "the bot can reach it.</i>"
     )
 
 
 @router.callback_query(F.data == "admin_filechan")
 async def cb_filechan(call: CallbackQuery) -> None:
     if not _is_super(call.from_user.id):
-        await call.answer("Super admin only", show_alert=True)
+        await call.answer("👑 This tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     await call.message.edit_text(
         await _panel_text(),
         reply_markup=kb([btn("✏️ Change Channel ID", "filechan_change", style="primary")],
                         [btn("📥 Import Old Files", "admin_import", style="success")],
-                        [btn("🔎 Diagnostics", "filechan_diag", style="primary")],
-                        [btn("🔙 Back", "admin_open", style="danger")]))
+                        [btn("🔎 Run Diagnostics", "filechan_diag", style="primary")],
+                        [btn("🔙 Back to Admin", "admin_open", style="danger")]))
 
 
 @router.callback_query(F.data == "filechan_diag")
 async def cb_diag(call: CallbackQuery) -> None:
     if not _is_super(call.from_user.id):
-        await call.answer("Super admin only", show_alert=True)
+        await call.answer("👑 This tool is reserved for the super admin.", show_alert=True)
         return
-    await call.answer("Checking…")
+    await call.answer("Running a quick health check…")
     db = await MongoManager.get()
     total = await archive_count()
     deliverable = await db.count_global("files", {"msg_id": {"$ne": None}})
@@ -110,29 +119,32 @@ async def cb_diag(call: CallbackQuery) -> None:
             try:
                 me = await call.bot.get_chat_member(live, (await call.bot.get_me()).id)
                 role = getattr(me, "status", "member")
-                access = f"✅ <b>{title}</b> (bot is {role})"
+                access = f"✅ <b>{title}</b> — bot is <i>{role}</i>"
             except Exception:  # noqa: BLE001
-                access = f"✅ reachable: <b>{title}</b>"
+                access = f"✅ Reachable — <b>{title}</b>"
         except Exception as exc:  # noqa: BLE001
-            access = f"❌ can't reach it — add the bot as <b>admin</b>\n<i>{str(exc)[:80]}</i>"
+            access = ("❌ Out of reach — add the bot as an <b>admin</b> in the channel\n"
+                      f"<i>{str(exc)[:80]}</i>")
 
-    health = "🟢 healthy" if (live and total > 0) else "🔴 needs setup"
+    health = "🟢 Healthy &amp; serving" if (live and total > 0) else "🔴 Setup needed"
     tips = []
     if not live:
-        tips.append("• Set the channel: <b>✏️ Change Channel ID</b>")
+        tips.append("✏️ <b>Change Channel ID</b> — connect your archive channel")
     if total == 0:
-        tips.append("• Import existing files: <b>📥 Import Old Files</b> (or run the Telethon backfill)")
-    tip_block = ("\n\n<b>To fix:</b>\n" + "\n".join(tips)) if tips else ""
+        tips.append("📥 <b>Import Old Files</b> — index existing uploads (or run the Telethon backfill)")
+    tip_block = ("\n\n<b>Next steps to go live:</b>\n<blockquote>" + "\n".join(tips) + "</blockquote>") if tips else ""
 
     await call.message.edit_text(
-        "🔎 <b>Archive Diagnostics</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"Status: <b>{health}</b>\n"
-        f"📚 Files indexed: <b>{total}</b>\n"
-        f"📤 Deliverable (have msg id): <b>{deliverable}</b>\n"
-        f"🗂 Channel: <code>{live or 'not set'}</code>\n"
-        f"🔌 Access: {access}"
+        "🔎 <b>Archive Diagnostics</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>A live snapshot of your library's plumbing.</i>\n\n"
+        f"<blockquote>📊 <b>Status</b> · {health}\n"
+        f"📚 <b>Files indexed</b> · <code>{total}</code>\n"
+        f"📤 <b>Ready to deliver</b> · <code>{deliverable}</code> <i>(have a message id)</i>\n"
+        f"🗂 <b>Channel</b> · <code>{live or 'not set'}</code>\n"
+        f"🔌 <b>Access</b> · {access}</blockquote>"
         + tip_block,
-        reply_markup=kb([btn("🔄 Refresh", "filechan_diag", style="primary")],
+        reply_markup=kb([btn("🔄 Re-run Check", "filechan_diag", style="primary")],
                         [btn("🔙 Back", "admin_filechan", style="primary")]))
 
 
@@ -140,14 +152,20 @@ async def cb_diag(call: CallbackQuery) -> None:
 @router.callback_query(F.data == "filechan_change")
 async def cb_change(call: CallbackQuery, state: FSMContext) -> None:
     if not _is_super(call.from_user.id):
-        await call.answer("Super admin only", show_alert=True)
+        await call.answer("👑 This tool is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     await state.set_state(ChannelFSM.awaiting_channel_id)
     await call.message.answer(
-        "🗂 <b>Set File Channel</b>\n\nSend the channel's <b>chat id</b> "
-        "(e.g. <code>-1001234567890</code>), or <b>forward any message</b> from the "
-        "channel and I'll read its id.\n\n/cancel to abort.")
+        "🗂 <b>Connect Your File Channel</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Two easy ways — pick whichever is quicker.</i>\n\n"
+        "<blockquote>🔢 <b>Send the chat id</b> — paste the channel's id, e.g. "
+        "<code>-1001234567890</code>.\n"
+        "↪️ <b>Forward a message</b> — forward anything from the channel and I'll "
+        "read its id for you.</blockquote>\n\n"
+        "<i>💡 Channel ids are negative and usually begin with <code>-100</code>.</i>\n\n"
+        "Send <code>/cancel</code> anytime to step away.")
 
 
 @router.message(ChannelFSM.awaiting_channel_id)
@@ -158,9 +176,9 @@ async def on_channel_id(message: Message, state: FSMContext) -> None:
     if txt.startswith("/") and getattr(message, "forward_origin", None) is None:
         await state.clear()
         if txt.lower() != "/cancel":
-            await message.answer("↩️ Left the channel setup. Run the command again.")
+            await message.answer("↩️ <b>Channel setup paused.</b>\n<i>Nothing changed — reopen the panel whenever you're ready.</i>")
         else:
-            await message.answer("❌ Cancelled.")
+            await message.answer("✅ <b>Setup cancelled.</b>\n<i>Your file channel stays exactly as it was.</i>")
         return
 
     # 1) a forwarded message reveals the channel id directly
@@ -172,13 +190,15 @@ async def on_channel_id(message: Message, state: FSMContext) -> None:
         try:
             new_id = int(raw)
         except (TypeError, ValueError):
-            await message.answer("⚠️ Send a numeric chat id like <code>-1001234567890</code>, "
-                                 "or forward a message from the channel.")
+            await message.answer("⚠️ <b>That doesn't look like a chat id.</b>\n"
+                                 "<i>Send a numeric id such as <code>-1001234567890</code>, "
+                                 "or forward any message from the channel and I'll read it for you.</i>")
             return
         # channels/supergroups are large negative ids; reject obvious mistakes
         if new_id >= 0:
-            await message.answer("⚠️ A channel id is negative and usually starts with "
-                                 "<code>-100</code>. Double-check and resend.")
+            await message.answer("⚠️ <b>That id looks off.</b>\n"
+                                 "<i>A channel id is negative and usually starts with "
+                                 "<code>-100</code>. Double-check it and resend.</i>")
             return
 
     await state.clear()
@@ -190,35 +210,48 @@ async def on_channel_id(message: Message, state: FSMContext) -> None:
     try:
         chat = await message.bot.get_chat(new_id)
         title = getattr(chat, "title", None) or new_id
-        note = f"\n✅ Connected to <b>{title}</b>."
+        note = (f"\n\n<blockquote>🔗 <b>Linked to</b> · {title}\n"
+                "✅ The bot can reach it — new uploads will index automatically.</blockquote>")
     except Exception:  # noqa: BLE001
-        note = ("\n⚠️ I couldn't read that chat yet — add me as an <b>admin</b> in the "
-                "channel, then new uploads will index automatically.")
+        note = ("\n\n<blockquote>⚠️ <b>One quick step left.</b>\n"
+                "I can't read that channel yet. Add the bot as an <b>admin</b> there, and "
+                "every new upload will index itself from then on.</blockquote>")
 
     await message.answer(
-        f"✅ File channel set to <code>{new_id}</code>.{note}",
+        "✨ <b>File channel connected</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"🗂 <b>Channel</b> · <code>{new_id}</code>"
+        f"{note}\n\n"
+        "<i>💡 Have older uploads from before the bot joined? Import them next so they "
+        "show up in search.</i>",
         reply_markup=kb([btn("📥 Import Old Files", "admin_import", style="success")],
-                        [btn("🔙 Admin", "admin_open", style="primary")]))
+                        [btn("🔙 Back to Admin", "admin_open", style="primary")]))
 
 
 # ── import old files (forward-to-index) ──────────────────────────────────────
 @router.callback_query(F.data == "admin_import")
 async def cb_import(call: CallbackQuery, state: FSMContext) -> None:
     if not _is_super(call.from_user.id):
-        await call.answer("Super admin only", show_alert=True)
+        await call.answer("👑 This tool is reserved for the super admin.", show_alert=True)
         return
     live = await get_file_channel()
     if not live:
-        await call.answer("Set the file channel first.", show_alert=True)
+        await call.answer("Connect your file channel first, then come back to import.", show_alert=True)
         return
     await call.answer()
     await state.set_state(ChannelFSM.importing)
     await state.update_data(imported=0, skipped=0)
     await call.message.answer(
-        "📥 <b>Import Old Files</b>\n━━━━━━━━━━━━━━━━━━\n"
-        "Forward me the old files from the channel (you can forward many in a row). "
-        "I'll index each so it becomes searchable and deliverable.\n\n"
-        "Send <b>/done</b> when finished.")
+        "📥 <b>Import Old Files</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Let's bring your legacy uploads into the library.</i>\n\n"
+        "<blockquote>📤 <b>Forward the old files</b> straight from the channel — as "
+        "many in a row as you like.\n"
+        "📚 I'll index each one so it becomes <b>searchable</b> and ready to "
+        "<b>deliver</b> on demand.\n"
+        "🔁 Already-indexed files are skipped automatically, so re-forwarding is "
+        "perfectly safe.</blockquote>\n\n"
+        "Send <code>/done</code> when you've finished.")
 
 
 @router.message(ChannelFSM.importing)
@@ -231,10 +264,14 @@ async def on_import(message: Message, state: FSMContext) -> None:
         data = await state.get_data()
         await state.clear()
         await message.answer(
-            f"✅ <b>Import finished.</b>\n📚 Indexed: <b>{data.get('imported', 0)}</b> · "
-            f"⏭ Skipped: <b>{data.get('skipped', 0)}</b>",
+            "✨ <b>Import complete</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<i>Your archive just grew. Nicely done.</i>\n\n"
+            f"<blockquote>📚 <b>Newly indexed</b> · <code>{data.get('imported', 0)}</code>\n"
+            f"⏭ <b>Already on the shelf</b> · <code>{data.get('skipped', 0)}</code></blockquote>\n\n"
+            "<i>💡 The new titles are searchable right away — try a search to see them land.</i>",
             reply_markup=kb([btn("🗂 File Channel", "admin_filechan", style="primary")],
-                            [btn("🔙 Admin", "admin_open", style="primary")]))
+                            [btn("🔙 Back to Admin", "admin_open", style="primary")]))
         return
 
     data = await state.get_data()
@@ -243,30 +280,36 @@ async def on_import(message: Message, state: FSMContext) -> None:
 
     fchat, fmsg_id = _forward_channel(message)
     if fchat is None or fmsg_id is None:
-        await message.answer("⏭ That isn't a forward from a channel — forward the file "
-                             "<i>from the channel</i> (forward-privacy can hide the source).")
+        await message.answer("⏭ <b>That wasn't a forward from a channel.</b>\n"
+                             "<i>Forward the file straight from the channel — forward-privacy "
+                             "can hide the source, in which case the original sender's id is lost.</i>")
         return
 
     live = await get_file_channel()
     if live and fchat != live:
         await message.answer(
-            f"⏭ Skipped — that file came from <code>{fchat}</code>, not the configured "
-            f"file channel <code>{live}</code>.")
+            "⏭ <b>Skipped — wrong channel.</b>\n"
+            f"<i>That file came from <code>{fchat}</code>, not your connected file "
+            f"channel <code>{live}</code>. Forward it from the right channel and I'll index it.</i>")
         return
 
     item = extract_from_message(message, msg_id=fmsg_id, chan_id=fchat)
     if not item:
         skipped += 1
         await state.update_data(skipped=skipped)
-        await message.answer(f"⏭ No file found in that message. (Indexed {imported}, skipped {skipped}.)")
+        await message.answer("⏭ <b>No file in that message.</b>\n"
+                             f"<i>Nothing to index here — running tally: indexed <code>{imported}</code>, "
+                             f"skipped <code>{skipped}</code>.</i>")
         return
 
     created = await index_file(item)
     if created:
         imported += 1
         await state.update_data(imported=imported)
-        await message.answer(f"📚 Indexed <b>{item['name'][:60]}</b>  ·  total {imported}")
+        await message.answer(f"📚 <b>Indexed</b> · {item['name'][:60]}\n"
+                             f"<i>On the shelf — total this session: <code>{imported}</code>.</i>")
     else:
         skipped += 1
         await state.update_data(skipped=skipped)
-        await message.answer(f"⏭ Already indexed: <b>{item['name'][:60]}</b>  ·  skipped {skipped}")
+        await message.answer(f"⏭ <b>Already in your library</b> · {item['name'][:60]}\n"
+                             f"<i>Skipped to avoid a duplicate — skipped so far: <code>{skipped}</code>.</i>")

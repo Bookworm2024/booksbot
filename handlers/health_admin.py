@@ -31,32 +31,40 @@ async def _health_text() -> str:
     errs = await recent_errors(5)
     total_err = await error_count()
     lines = [
-        "🩺 <b>Health &amp; Metrics</b>",
+        "🩺 <b>System Health</b>",
         "━━━━━━━━━━━━━━━━━━",
-        f"⏱ Uptime: <b>{m['uptime']}</b>",
-        f"📨 Updates: <b>{m['updates']:,}</b> "
-        f"(💬 {m['messages']:,} · 🔘 {m['callbacks']:,})",
-        f"⚠️ Errors (since boot): <b>{m['errors']:,}</b> · rate <b>{m['error_rate']}%</b>",
-        f"🗃 Errors stored: <b>{total_err:,}</b>",
+        "<i>A live pulse on the service powering your library.</i>",
+        "",
+        "<blockquote>"
+        f"⏱ <b>Uptime</b> — running for <b>{m['uptime']}</b>\n"
+        f"📨 <b>Updates</b> — <code>{m['updates']:,}</code> "
+        f"(💬 <code>{m['messages']:,}</code> messages · 🔘 <code>{m['callbacks']:,}</code> taps)\n"
+        f"⚠️ <b>Errors since boot</b> — <code>{m['errors']:,}</code> · "
+        f"rate <code>{m['error_rate']}%</code>\n"
+        f"🗃 <b>Errors on record</b> — <code>{total_err:,}</code>"
+        "</blockquote>",
     ]
     if errs:
-        lines.append("\n<b>Recent errors:</b>")
+        lines.append("\n📋 <b>Most recent issues</b>")
+        rows = []
         for e in errs:
             at = e.get("at")
             ts = at.strftime("%d %b %H:%M") if hasattr(at, "strftime") else "—"
             where = escape((e.get("where") or "")[:40])
             msg = escape((e.get("message") or "")[:90])
-            lines.append(f"<code>{ts}</code> · <b>{escape(e.get('type','?'))}</b>"
-                         f"{(' @ ' + where) if where else ''}\n   <i>{msg}</i>")
+            rows.append(f"<code>{ts}</code> · <b>{escape(e.get('type','?'))}</b>"
+                        f"{(' @ ' + where) if where else ''}\n   <i>{msg}</i>")
+        lines.append("<blockquote expandable>" + "\n".join(rows) + "</blockquote>")
     else:
-        lines.append("\n<i>No errors captured. 🎉</i>")
+        lines.append("\n<blockquote>✨ <b>Running clean.</b> No errors captured — "
+                     "everything is behaving exactly as it should.</blockquote>")
     return "\n".join(lines)
 
 
 @router.callback_query(F.data == "admin_health")
 async def cb_health(call: CallbackQuery) -> None:
     if not _is_admin(call.from_user.id):
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("This area is for admins only.", show_alert=True)
         return
     await call.answer()
     await call.message.edit_text(
@@ -69,23 +77,36 @@ async def cb_health(call: CallbackQuery) -> None:
 @router.callback_query(F.data == "admin_backup")
 async def cb_backup(call: CallbackQuery) -> None:
     if not _is_admin(call.from_user.id):
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("This area is for admins only.", show_alert=True)
         return
-    await call.answer("Building backup…")
+    await call.answer("Packaging your latest backup…")
     from utils.backup import backup_channel, backup_now
     if not await backup_channel():
         await call.message.answer(
-            "📦 <b>No backup channel set.</b>\nSet kv <code>backup_channel</code> "
-            "or a LOG_CHANNEL_ID so I can post backups there.")
+            "📦 <b>No backup channel yet</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<i>Tell me where to keep your safety copies.</i>\n\n"
+            "<blockquote>Set the <code>backup_channel</code> key — or a "
+            "<code>LOG_CHANNEL_ID</code> — and I'll post a full export of your "
+            "config and economy state there on demand.</blockquote>")
         return
     try:
         summary = await backup_now(call.bot)
     except Exception as exc:  # noqa: BLE001
         from utils.errors import capture
         await capture(exc, "admin_backup")
-        await call.message.answer(f"⚠️ Backup failed: {escape(str(exc)[:120])}")
+        await call.message.answer(
+            "⚠️ <b>Backup didn't complete</b>\n"
+            f"<i>{escape(str(exc)[:120])}</i>\n\n"
+            "Nothing was lost — give it another try, or check the backup channel "
+            "is reachable.")
         return
     await log_action(call.from_user.id, "backup", str(summary))
     await call.message.answer(
-        "✅ <b>Backup posted</b> to the backup channel.\n"
-        + " · ".join(f"{k}: {v}" for k, v in summary.items()))
+        "✅ <b>Backup secured</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>A fresh snapshot is now saved to your backup channel.</i>\n\n"
+        "<blockquote>"
+        + "\n".join(f"📦 <b>{escape(str(k))}</b> — <code>{escape(str(v))}</code>"
+                    for k, v in summary.items())
+        + "</blockquote>")

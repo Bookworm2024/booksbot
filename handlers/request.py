@@ -50,9 +50,16 @@ async def cb_request_center(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await call.answer()
     await call.message.edit_text(
-        "<b>📚 Request Center</b>\n\n"
-        "🤖 <b>Request Bot</b> — instant search of our 24/7 archive.\n"
-        "👤 <b>Request Admin</b> — for rare titles not in the archive.",
+        "📚 <b>Request Center</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Two ways to find any title — we'll take it from here.</i>\n\n"
+        "<blockquote>"
+        "🤖 <b>Request Bot</b> — search our 24/7 archive in an instant and "
+        "receive your file on the spot. Fast, fully automatic, always on.\n\n"
+        "👤 <b>Request Admin</b> — for the rare and out-of-print titles our "
+        "archive doesn't carry yet. A curator sources it for you by hand."
+        "</blockquote>\n"
+        "<i>💡 Start with the bot — it covers the vast majority of titles.</i>",
         reply_markup=kb(
             [btn("🤖 Request Bot", "req_auto", style="success"),
              btn("👤 Request Admin", "req_manual", style="primary")],
@@ -68,7 +75,14 @@ async def cb_req_auto(call: CallbackQuery, state: FSMContext) -> None:
     from utils.flags import is_on
     if not await is_on("search"):
         await call.message.edit_text(
-            "🔎 <b>Search is paused</b> right now — check back soon!",
+            "🔎 <b>Search is taking a short break</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>Our archive is being tuned for you.</i>\n\n"
+            "<blockquote>"
+            "Instant search is paused for a moment while we polish the index. "
+            "Everything else in your library stays open — pop back shortly and "
+            "we'll have you covered."
+            "</blockquote>",
             reply_markup=kb([btn("🔙 Back", "menu_request", style="danger")]))
         return
     await state.set_state(RequestFSM.awaiting_query)
@@ -79,10 +93,16 @@ async def cb_req_auto(call: CallbackQuery, state: FSMContext) -> None:
             for i, q in enumerate((u.get("search_history") or [])[:5])]
     rows.append([btn("🔙 Back", "menu_request", style="danger")])
     await call.message.edit_text(
-        "🔍 <b>Search the Archive</b>\n\n"
-        "Send the <b>title</b> or keywords of the book/audiobook you want.\n\n"
-        "📝 Example: <code>atomic habits</code>"
-        + ("\n\n🕘 <i>Or re-run a recent search below.</i>" if len(rows) > 1 else ""),
+        "🔍 <b>Search the Archive</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Type a title — your file is moments away.</i>\n\n"
+        "<blockquote>"
+        "Send the <b>title</b> or a few keywords for the book or audiobook you "
+        "have in mind. Our instant search reads every word, forgives the odd "
+        "typo, and surfaces the closest matches in seconds.\n\n"
+        "📝 Try something like <code>atomic habits</code>"
+        "</blockquote>"
+        + ("\n🕘 <i>Or tap a recent search below to run it again.</i>" if len(rows) > 1 else ""),
         reply_markup=kb(*rows),
     )
 
@@ -122,7 +142,7 @@ async def cb_recent(call: CallbackQuery, state: FSMContext) -> None:
                                  {"search_history": 1}) or {}
     hist = u.get("search_history") or []
     if i >= len(hist):
-        await call.answer("That search is gone.", show_alert=True)
+        await call.answer("That recent search has rolled off your history — just type the title again.", show_alert=True)
         return
     query = hist[i]
     await state.update_data(sq=query, sp=0, sf="all", ss="relevance")
@@ -182,20 +202,31 @@ async def _render_results(message: Message, state: FSMContext, query: str,
         await state.clear()
         if await archive_count() == 0:
             # the archive itself is empty/unindexed — be honest, don't blame the query
-            text = ("📚 <b>The library is still being set up.</b>\n\n"
-                    "No files have been indexed yet, so search can't find anything. "
-                    "An admin needs to add the file channel and import the books.\n\n"
-                    "<i>Check back soon!</i>")
-            markup = kb([btn("👤 Request from Admin", "req_manual", style="primary")],
+            text = ("📚 <b>Your library is being prepared</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    "<i>The shelves are going up as we speak.</i>\n\n"
+                    "<blockquote>"
+                    "No titles have been indexed yet, so there's nothing to search "
+                    "for the moment. Our team is connecting the archive and importing "
+                    "the collection now.\n\n"
+                    "In the meantime, you can ask a curator to source a specific title "
+                    "for you by hand."
+                    "</blockquote>\n"
+                    "<i>💡 Check back soon — the catalogue grows daily.</i>")
+            markup = kb([btn("👤 Request from a Curator", "req_manual", style="primary")],
                         [btn("🔙 Menu", "menu_home", style="danger")])
         else:
-            text = (f"❌ <b>No matches for</b> <code>{query}</code>.\n\n"
-                    "Double-check the spelling, or:\n"
-                    "• 🔔 get a ping when it's added\n"
-                    "• 👤 ask an admin to source it")
-            markup = kb([btn("🔔 Notify me when added", "wl_last", style="success")],
+            text = (f"🔍 <b>No matches yet for</b> <code>{query}</code>\n"
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    "<i>It's not in the archive — but it doesn't have to stay that way.</i>\n\n"
+                    "<blockquote>"
+                    "A quick spell-check can help — or let us do the work for you:\n\n"
+                    "🔔 <b>Get notified</b> the moment this title lands in the archive.\n"
+                    "👤 <b>Ask a curator</b> to source it for you by hand."
+                    "</blockquote>")
+            markup = kb([btn("🔔 Notify Me When Added", "wl_last", style="success")],
                         [btn("🔍 New Search", "req_auto", style="primary"),
-                         btn("👤 Request from Admin", "req_manual", style="primary")],
+                         btn("👤 Request from a Curator", "req_manual", style="primary")],
                         [btn("🔙 Menu", "menu_home", style="danger")])
         await (message.edit_text if edit else message.answer)(text, reply_markup=markup)
         return
@@ -227,10 +258,15 @@ async def _render_results(message: Message, state: FSMContext, query: str,
     pages = max(1, (total + _PER_PAGE - 1) // _PER_PAGE)
     head = (f"🔎 <b>Closest matches for</b> <code>{query}</code>" if fuzzy
             else f"🔍 <b>Results for</b> <code>{query}</code>")
-    hint = "\n<i>No exact hits — showing nearest titles.</i>" if fuzzy else ""
-    text = (f"{head}\n📊 {total} match(es) · page {page + 1}/{pages}{hint}\n\n"
-            "💸 Cost: from <b>1 BCN/BGM</b> per download "
-            "<i>(varies with VIP, Happy Hour &amp; surge)</i>.")
+    hint = "\n<i>No exact title — here are the nearest reads we found.</i>" if fuzzy else ""
+    text = (f"{head}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 <code>{total}</code> match(es) · page <code>{page + 1}/{pages}</code>{hint}\n\n"
+            "<blockquote>"
+            "Tap a title to receive it instantly, or 📌 to save it for later.\n\n"
+            "💸 <b>Delivery</b> — from <code>1</code> 🪙 BCN / 💎 BGM per title "
+            "<i>(less with VIP and during Happy Hour; more during surge).</i>"
+            "</blockquote>")
     await (message.edit_text if edit else message.answer)(text, reply_markup=kb(*rows))
 
 
@@ -252,12 +288,19 @@ async def cb_watch_last(call: CallbackQuery) -> None:
                                  {"search_history": 1}) or {}
     hist = u.get("search_history") or []
     if not hist:
-        await call.answer("Nothing to watch yet.", show_alert=True)
+        await call.answer("Run a search first — then I can keep an eye out for that title.", show_alert=True)
         return
     await _add_watchlist(call.from_user.id, hist[0])
-    await call.answer("🔔 Added — I'll DM you when it's uploaded.", show_alert=True)
+    await call.answer("🔔 Done — I'll message you the moment it lands in the archive.", show_alert=True)
     await call.message.edit_text(
-        f"🔔 <b>Watching</b> <code>{hist[0]}</code>\nI'll message you the moment it lands.",
+        "🔔 <b>Added to your Watchlist</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Consider it tracked — we'll do the watching for you.</i>\n\n"
+        "<blockquote>"
+        f"We're now keeping an eye out for <code>{escape(hist[0])}</code>. "
+        "The moment it lands in the archive, we'll send it straight to your inbox — "
+        "no need to check back."
+        "</blockquote>",
         reply_markup=kb([btn("🔍 New Search", "req_auto", style="primary")],
                         [btn("🔙 Menu", "menu_home", style="danger")]))
 
@@ -269,7 +312,7 @@ async def cb_download(call: CallbackQuery) -> None:
     fuid = call.data.split(":", 1)[1]
     f = await get_file(fuid)
     if not f:
-        await call.answer("This file is no longer available.", show_alert=True)
+        await call.answer("This title is no longer in the archive. Try a fresh search and we'll find another copy.", show_alert=True)
         return
 
     from utils.settings import get_float
@@ -285,19 +328,29 @@ async def cb_download(call: CallbackQuery) -> None:
         if bgm + bcn < cost:
             await call.answer()
             await call.message.answer(
-                f"❌ <b>Insufficient balance.</b>\nYou need {fmt_amount(cost)} BCN/BGM to download.\n"
-                "💡 Use /claim for free BCN, buy BGM, or go 💎 Premium for cheaper downloads.",
+                "💼 <b>A little short for this one</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "<i>You're almost there — top up and it's yours.</i>\n\n"
+                "<blockquote>"
+                f"This title costs <code>{fmt_amount(cost)}</code> 🪙 BCN / 💎 BGM to deliver, "
+                "and your balance doesn't quite cover it yet.\n\n"
+                "⚡ Claim your free daily 🪙 BCN with /claim\n"
+                "💎 Buy 💎 BGM for instant, lasting balance\n"
+                "👑 Go Premium for cheaper — even free — downloads"
+                "</blockquote>",
                 reply_markup=kb([btn("💎 Buy BGM", "acc_buy", style="success"),
-                                 btn("💎 Premium", "acc_vip", style="primary")]),
+                                 btn("👑 Go Premium", "acc_vip", style="primary")]),
             )
             return
         currency = await spend(uid, cost)
         if not currency:
-            await call.answer("Balance changed — not enough tokens.", show_alert=True)
+            await call.answer("Your balance just changed and no longer covers this title — top up and try again.", show_alert=True)
             return
 
-    await call.answer("📤 Sending…")
-    caption = (f"{icon_for(f.get('ext',''))} <b>{escape(f.get('name','Your File') or 'Your File')}</b>\n\n"
+    await call.answer("📤 Delivering your title — one moment…")
+    caption = (f"{icon_for(f.get('ext',''))} <b>{escape(f.get('name','Your File') or 'Your File')}</b>\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "<i>Delivered to your library — enjoy the read.</i>\n\n"
                f"{CREDIT}")
     # Read/Listen opens the universal reader Mini App (routes by type: PDF/EPUB →
     # reader, audio → player, etc.). Shown only when a Mini-App host is configured.
@@ -306,9 +359,9 @@ async def cb_download(call: CallbackQuery) -> None:
     fav_rows = []
     if BOT_PUBLIC_URL:
         fav_rows.append([webapp_btn(
-            "🎧 Listen to Audio" if is_audio else "📖 Read Book",
+            "🎧 Listen Now" if is_audio else "📖 Open in Reader",
             "view.html", query=f"fuid={fuid}&ext={ext}", style="success")])
-    fav_rows.append([btn("⭐ Add to Favorites", f"fav_add:{fuid}", style="success")])
+    fav_rows.append([btn("⭐ Save to Favorites", f"fav_add:{fuid}", style="success")])
     fav_kb = kb(*fav_rows)
 
     delivered = False
@@ -334,8 +387,16 @@ async def cb_download(call: CallbackQuery) -> None:
         if currency != "VIP":
             await refund(uid, cost, currency)
         await call.message.answer(
-            "❌ <b>Delivery failed.</b> Your token was refunded.\n"
-            "<i>The file may have been removed, or I'm not in the archive channel.</i>")
+            "⚠️ <b>That delivery didn't go through</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>No tokens lost — you've been fully refunded.</i>\n\n"
+            "<blockquote>"
+            "We couldn't hand over this file just now. The copy may have been "
+            "removed from the archive, or we've briefly lost access to the source "
+            "channel.\n\n"
+            "Please try another result, or run a fresh search — we'll find you "
+            "another copy."
+            "</blockquote>")
         return
 
     # success bookkeeping
@@ -365,7 +426,10 @@ async def cb_download(call: CallbackQuery) -> None:
         nxt = await next_volume(f)
         if nxt:
             await call.message.answer(
-                f"📚 <b>Next in series:</b> {escape(nxt.get('name') or '')}",
+                "📚 <b>Next in the series</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "<i>Keep the story going — the next volume is ready for you.</i>\n\n"
+                f"<blockquote>📖 {escape(nxt.get('name') or '')}</blockquote>",
                 reply_markup=kb([btn(f"📥 Get «{(nxt.get('name') or '')[:28]}»",
                                      f"dl:{nxt['file_unique_id']}", style="success")]))
     except Exception:  # noqa: BLE001 — a nudge must never break delivery

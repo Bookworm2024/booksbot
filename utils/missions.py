@@ -13,10 +13,10 @@ from utils.wallet import add_bgm
 
 # key → (label, reward BGM)
 MISSIONS = {
-    "play_game": ("🎮 Play a game", 0.2),
-    "download":  ("📥 Download a book", 0.2),
-    "spin":      ("🎡 Spin the wheel", 0.1),
-    "claim":     ("🪙 Claim daily BCN", 0.1),
+    "play_game": ("🎮 Play a game in the arcade", 0.2),
+    "download":  ("📚 Add a book to your library", 0.2),
+    "spin":      ("🎡 Take a spin on the wheel", 0.1),
+    "claim":     ("🪙 Collect your daily BCN", 0.1),
 }
 
 

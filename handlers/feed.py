@@ -43,13 +43,30 @@ async def cb_foryou(call: CallbackQuery) -> None:
 
     if not picks:
         await call.message.edit_text(
-            "🎯 <b>For You</b>\n\nFavorite a few books and I'll tailor picks to your taste!",
-            reply_markup=kb([btn("🔭 Discover", "lib_discover", style="success")],
-                            [btn("🔙 Library", "menu_library", style="danger")]))
+            "🎯 <b>For You</b>\n"
+            "<i>Your personal shelf, curated by us.</i>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>Your taste profile is still a blank page — and that's "
+            "the best part. ✨\n\n"
+            "🔖 <b>Favourite a few titles</b> you love, and we'll read between "
+            "the lines to hand-pick books made just for you.\n"
+            "🔭 <b>Or open Discover</b> to wander New Arrivals, the Book of the "
+            "Day and curated shelves until something clicks.</blockquote>\n"
+            "<i>💡 The more you save, the sharper your picks become.</i>",
+            reply_markup=kb([btn("🔭 Explore Discover", "lib_discover", style="success")],
+                            [btn("🔙 Back to Library", "menu_library", style="danger")]))
         return
 
     rows = [[btn(f"{icon_for(f.get('ext', ''))} {f.get('name', 'Untitled')[:34]}",
                  f"dl:{f['file_unique_id']}", style="success")] for f in picks]
-    rows.append([btn("🔙 Library", "menu_library", style="danger")])
-    await call.message.edit_text(f"🎯 <b>For You</b>\nPicked from {basis}:",
-                                 reply_markup=kb(*rows))
+    rows.append([btn("🔙 Back to Library", "menu_library", style="danger")])
+    await call.message.edit_text(
+        "🎯 <b>For You</b>\n"
+        "<i>Hand-picked, just for your shelf.</i>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>We pulled these from {basis} — and left out anything "
+        "you've already saved, so every title here is a fresh discovery.\n\n"
+        "📖 Tap any book below to open it instantly.</blockquote>\n"
+        "<i>💡 Favourite the ones you enjoy — it keeps these picks beautifully "
+        "on-point.</i>",
+        reply_markup=kb(*rows))

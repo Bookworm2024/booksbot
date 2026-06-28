@@ -11,13 +11,13 @@ from utils.wallet import charge_bgm
 
 # id · shop label · price (BGM) · flair emblem shown on the profile
 FLAIRS = [
-    {"id": "none",   "label": "🚫 None",            "price": 0,   "flair": ""},
-    {"id": "reader", "label": "📖 Bookworm",        "price": 5,   "flair": "📖"},
-    {"id": "star",   "label": "🌟 Star Reader",     "price": 15,  "flair": "🌟"},
-    {"id": "fire",   "label": "🔥 On Fire",         "price": 30,  "flair": "🔥"},
-    {"id": "crown",  "label": "👑 Royal Reader",    "price": 60,  "flair": "👑"},
-    {"id": "dragon", "label": "🐉 Bibliodragon",    "price": 120, "flair": "🐉"},
-    {"id": "galaxy", "label": "🌌 Cosmic Reader",   "price": 250, "flair": "🌌"},
+    {"id": "none",   "label": "🚫 No Flair",          "price": 0,   "flair": ""},
+    {"id": "reader", "label": "📖 Bookworm",          "price": 5,   "flair": "📖"},
+    {"id": "star",   "label": "🌟 Star Reader",       "price": 15,  "flair": "🌟"},
+    {"id": "fire",   "label": "🔥 On Fire",           "price": 30,  "flair": "🔥"},
+    {"id": "crown",  "label": "👑 Royal Reader",      "price": 60,  "flair": "👑"},
+    {"id": "dragon", "label": "🐉 Bibliodragon",      "price": 120, "flair": "🐉"},
+    {"id": "galaxy", "label": "🌌 Cosmic Reader",     "price": 250, "flair": "🌌"},
 ]
 _BY_ID = {f["id"]: f for f in FLAIRS}
 

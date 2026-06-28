@@ -28,13 +28,23 @@ def _is_admin(uid: int) -> bool:
 async def _panel():
     groups = await duplicate_groups(12)
     if not groups:
-        return ("🧹 <b>Duplicates</b>\n\nNo title-duplicate files found. 🎉",
-                kb([btn("🔄 Refresh", "admin_dedupe", style="primary")],
+        return ("✨ <b>Duplicates</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "<i>Your archive is spotless.</i>\n\n"
+                "<blockquote>✅ No title-duplicate files found — every title earns its "
+                "place on the shelf. Pop back anytime to keep things tidy.</blockquote>",
+                kb([btn("🔄 Check Again", "admin_dedupe", style="primary")],
                    [btn("🔙 More Tools", "admin_more", style="primary")]))
     removable = sum(g["count"] - 1 for g in groups)
-    lines = [f"🧹 <b>Duplicate Files</b> — {len(groups)} group(s), "
-             f"~{removable} removable\n━━━━━━━━━━━━━━━━━━",
-             "Tap a group to keep the best copy &amp; delete the rest:"]
+    lines = ["🧹 <b>Duplicate Cleanup</b>\n"
+             "━━━━━━━━━━━━━━━━━━",
+             "<i>Tidy the archive without losing a single read.</i>\n",
+             f"<blockquote>📊 <b>Duplicate groups</b> · <code>{len(groups)}</code>\n"
+             f"🗑 <b>Removable copies</b> · <code>~{removable}</code></blockquote>\n",
+             "<blockquote>Tap a group below and we'll keep the <b>best-deliverable</b> "
+             "copy, then quietly remove the rest. Genuinely different same-title "
+             "editions stay safe — nothing is purged without your tap.</blockquote>",
+             "<i>💡 Pick a group to clean it up.</i>"]
     rows = []
     for g in groups:
         rep = g["ids"][0] if g["ids"] else ""
@@ -48,7 +58,7 @@ async def _panel():
 @router.callback_query(F.data == "admin_dedupe")
 async def cb_dedupe(call: CallbackQuery) -> None:
     if not _is_admin(call.from_user.id):
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("🛡 Admins only — this area is locked.", show_alert=True)
         return
     await call.answer()
     text, markup = await _panel()
@@ -58,15 +68,15 @@ async def cb_dedupe(call: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("dd_clean:"))
 async def cb_clean(call: CallbackQuery) -> None:
     if not _is_admin(call.from_user.id):
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("🛡 Admins only — this area is locked.", show_alert=True)
         return
     fuid = call.data.split(":", 1)[1]
     f = await get_file(fuid)
     if not f or not f.get("name_lc"):
-        await call.answer("That group is already gone.", show_alert=True)
+        await call.answer("That group has already been cleaned — nothing left to remove.", show_alert=True)
     else:
         removed = await clean_group(f["name_lc"])
         await log_action(call.from_user.id, "dedupe", f"{f.get('name','')[:40]} -{removed}")
-        await call.answer(f"🧹 Removed {removed} duplicate(s).", show_alert=True)
+        await call.answer(f"✨ Done — kept the best copy, removed {removed} duplicate(s).", show_alert=True)
     text, markup = await _panel()
     await call.message.edit_text(text, reply_markup=markup)

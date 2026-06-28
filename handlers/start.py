@@ -50,8 +50,8 @@ async def _not_joined(bot, user_id: int) -> list[str]:
 
 def _dashboard_kb():
     return kb(
-        [btn("📚 Request Now", "menu_request", style="primary"),
-         btn("🎮 Play Now", "menu_games", style="success")],
+        [btn("📚 Request a Book", "menu_request", style="primary"),
+         btn("🎮 Play & Earn", "menu_games", style="success")],
         [btn("📖 My Library", "menu_library", style="primary"),
          btn("👤 My Account", "menu_account", style="success")],
         [btn("🛠️ Bot Tools", "menu_tools", style="danger")],
@@ -77,7 +77,7 @@ def _join_kb(missing: list[str]):
     rows = []
     for i, ch in enumerate(missing, 1):
         rows.append([url_btn(f"📢 Join Channel {i}", f"https://t.me/{ch.lstrip('@')}")])
-    rows.append([btn("✅ I've Joined — Verify", "verify_join", style="success")])
+    rows.append([btn("✅ I've Joined — Unlock My Library", "verify_join", style="success")])
     return kb(*rows)
 
 
@@ -89,13 +89,23 @@ async def cmd_start(message: Message, command: CommandObject, state: FSMContext)
     await state.clear()
     if message.chat.type != "private":
         await message.answer(
-            "👋 <b>Hello!</b> Please talk to me in private to use my features.",
+            "👋 <b>Let's continue in private</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>Your library, wallet and rewards are personal to you, so I "
+            "keep them in our private chat.\n\n"
+            "📖 Tap my name and open a direct message — your reading hub is waiting "
+            "there.</blockquote>",
         )
         return
 
     uid = message.chat.id
     if await is_banned(uid):
-        await message.answer("🚫 <b>Access Denied.</b> You are banned from this bot.")
+        await message.answer(
+            "🔒 <b>Access Restricted</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>This account is currently blocked from using the bot.\n\n"
+            "If you believe this is a mistake, reach out to our team and we'll review "
+            "it for you.</blockquote>")
         return
 
     doc = await ensure_user(uid, message.from_user.first_name or "Reader",
@@ -127,7 +137,7 @@ async def cmd_start(message: Message, command: CommandObject, state: FSMContext)
 @router.callback_query(F.data == "verify_join")
 async def cb_verify(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    await call.answer("Checking membership…")
+    await call.answer("Verifying your channels… one moment ✨")
     await _render_gate_or_dashboard(call.message, override_user=call.from_user.id,
                                     first_name=call.from_user.first_name)
 
@@ -139,8 +149,13 @@ async def _render_gate_or_dashboard(message: Message, *, override_user: int = 0,
     missing = await _not_joined(message.bot, uid)
     if missing:
         await message.answer(
-            f"👋 <b>Welcome, {escape(name)}!</b>\n\n"
-            "To access the library, please join our official channels:",
+            f"👋 <b>Welcome, {escape(name)}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>One quick step and your library opens.</i>\n\n"
+            "<blockquote>🔒 To keep the archive free and running, members join our "
+            "official channels first — it takes just a moment.\n\n"
+            "📢 Tap each channel below to join, then press <b>Verify</b> and we'll "
+            "take it from here.</blockquote>",
             reply_markup=_join_kb(missing),
         )
         return
@@ -159,19 +174,32 @@ async def _deeplink_download(message: Message, uid: int, fuid: str) -> None:
     missing = await _not_joined(message.bot, uid)
     if missing:
         await message.answer(
-            "👋 Almost there — join our channels, then tap the link again:",
+            "👋 <b>Almost there</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>Join our official channels below to unlock the archive, then "
+            "tap your link once more — your title will be waiting.</blockquote>",
             reply_markup=_join_kb(missing))
         return
     f = await get_file(fuid)
     if not f:
-        await message.answer("❌ That title is no longer available.",
-                             reply_markup=_dashboard_kb())
+        await message.answer(
+            "🔭 <b>This title has moved on</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>This file is no longer in our archive. It happens — try a "
+            "fresh search and we'll help you find another copy or something even "
+            "better.</blockquote>",
+            reply_markup=_dashboard_kb())
         return
     await message.answer(
-        f"📚 <b>{escape(f.get('name') or 'Your book')}</b>\n{icon_for(f.get('ext',''))} "
-        f".{(f.get('ext') or '').upper()}\n\n💸 1 BCN/BGM to download.",
-        reply_markup=kb([btn("📥 Get it now", f"dl:{fuid}", style="success")],
-                        [btn("🏠 Menu", "menu_home", style="primary")]))
+        f"📚 <b>{escape(f.get('name') or 'Your book')}</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Ready when you are.</i>\n\n"
+        f"<blockquote>📄 <b>Format</b> · {icon_for(f.get('ext',''))} "
+        f"<code>.{(f.get('ext') or '').upper()}</code>\n"
+        f"💸 <b>Delivery</b> · just <code>1</code> 🪙 BCN or 💎 BGM\n\n"
+        "Tap below and it's yours in an instant.</blockquote>",
+        reply_markup=kb([btn("📥 Download Now", f"dl:{fuid}", style="success")],
+                        [btn("🏠 Dashboard", "menu_home", style="primary")]))
 
 
 async def _send_dashboard(message: Message, name: str) -> None:
@@ -188,14 +216,19 @@ async def _send_dashboard(message: Message, name: str) -> None:
     lang = await get_lang(message.chat.id)
     await message.answer(
         lvlup
-        + f"👋 <b>{t('welcome', lang)}, {escape(name)}!</b>\n\n"
+        + f"👋 <b>{t('welcome', lang)}, {escape(name)}!</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
         + (f"{promo}\n\n" if promo else "")
-        + f"✨ <b>{t('ready', lang)}</b>\n\n"
-        "<blockquote>📚 <b>Explore Features:</b>\n"
-        "• Request any eBook or Audiobook\n"
-        "• Manage tokens and your library\n"
-        "• Play games and earn rewards\n"
-        "• Use advanced utility tools</blockquote>\n\n"
+        + f"✨ <i>{t('ready', lang)}</i>\n\n"
+        "<blockquote>📚 <b>Request anything</b> — any eBook or audiobook, delivered "
+        "straight to your chat\n"
+        "📖 <b>Your private library</b> — read, listen, bookmark and pick up right "
+        "where you left off\n"
+        "🎮 <b>Play &amp; earn</b> — games, quests and daily rewards that top up your "
+        "wallet\n"
+        "💼 <b>One smart wallet</b> — 💎 BGM &amp; 🪙 BCN, redeems, gifts and VIP "
+        "perks in one place</blockquote>\n\n"
+        "<i>💡 Pick a tile below to begin — your shelf is ready when you are.</i>\n\n"
         + DASHBOARD_FOOTER,
         reply_markup=await _dashboard_kb_with_ad(),
     )
@@ -212,8 +245,11 @@ async def cb_home(call: CallbackQuery, state: FSMContext) -> None:
     lang = await get_lang(call.from_user.id)
     await call.message.edit_text(
         lvlup
-        + f"👋 <b>{t('welcome', lang)}, {escape(call.from_user.first_name or 'Reader')}!</b>\n\n"
-        f"✨ <b>{t('ready', lang)}</b>",
+        + f"👋 <b>{t('welcome', lang)}, {escape(call.from_user.first_name or 'Reader')}!</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"✨ <i>{t('ready', lang)}</i>\n\n"
+        "<blockquote>You're back at your dashboard. Choose a tile below — request a "
+        "title, open your library, play for rewards or manage your wallet.</blockquote>",
         reply_markup=await _dashboard_kb_with_ad(),
     )
 
@@ -223,7 +259,15 @@ async def cb_library(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await call.answer()
     await call.message.edit_text(
-        "<b>📖 My Library</b>\n\nYour personal reading hub.",
+        "📖 <b>My Library</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Everything you read, save and continue — gathered in one place.</i>\n\n"
+        "<blockquote>🔭 <b>Discover</b> finds your next read, while <b>For You</b> and "
+        "<b>AI Recommendations</b> learn your taste.\n"
+        "📖 <b>Continue Reading</b> reopens your last page; ⭐ <b>Favorites</b>, "
+        "📒 <b>My Shelf</b> and 📌 <b>Reading List</b> keep it all organised.\n"
+        "🎯 Set a <b>Reading Goal</b>, track your 📊 <b>stats</b>, and join "
+        "👥 <b>Book Clubs</b> and 🎯 <b>Challenges</b> to read together.</blockquote>",
         reply_markup=kb(
             [btn("🔭 Discover", "lib_discover", style="success"),
              btn("🎯 For You", "lib_foryou", style="success")],
@@ -247,7 +291,16 @@ async def cb_account(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await call.answer()
     await call.message.edit_text(
-        "<b>👤 My Account</b>\n\nProfile, tokens, rewards and activity.",
+        "👤 <b>My Account</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Your profile, wallet and rewards — all under your control.</i>\n\n"
+        "<blockquote>💼 Check your 💎 <b>BGM</b> &amp; 🪙 <b>BCN</b> balance, top up "
+        "instantly, or claim your 🎁 <b>daily reward</b>.\n"
+        "🎟 <b>Redeem</b> codes, 🎁 <b>gift</b> tokens to friends and earn more through "
+        "<b>referrals</b>, 🚀 <b>quests</b> and 🎁 <b>loot crates</b>.\n"
+        "👑 Unlock <b>VIP</b> perks, 🚨 track your requests, and tune your 🔔 alerts, "
+        "🌐 language and 🆘 support — all in one place.</blockquote>\n\n"
+        "<i>💡 New here? Claim your daily reward to start building your wallet.</i>",
         reply_markup=kb(
             [btn("👤 Profile", "acc_profile", style="primary"),
              btn("💼 Balance", "acc_balance", style="primary")],
@@ -282,8 +335,15 @@ async def cb_tools(call: CallbackQuery, state: FSMContext) -> None:
     if call.from_user.id in ADMIN_IDS:
         rows.append([btn("🛠 Admin Centre", "admin_open", style="danger")])
     rows.append([btn("🔙 Back", "menu_home", style="danger")])
-    await call.message.edit_text("<b>🛠️ Bot Tools</b>\n\nUtilities and system info.",
-                                 reply_markup=kb(*rows))
+    await call.message.edit_text(
+        "🛠️ <b>Bot Tools</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Stats, standings and everything behind the scenes.</i>\n\n"
+        "<blockquote>🏆 Climb the <b>leaderboards</b>, watch the bot's live 📊 "
+        "<b>stats</b>, and skim the public 📜 <b>activity log</b>.\n"
+        "⭐ Love the service? <b>Rate us</b> in a tap, or read the ℹ️ <b>About</b> to "
+        "meet the team behind your library.</blockquote>",
+        reply_markup=kb(*rows))
 
 
 @router.callback_query(F.data == "menu_about")

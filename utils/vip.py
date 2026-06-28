@@ -55,12 +55,13 @@ async def claim_multiplier(uid: int) -> float:
 async def subscribe(uid: int, tier: int) -> tuple[bool, str]:
     cfg = TIERS.get(tier)
     if not cfg:
-        return False, "Unknown tier."
+        return False, "👑 That membership tier isn't available. Choose Silver or Gold to continue."
     db = await MongoManager.get()
     # BGM debit, combined across clusters (no false "insufficient" on a split
     # balance); rolls back a partial debit on failure.
     if not await charge_bgm(uid, cfg["price"]):
-        return False, f"You need {fmt_amount(cfg['price'])} BGM for {cfg['name']}."
+        return False, (f"💎 {cfg['name']} costs {fmt_amount(cfg['price'])} BGM, and your wallet's a "
+                       f"little short right now. Top up your BGM and your membership will be ready and waiting.")
     doc = await db.find_one_global("users", {"user_id": uid}, {"vip_until": 1}) or {}
     cur_until = doc.get("vip_until")
     base = cur_until if isinstance(cur_until, datetime) and cur_until > _now() else _now()
@@ -69,9 +70,11 @@ async def subscribe(uid: int, tier: int) -> tuple[bool, str]:
                          {"$set": {"vip_tier": tier, "vip_until": new_until}})
     if cfg["monthly_bgm"]:
         await add_bgm(uid, cfg["monthly_bgm"])
-    return True, (f"{cfg['emoji']} <b>{cfg['name']} activated!</b>\n"
-                  f"Valid until {new_until.strftime('%d %b %Y')}.\n"
-                  f"🎁 +{fmt_amount(cfg['monthly_bgm'])} BGM granted now.")
+    return True, (f"{cfg['emoji']} <b>Welcome to {cfg['name']}</b>\n"
+                  f"<i>Your membership is live — enjoy every perk.</i>\n"
+                  f"<blockquote>🗓 Active through <b>{new_until.strftime('%d %b %Y')}</b>\n"
+                  f"🎁 We've credited <code>{fmt_amount(cfg['monthly_bgm'])} BGM</code> to your wallet to celebrate.</blockquote>\n"
+                  f"<i>💡 Re-subscribe any time to extend the window — perks pick up right where they left off.</i>")
 
 
 async def badge(uid: int) -> str:

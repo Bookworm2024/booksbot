@@ -65,31 +65,37 @@ async def _balance_view(uid: int):
     ab = int(u.get("audiobook_requests") or 0)
     from utils.vip import badge
     vip = await badge(uid)
-    claim_line = ("🎁 <b>Daily Bonus:</b> READY — /claim now"
-                  if left == 0 else f"🎁 <b>Daily Bonus:</b> in {_fmt_dur(left)}")
+    claim_line = ("🎁 <b>Daily bonus:</b> <i>ready now</i> — tap below to collect"
+                  if left == 0 else f"🎁 <b>Daily bonus:</b> <i>unlocks in {_fmt_dur(left)}</i>")
     text = (
-        "<b>💼 Your Wallet</b>\n"
+        "💼 <b>Your Wallet</b>\n"
         + (f"{vip}\n" if vip else "")
-        + "━━━━━━━━━━━━━━━━━━\n"
-        f"💎 <b>BGM:</b> <code>{fmt_amount(bgm, 3)}</code>  <i>(permanent)</i>\n"
-        f"🪙 <b>BCN:</b> <code>{fmt_amount(bcn, 3)}</code>  <i>(expires 24h)</i>\n"
-        f"⚖️ <b>Total:</b> <code>{fmt_amount(bgm + bcn, 3)}</code>\n\n"
-        f"📚 eBook reqs: <code>{eb}</code>  ·  🎧 Audio reqs: <code>{ab}</code>  ·  "
-        f"📈 Total: <code>{eb + ab}</code>\n\n"
+        + "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>A premium statement of everything you hold.</i>\n"
+        "<blockquote>"
+        f"💎 <b>BGM</b>  <code>{fmt_amount(bgm, 3)}</code>  <i>· permanent, your premium balance</i>\n"
+        f"🪙 <b>BCN</b>  <code>{fmt_amount(bcn, 3)}</code>  <i>· free daily, expires in 24h</i>\n"
+        f"⚖️ <b>Total</b>  <code>{fmt_amount(bgm + bcn, 3)}</code>  <i>· combined spending power</i>"
+        "</blockquote>\n"
+        "<blockquote>"
+        f"📚 eBook requests  <code>{eb}</code>\n"
+        f"🎧 Audiobook requests  <code>{ab}</code>\n"
+        f"📈 Lifetime requests  <code>{eb + ab}</code>"
+        "</blockquote>\n"
         f"{claim_line}"
     )
     # low-balance upsell — surface a gentle prompt when nearly out of tokens
     if bgm + bcn < 1:
-        text += ("\n\n💡 <b>Running low!</b> Use /claim for free BCN, spin the wheel, "
-                 "or top up BGM to keep downloading.")
+        text += ("\n\n💡 <i>Running low — claim your free daily BCN, spin the wheel, "
+                 "or top up BGM and keep your library growing.</i>")
     rows = []
     if left == 0:
         rows.append([btn("⚡ Claim Daily BCN", "do_claim", style="success")])
-    rows.append([btn("💎 Buy BGM", "acc_buy", style="success"),
-                 btn("🎟 Redeem", "acc_redeem", style="primary")])
+    rows.append([btn("💎 Top Up BGM", "acc_buy", style="success"),
+                 btn("🎟 Redeem a Code", "acc_redeem", style="primary")])
     if bcn > 0:
-        rows.append([btn("🔄 Convert BCN→BGM", "convert_bcn", style="primary")])
-    rows.append([btn("🔙 Back", "menu_account", style="danger")])
+        rows.append([btn("💱 Convert BCN → BGM", "convert_bcn", style="primary")])
+    rows.append([btn("🔙 Back to Account", "menu_account", style="danger")])
     return text, kb(*rows)
 
 
@@ -110,9 +116,13 @@ async def cb_balance(call: CallbackQuery) -> None:
 async def _do_claim(uid: int) -> tuple[str, object]:
     left = await seconds_until_claim(uid)
     if left > 0:
-        return (f"⏳ <b>Claim on cooldown.</b>\nNext claim in <b>{_fmt_dur(left)}</b>.",
-                kb([btn("💎 Buy BGM (skip wait)", "acc_buy", style="success")],
-                   [btn("🔙 Back", "menu_account", style="danger")]))
+        return ("⏳ <b>Daily Bonus Resting</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "<blockquote>You have already collected today's free BCN. The reward "
+                f"recharges once a day — your next claim unlocks in <b>{_fmt_dur(left)}</b>.</blockquote>\n"
+                "💡 <i>Can't wait? Top up BGM for instant, permanent balance.</i>",
+                kb([btn("💎 Top Up BGM (skip the wait)", "acc_buy", style="success")],
+                   [btn("🔙 Back to Account", "menu_account", style="danger")]))
     from utils.settings import get_float
     from utils.vip import claim_multiplier
     lo = await get_float("claim_min")
@@ -122,10 +132,15 @@ async def _do_claim(uid: int) -> tuple[str, object]:
     await set_daily_bcn(uid, bonus)
     from utils.missions import mark
     await mark(uid, "claim")
-    return (f"✨ <b>Claim Successful!</b>\n\n💰 <b>+{bonus:.2f} BCN</b>\n"
-            "📅 Valid for 24 hours.",
-            kb([btn("💼 View Balance", "acc_balance", style="primary")],
-               [btn("🔙 Back", "menu_account", style="danger")]))
+    return ("✨ <b>Daily Bonus Collected</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>"
+            f"🪙 <b>+{bonus:.2f} BCN</b> credited to your wallet\n"
+            "⏳ <i>Good for the next 24 hours — spend it before it expires</i>"
+            "</blockquote>\n"
+            "💡 <i>Come back tomorrow to keep your daily streak alive.</i>",
+            kb([btn("💼 View My Wallet", "acc_balance", style="primary")],
+               [btn("🔙 Back to Account", "menu_account", style="danger")]))
 
 
 @router.message(Command("claim"))
@@ -156,8 +171,14 @@ async def cb_redeem(call: CallbackQuery, state: FSMContext) -> None:
 async def _prompt_redeem(message: Message, state: FSMContext) -> None:
     await state.set_state(RedeemFSM.awaiting_code)
     await message.answer(
-        "🎟 <b>Redeem a Code</b>\n\nType or paste your code below.\n"
-        "<i>Codes are case-sensitive and usually one-use per account.</i>",
+        "🎟 <b>Redeem a Code</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Turn a code into instant 💎 BGM, credited the moment it clears.</i>\n"
+        "<blockquote>"
+        "Type or paste your code in the chat below and we'll take it from here.\n"
+        "🔑 <b>Codes are case-sensitive</b> — match it exactly\n"
+        "👤 Most codes are <b>one claim per account</b>"
+        "</blockquote>",
         reply_markup=kb([btn("❌ Cancel", "menu_account", style="danger")]),
     )
 
@@ -174,7 +195,12 @@ async def on_code(message: Message, state: FSMContext) -> None:
 
     doc = await db.find_one_global("codes", {"code": code})
     if not doc:
-        await message.answer("❌ <b>Invalid code.</b> Check for typos and try again.")
+        await message.answer(
+            "❌ <b>That Code Didn't Match</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>We couldn't find a code matching what you entered. Codes are "
+            "case-sensitive, so double-check it character by character and try again.</blockquote>\n"
+            "💡 <i>Reopen 🎟 Redeem from your wallet to give it another go.</i>")
         return
     amount = float(doc.get("amount_per_claim", 0))
 
@@ -183,7 +209,12 @@ async def on_code(message: Message, state: FSMContext) -> None:
     claimed = await db.safe_insert("code_claims", {"code": code, "user_id": uid,
                                                    "at": datetime.now(timezone.utc)})
     if not claimed:
-        await message.answer("⚠️ You have already redeemed this code.")
+        await message.answer(
+            "⚠️ <b>Already Redeemed</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>This code is already on your account — most codes are limited to "
+            "a single claim per member, so there's nothing more to collect here.</blockquote>\n"
+            "💡 <i>Have another code? Open 🎟 Redeem and enter it next.</i>")
         return
 
     # 2) Atomically decrement remaining only if a unit is left. If none, roll
@@ -193,13 +224,24 @@ async def on_code(message: Message, state: FSMContext) -> None:
     if not dec:
         for idx in db.healthy:
             await db.dbs[idx]["code_claims"].delete_one({"code": code, "user_id": uid})
-        await message.answer("❌ <b>Code exhausted.</b> All claims used up.")
+        await message.answer(
+            "❌ <b>Code Fully Claimed</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>This one's a valid code, but every available claim has already "
+            "been taken. Keep an eye out — fresh codes drop in announcements and events.</blockquote>\n"
+            "💡 <i>Watch for our next giveaway to grab the next batch.</i>")
         return
 
     await add_bgm(uid, amount)
     await message.answer(
-        f"✨ <b>Redeemed!</b>\n\n🎁 <b>+{fmt_amount(amount)} BGM</b> added to your wallet.",
-        reply_markup=kb([btn("💼 Check Balance", "acc_balance", style="primary")]),
+        "✨ <b>Code Redeemed</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>"
+        f"🎁 <b>+{fmt_amount(amount)} BGM</b> has landed in your wallet\n"
+        "💎 <i>Permanent balance — ready to spend whenever you are</i>"
+        "</blockquote>\n"
+        "💡 <i>Put it to work on a download, a perk, or your next great read.</i>",
+        reply_markup=kb([btn("💼 View My Wallet", "acc_balance", style="primary")]),
     )
 
 
@@ -232,30 +274,49 @@ async def cb_convert(call: CallbackQuery) -> None:
     tax, min_bgm = await _convert_params()
 
     if bcn <= 0:
-        await call.message.edit_text("You have no BCN to convert.",
-                                     reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
+        await call.message.edit_text(
+            "🪙 <b>No BCN to Convert</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>Your BCN balance is empty right now. Claim your free daily bonus "
+            "or win more in games, then come back to turn it into permanent 💎 BGM.</blockquote>\n"
+            "💡 <i>Tip: BCN expires after 24h — converting locks its value in for good.</i>",
+            reply_markup=kb([btn("🔙 Back to Wallet", "acc_balance", style="danger")]))
         return
     if bgm < min_bgm:
         await call.message.edit_text(
-            f"🔒 <b>Converter Locked</b>\n\nYou must hold at least <b>{fmt_amount(min_bgm)} BGM</b> "
-            f"to use the converter.\nYou have {fmt_amount(bgm)} BGM.",
-            reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
+            "🔒 <b>Converter Locked</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>The BCN → BGM converter unlocks once you hold a minimum premium "
+            f"balance.\n💎 <b>Required:</b> <code>{fmt_amount(min_bgm)} BGM</code>\n"
+            f"💼 <b>You hold:</b> <code>{fmt_amount(bgm)} BGM</code></blockquote>\n"
+            "💡 <i>Top up to reach the threshold and the converter opens right away.</i>",
+            reply_markup=kb([btn("💎 Top Up BGM", "acc_buy", style="success")],
+                            [btn("🔙 Back to Wallet", "acc_balance", style="danger")]))
         return
     if used >= _CONVERT_MONTHLY_CAP:
         await call.message.edit_text(
-            f"🔒 Monthly converter limit reached ({_CONVERT_MONTHLY_CAP}×). Try next month.",
-            reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
+            "🔒 <b>Monthly Limit Reached</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>You've used all of this month's conversions "
+            f"(<code>{_CONVERT_MONTHLY_CAP}×</code>). The allowance refreshes at the start "
+            "of next month — your BCN keeps working in games and downloads until then.</blockquote>",
+            reply_markup=kb([btn("🔙 Back to Wallet", "acc_balance", style="danger")]))
         return
 
     credited = round(bcn * (1 - tax), 3)
     await call.message.edit_text(
-        "<b>🔄 Convert BCN → BGM</b>\n"
-        f"🪙 Converting: <code>{fmt_amount(bcn, 3)} BCN</code>\n"
-        f"🧾 Tax ({fmt_amount(tax * 100)}%): <code>{fmt_amount(bcn * tax, 3)}</code>\n"
-        f"💎 You receive: <code>{fmt_amount(credited, 3)} BGM</code>\n\n"
-        f"Uses this month: {used}/{_CONVERT_MONTHLY_CAP}",
-        reply_markup=kb([btn("✅ Confirm Convert", "convert_do", style="success")],
-                        [btn("🔙 Back", "acc_balance", style="danger")]))
+        "💱 <b>Convert BCN → BGM</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Lock your free daily coins into permanent premium balance.</i>\n"
+        "<blockquote>"
+        f"🪙 <b>Converting</b>  <code>{fmt_amount(bcn, 3)} BCN</code>\n"
+        f"🧾 <b>Tax ({fmt_amount(tax * 100)}%)</b>  <code>−{fmt_amount(bcn * tax, 3)}</code>\n"
+        f"💎 <b>You receive</b>  <code>{fmt_amount(credited, 3)} BGM</code>"
+        "</blockquote>\n"
+        f"📊 <i>Conversions this month: <code>{used}/{_CONVERT_MONTHLY_CAP}</code></i>\n"
+        "💡 <i>This converts your full BCN balance. Confirm to lock it in.</i>",
+        reply_markup=kb([btn("✅ Confirm Conversion", "convert_do", style="success")],
+                        [btn("🔙 Back to Wallet", "acc_balance", style="danger")]))
 
 
 @router.callback_query(F.data == "convert_do")
@@ -268,7 +329,9 @@ async def cb_convert_do(call: CallbackQuery) -> None:
     used = udoc.get("convert_count", 0) if udoc.get("convert_month") == _month_key() else 0
     tax, min_bgm = await _convert_params()
     if bcn <= 0 or bgm < min_bgm or used >= _CONVERT_MONTHLY_CAP:
-        await call.answer("Conditions no longer met.", show_alert=True)
+        await call.answer(
+            "The conversion conditions have changed since this preview. Reopen the "
+            "converter from your wallet to see the latest numbers.", show_alert=True)
         return
     await call.answer()
     # Atomically zero bookcoin across ALL clusters, returning the TOTAL drained so
@@ -276,8 +339,12 @@ async def cb_convert_do(call: CallbackQuery) -> None:
     # what we zeroed. A concurrent second tap drains 0 → no double credit.
     drained = await drain_bcn(uid)
     if drained <= 0:
-        await call.message.edit_text("Nothing to convert.",
-                                     reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
+        await call.message.edit_text(
+            "🪙 <b>Nothing Left to Convert</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>Your BCN balance just reached zero, so there's nothing to "
+            "convert right now. Claim your daily bonus and it'll be ready again.</blockquote>",
+            reply_markup=kb([btn("🔙 Back to Wallet", "acc_balance", style="danger")]))
         return
     await db.safe_update("users", {"user_id": uid},
                          {"$set": {"convert_month": _month_key(), "convert_count": used + 1}})
@@ -289,83 +356,115 @@ async def cb_convert_do(call: CallbackQuery) -> None:
                          credited, uid, drained)
         await add_bcn(uid, drained)
         await call.message.edit_text(
-            "⚠️ Conversion hit a snag — your BCN was restored. Please try again.",
-            reply_markup=kb([btn("🔙 Back", "acc_balance", style="danger")]))
+            "⚠️ <b>Conversion Hit a Snag</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>Something interrupted the conversion, so we safely restored your "
+            "full BCN balance — nothing was lost. Please give it another try in a moment.</blockquote>",
+            reply_markup=kb([btn("💱 Try Again", "convert_bcn", style="success")],
+                            [btn("🔙 Back to Wallet", "acc_balance", style="danger")]))
         return
     text, markup = await _balance_view(uid)
-    await call.message.edit_text(f"✅ Converted to <b>{fmt_amount(credited, 3)} BGM</b>.\n\n" + text,
-                                 reply_markup=markup)
+    await call.message.edit_text(
+        "✨ <b>Conversion Complete</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>💎 <b>+{fmt_amount(credited, 3)} BGM</b> locked into your permanent "
+        "balance — your daily coins now carry forward for good.</blockquote>\n\n" + text,
+        reply_markup=markup)
 
 
 # ── /create (admin) ────────────────────────────────────────────────────────────
 @router.message(Command("create"))
 async def cmd_create(message: Message, command: CommandObject) -> None:
     if message.chat.id not in ADMIN_IDS:
-        await message.answer("🚫 Access denied.")
+        await message.answer("🛡 <b>Admins Only</b>\n<i>This command mints redeem codes and is restricted to the team.</i>")
         return
     parts = (command.args or "").split()
     if len(parts) != 2 or not all(p.replace(".", "").isdigit() for p in parts):
-        await message.answer("❌ Usage: <code>/create &lt;max_claims&gt; &lt;total_bgm&gt;</code>\n"
-                             "Example: <code>/create 20 50</code> → 2.5 BGM each.")
+        await message.answer(
+            "🛡 <b>Mint a Redeem Code</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>"
+            "<b>Usage</b>  <code>/create &lt;max_claims&gt; &lt;total_bgm&gt;</code>\n"
+            "<b>Example</b>  <code>/create 20 50</code>  →  20 claims at <code>2.5 BGM</code> each"
+            "</blockquote>\n"
+            "💡 <i>The total is split evenly across every claim.</i>")
         return
     max_claims, total = int(parts[0]), float(parts[1])
     if max_claims <= 0 or total <= 0:
-        await message.answer("❌ Max claims and total BGM must be > 0.")
+        await message.answer("⚠️ <b>Values Out of Range</b>\n<i>Both the claim count and total BGM must be greater than zero.</i>")
         return
     code, per = await _mint_code(max_claims, total, message.chat.id)
     await message.answer(
-        "✅ <b>Redeem Code Created</b>\n\n"
-        f"🎟️ <code>{code}</code>\n🧮 Claims: {max_claims}\n"
-        f"💸 Per user: {fmt_amount(per, 3)} BGM\n💰 Total: {fmt_amount(total)} BGM")
+        "✅ <b>Redeem Code Minted</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>"
+        f"🎟️ <b>Code</b>  <code>{code}</code>\n"
+        f"🧮 <b>Claims</b>  <code>{max_claims}</code>\n"
+        f"💸 <b>Per user</b>  <code>{fmt_amount(per, 3)} BGM</code>\n"
+        f"💰 <b>Total loaded</b>  <code>{fmt_amount(total)} BGM</code>"
+        "</blockquote>\n"
+        "💡 <i>Share the code — members claim it via 🎟 Redeem.</i>")
 
 
 # ── 🎟️ Create Code (admin panel — interactive) ─────────────────────────────────
 @router.callback_query(F.data == "admin_create")
 async def cb_admin_create(call: CallbackQuery, state: FSMContext) -> None:
     if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("Admins only — this tool mints redeem codes for the team.", show_alert=True)
         return
     await call.answer()
     await state.set_state(RedeemFSM.cc_max)
     await call.message.answer(
-        "🎟️ <b>Create Redeem Code</b>\n\nHow many users can claim it? "
-        "Send a whole number. /cancel to abort.")
+        "🛡 <b>Create a Redeem Code</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Step 1 of 2 — set how many members can claim it.</i>\n"
+        "<blockquote>Send a whole number for the total claims (e.g. <code>20</code>).\n"
+        "Type /cancel anytime to abort.</blockquote>")
 
 
 @router.message(RedeemFSM.cc_max, F.text)
 async def cc_max_in(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     if raw.lower() == "/cancel":
-        await state.clear(); await message.answer("❌ Cancelled."); return
+        await state.clear(); await message.answer("❌ <b>Cancelled</b>\n<i>No code was created.</i>"); return
     if not raw.isdigit() or int(raw) <= 0:
-        await message.answer("❌ Send a whole number greater than 0.")
+        await message.answer("⚠️ <b>Invalid Count</b>\n<i>Send a whole number greater than 0 for the claim count.</i>")
         return
     await state.update_data(max_claims=int(raw))
     await state.set_state(RedeemFSM.cc_total)
-    await message.answer("💰 Total <b>BGM</b> to load into the code (split across claims)? "
-                         "e.g. <code>50</code>")
+    await message.answer(
+        "🛡 <b>Create a Redeem Code</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Step 2 of 2 — set the reward pool.</i>\n"
+        "<blockquote>How much total 💎 <b>BGM</b> should the code hold? It'll be split "
+        "evenly across every claim (e.g. <code>50</code>).</blockquote>")
 
 
 @router.message(RedeemFSM.cc_total, F.text)
 async def cc_total_in(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     if raw.lower() == "/cancel":
-        await state.clear(); await message.answer("❌ Cancelled."); return
+        await state.clear(); await message.answer("❌ <b>Cancelled</b>\n<i>No code was created.</i>"); return
     try:
         total = float(raw)
         if total <= 0:
             raise ValueError
     except ValueError:
-        await message.answer("❌ Send a positive number.")
+        await message.answer("⚠️ <b>Invalid Amount</b>\n<i>Send a positive number for the total BGM to load.</i>")
         return
     data = await state.get_data()
     await state.clear()
     max_claims = int(data.get("max_claims", 1))
     code, per = await _mint_code(max_claims, total, message.chat.id)
     await message.answer(
-        "✅ <b>Redeem Code Created</b>\n\n"
-        f"🎟️ <code>{code}</code>\n🧮 Claims: {max_claims}\n"
-        f"💸 Per user: {fmt_amount(per, 3)} BGM\n💰 Total: {fmt_amount(total)} BGM\n\n"
-        "Share the code — users claim it via 🎟 Redeem.",
-        reply_markup=kb([btn("🎟️ Create Another", "admin_create", style="success")],
-                        [btn("🔙 Admin", "admin_open", style="primary")]))
+        "✅ <b>Redeem Code Minted</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>"
+        f"🎟️ <b>Code</b>  <code>{code}</code>\n"
+        f"🧮 <b>Claims</b>  <code>{max_claims}</code>\n"
+        f"💸 <b>Per user</b>  <code>{fmt_amount(per, 3)} BGM</code>\n"
+        f"💰 <b>Total loaded</b>  <code>{fmt_amount(total)} BGM</code>"
+        "</blockquote>\n"
+        "💡 <i>Share the code — members claim it via 🎟 Redeem.</i>",
+        reply_markup=kb([btn("🎟️ Mint Another Code", "admin_create", style="success")],
+                        [btn("🔙 Back to Admin", "admin_open", style="primary")]))

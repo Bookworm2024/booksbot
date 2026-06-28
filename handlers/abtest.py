@@ -52,36 +52,51 @@ async def _gate(uid: int) -> bool:
 @router.callback_query(F.data == "admin_abtest")
 async def cb_abtest(call: CallbackQuery, state: FSMContext) -> None:
     if not await _gate(call.from_user.id):
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("You don't have the broadcast permission for this.", show_alert=True)
         return
     await call.answer()
     await state.set_state(ABFSM.variant_a)
     await call.message.answer(
-        "🧪 <b>A/B Test</b>\n\nSend <b>Variant A</b> (the first message). /cancel to abort.")
+        "🧪 <b>A/B Test</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Test two messages head-to-head, then let the numbers pick the winner.</i>\n\n"
+        "<blockquote>I'll split your audience evenly — half see <b>Variant A</b>, "
+        "half see <b>Variant B</b> — and report exactly how many each reached. "
+        "Compare the response and keep the version that lands.</blockquote>\n\n"
+        "Send <b>Variant A</b> — the first message to test.\n"
+        "<i>Send /cancel anytime to step away.</i>")
 
 
 @router.message(Command("abtest"))
 async def cmd_abtest(message: Message, state: FSMContext) -> None:
     if not await _gate(message.chat.id):
-        await message.answer("🚫 Access denied.")
+        await message.answer("🔒 <b>Not available</b>\n<i>You'll need the broadcast permission to run A/B tests.</i>")
         return
     await state.set_state(ABFSM.variant_a)
-    await message.answer("🧪 <b>A/B Test</b>\n\nSend <b>Variant A</b>. /cancel to abort.")
+    await message.answer(
+        "🧪 <b>A/B Test</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Two messages, one winner — decided by real delivery.</i>\n\n"
+        "Send <b>Variant A</b> to begin.\n"
+        "<i>Send /cancel anytime to step away.</i>")
 
 
 @router.message(ABFSM.variant_a)
 async def on_variant_a(message: Message, state: FSMContext) -> None:
     if (message.text or "").strip().lower() == "/cancel":
-        await state.clear(); await message.answer("❌ Cancelled."); return
+        await state.clear(); await message.answer("❌ No problem — the A/B test was cancelled."); return
     await state.update_data(a_chat=message.chat.id, a_msg=message.message_id)
     await state.set_state(ABFSM.variant_b)
-    await message.answer("✅ Got Variant A. Now send <b>Variant B</b>. /cancel to abort.")
+    await message.answer(
+        "✅ <b>Variant A saved.</b>\n\n"
+        "Now send <b>Variant B</b> — the alternative you'd like to test against it.\n"
+        "<i>Send /cancel anytime to step away.</i>")
 
 
 @router.message(ABFSM.variant_b)
 async def on_variant_b(message: Message, state: FSMContext) -> None:
     if (message.text or "").strip().lower() == "/cancel":
-        await state.clear(); await message.answer("❌ Cancelled."); return
+        await state.clear(); await message.answer("❌ No problem — the A/B test was cancelled."); return
     await state.update_data(b_chat=message.chat.id, b_msg=message.message_id)
     await state.set_state(None)
     db = await MongoManager.get()
@@ -90,22 +105,29 @@ async def on_variant_b(message: Message, state: FSMContext) -> None:
         n = await db.count_global("users", _audience_filter(seg))
         rows.append([btn(f"{label} — {n}", f"ab_aud:{seg}", style="primary")])
     rows.append([btn("❌ Cancel", "menu_home", style="danger")])
-    await message.answer("🧪 <b>Choose audience</b> for the A/B test:", reply_markup=kb(*rows))
+    await message.answer(
+        "🧪 <b>Both variants ready</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Now pick who gets the test.</i>\n\n"
+        "<blockquote>Each segment shows its current reach. The group splits "
+        "evenly between your two variants, so both get a fair shot.</blockquote>\n"
+        "👥 <b>Choose an audience below.</b>",
+        reply_markup=kb(*rows))
 
 
 @router.callback_query(F.data.startswith("ab_aud:"))
 async def cb_aud(call: CallbackQuery, state: FSMContext) -> None:
     if not await _gate(call.from_user.id):
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("You don't have the broadcast permission for this.", show_alert=True)
         return
     seg = call.data.split(":", 1)[1]
     if seg not in SEG_LABELS:
-        await call.answer("Unknown audience", show_alert=True); return
+        await call.answer("That audience isn't recognised — please pick one from the list.", show_alert=True); return
     data = await state.get_data()
     a = (data.get("a_chat"), data.get("a_msg"))
     b = (data.get("b_chat"), data.get("b_msg"))
     if not all(a) or not all(b):
-        await call.answer("Session expired — restart the A/B test.", show_alert=True); return
+        await call.answer("This test session expired — start a fresh A/B test to continue.", show_alert=True); return
     await state.clear()
     aid = _aid()
     db = await MongoManager.get()
@@ -114,7 +136,7 @@ async def cb_aud(call: CallbackQuery, state: FSMContext) -> None:
         "b_chat": b[0], "b_msg": b[1], "sent_a": 0, "sent_b": 0, "failed": 0,
         "status": "running", "started_by": call.from_user.id, "created_at": _now()})
     asyncio.create_task(_run_ab(call.bot, aid))
-    await call.answer("Launching…")
+    await call.answer("Your A/B test is on its way. 🚀")
     await call.message.edit_text(await _card(aid),
                                  reply_markup=kb([btn("🔄 Refresh", f"ab_refresh:{aid}", style="primary")]))
 
@@ -125,13 +147,17 @@ async def _card(aid: str) -> str:
     sa, sb, fa = int(t.get("sent_a") or 0), int(t.get("sent_b") or 0), int(t.get("failed") or 0)
     status = t.get("status", "done")
     icon = {"running": "⚡", "done": "✅"}.get(status, "•")
-    return (f"🧪 <b>A/B Test {aid}</b>\n{icon} <b>{status.upper()}</b>\n"
-            f"👥 Audience: <b>{SEG_LABELS.get(t.get('segment','all'),'all')}</b>\n"
+    label = {"running": "In progress", "done": "Complete"}.get(status, status.title())
+    return (f"🧪 <b>A/B Test · {aid}</b>\n"
+            f"{icon} <b>{label}</b>\n"
+            f"👥 Audience — <b>{SEG_LABELS.get(t.get('segment','all'),'all')}</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            f"🅰️ Variant A delivered: <b>{sa}</b>\n"
-            f"🅱️ Variant B delivered: <b>{sb}</b>\n"
-            f"❌ Failed: <b>{fa}</b>\n\n"
-            "<i>Compare downstream activity between the two groups to pick a winner.</i>")
+            "<blockquote>"
+            f"🅰️ <b>Variant A</b> delivered — <code>{sa}</code>\n"
+            f"🅱️ <b>Variant B</b> delivered — <code>{sb}</code>\n"
+            f"❌ <b>Couldn't reach</b> — <code>{fa}</code>"
+            "</blockquote>\n"
+            "<i>💡 Watch which group reads, claims and returns more — that's your winner.</i>")
 
 
 async def _run_ab(bot, aid: str) -> None:

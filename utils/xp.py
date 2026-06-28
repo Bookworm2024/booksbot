@@ -160,8 +160,12 @@ async def levelup_banner(uid: int) -> str:
     lvl = await pop_levelup(uid)
     if not lvl:
         return ""
-    return (f"🎉 <b>Level Up!</b> You reached <b>Level {lvl}</b> "
-            f"— {title_for(lvl)} (+{level_reward(lvl):g} BGM)\n\n")
+    return (f"🎉 <b>Level Up — welcome to Level {lvl}!</b>\n"
+            f"<i>Your reading earns its rank.</i>\n"
+            f"<blockquote>"
+            f"🏅 New title: <b>{title_for(lvl)}</b>\n"
+            f"🎁 Reward credited: <code>+{level_reward(lvl):g}</code> 💎 BGM"
+            f"</blockquote>\n\n")
 
 
 async def get_progress(uid: int) -> dict:

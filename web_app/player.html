@@ -6,29 +6,84 @@
 <title>Books Provider — Player</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-  :root { color-scheme: light dark; }
-  * { box-sizing: border-box; }
-  body { margin:0; min-height:100vh; display:flex; flex-direction:column; justify-content:center;
-    align-items:center; gap:18px; padding:24px; font-family: system-ui, sans-serif;
-    background: var(--tg-theme-bg-color,#0f1115); color: var(--tg-theme-text-color,#e8e8e8); }
-  h1 { font-size:1.1rem; text-align:center; margin:0; }
-  .disc { font-size:4rem; }
-  input[type=range]{ width:100%; accent-color: var(--tg-theme-button-color,#3390ec); }
-  .times { display:flex; justify-content:space-between; width:100%; font-variant-numeric:tabular-nums; font-size:.85rem; opacity:.8; }
-  .row { display:flex; gap:14px; align-items:center; }
-  button { border:0; border-radius:50%; width:64px; height:64px; font-size:1.5rem; cursor:pointer;
-    background: var(--tg-theme-button-color,#3390ec); color: var(--tg-theme-button-text-color,#fff); }
-  button.sm { width:46px; height:46px; font-size:1rem; background: var(--tg-theme-secondary-bg-color,#1c2027);
-    color: var(--tg-theme-text-color,#e8e8e8); }
-  .speeds button { width:auto; height:auto; border-radius:10px; padding:6px 10px; font-size:.85rem;
-    background: var(--tg-theme-secondary-bg-color,#1c2027); color: var(--tg-theme-text-color,#e8e8e8); }
-  .speeds button.on { background: var(--tg-theme-button-color,#3390ec); color:#fff; }
-  #wrap { width:100%; max-width:420px; display:flex; flex-direction:column; gap:16px; align-items:center; }
-  #msg { text-align:center; }
+  :root {
+    color-scheme: light dark;
+    --bg: var(--tg-theme-bg-color,#0f1115);
+    --fg: var(--tg-theme-text-color,#e8e8e8);
+    --card: var(--tg-theme-secondary-bg-color,#1c2027);
+    --accent: var(--tg-theme-button-color,#3390ec);
+    --accent-fg: var(--tg-theme-button-text-color,#fff);
+    --hint: var(--tg-theme-hint-color,#8b93a1);
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin:0; min-height:100vh; min-height:100dvh; display:flex; flex-direction:column;
+    justify-content:center; align-items:center; gap:18px; padding:28px 24px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--fg);
+    background-image: radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%);
+    -webkit-font-smoothing: antialiased; }
+
+  h1 { font-size:1.18rem; line-height:1.35; font-weight:650; letter-spacing:-0.01em;
+    text-align:center; margin:0; max-width:32ch; }
+
+  /* The cover disc — soft, premium, gently pulsing while it spins up */
+  .disc { font-size:3.4rem; width:148px; height:148px; display:flex; align-items:center;
+    justify-content:center; border-radius:50%;
+    background:
+      radial-gradient(130% 130% at 30% 25%, color-mix(in srgb, var(--accent) 28%, var(--card)), var(--card));
+    box-shadow: 0 18px 48px -16px color-mix(in srgb, var(--accent) 55%, transparent),
+                inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+    animation: breathe 4.5s ease-in-out infinite; }
+  @keyframes breathe { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.035); } }
+  @media (prefers-reduced-motion: reduce){ .disc{ animation:none; } }
+
+  input[type=range]{ width:100%; accent-color: var(--accent); height:6px; cursor:pointer; }
+
+  .times { display:flex; justify-content:space-between; width:100%;
+    font-variant-numeric:tabular-nums; font-size:.82rem; font-weight:600;
+    letter-spacing:0.02em; color: var(--hint); }
+
+  .row { display:flex; gap:14px; align-items:center; justify-content:center; flex-wrap:wrap; }
+
+  /* Primary transport — play/pause */
+  button { border:0; border-radius:50%; width:72px; height:72px; font-size:1.6rem; cursor:pointer;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 92%, #fff 8%), var(--accent));
+    color: var(--accent-fg); display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 12px 30px -10px color-mix(in srgb, var(--accent) 70%, transparent);
+    transition: transform .12s ease, box-shadow .2s ease, background .2s ease, color .2s ease; }
+  button:active { transform: scale(0.93); }
+
+  /* Skip buttons */
+  button.sm { width:54px; height:54px; font-size:.82rem; font-weight:700; letter-spacing:-0.02em;
+    background: var(--card); color: var(--fg);
+    box-shadow: 0 6px 18px -10px rgba(0,0,0,.5); }
+
+  /* Speed + sleep chips */
+  .speeds button { width:auto; height:auto; min-width:48px; border-radius:12px; padding:9px 13px;
+    font-size:.82rem; font-weight:650; letter-spacing:0.01em;
+    background: var(--card); color: var(--fg); box-shadow:none; }
+  .speeds button.on {
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 92%, #fff 8%), var(--accent));
+    color: var(--accent-fg);
+    box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--accent) 70%, transparent); }
+
+  #wrap { width:100%; max-width:420px; display:flex; flex-direction:column; gap:18px;
+    align-items:center; animation: rise .45s cubic-bezier(.2,.8,.25,1) both; }
+  @keyframes rise { from{ opacity:0; transform:translateY(12px); } to{ opacity:1; transform:none; } }
+
+  #msg { text-align:center; font-size:.92rem; line-height:1.5; color: var(--hint); max-width:30ch; }
+
+  /* Tiny labels above the chip rows, injected once via JS-free markup */
+  .lbl { width:100%; text-align:left; font-size:.7rem; font-weight:700; letter-spacing:0.08em;
+    text-transform:uppercase; color: var(--hint); margin:2px 0 -6px; }
+
+  .brand { margin-top:6px; font-size:.74rem; line-height:1.55; text-align:center; color: var(--hint); }
+  .brand a { color: color-mix(in srgb, var(--accent) 75%, var(--fg)); text-decoration:none; font-weight:600; }
 </style>
 </head>
 <body>
-<div id="wrap"><div class="disc">🎧</div><h1 id="title">Loading…</h1><div id="msg"></div></div>
+<div id="wrap"><div class="disc">🎧</div><h1 id="title">Tuning your audiobook…</h1><div id="msg">Just a moment while we pick up where you left off.</div></div>
 
 <script>
 const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
@@ -42,14 +97,20 @@ function saveState(){ fetch("/api/reader/state",{method:"POST",headers:{"Content
   body: JSON.stringify({init_data:INIT, fuid:FUID, position: audio.currentTime})}); }
 
 async function boot(){
-  if(!FUID){ document.getElementById("title").textContent="⚠️ No file."; return; }
+  if(!FUID){ document.getElementById("title").textContent="⚠️ Nothing to play here";
+    document.getElementById("msg").textContent="No audiobook was selected. Head back to the library and tap Listen on any title.";
+    return; }
   try{ state = await (await fetch(`/api/reader/state?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`)).json(); }catch(e){}
   const r = await fetch(`/api/file?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`);
   if(!r.ok){
     const j = await r.json().catch(()=>({}));
-    const m = j.error==="too_large" ? "🎧 Too large to stream — receive it in chat."
-      : j.error==="not_in_library" ? "🔒 Add it to Favorites first." : "❌ Couldn't load audio.";
+    const m = j.error==="too_large" ? "🎧 This one's a big listen"
+      : j.error==="not_in_library" ? "🔒 Save it to start listening" : "❌ We couldn't load this audiobook";
+    const sub = j.error==="too_large" ? "It's too large to stream here — tap back to chat and we'll send the full file straight to you."
+      : j.error==="not_in_library" ? "Add this title to your Favorites first, then reopen the player to begin."
+      : "Something interrupted the stream. Please close this window and try again in a moment.";
     document.getElementById("title").textContent = m;
+    document.getElementById("msg").textContent = sub;
     return;
   }
   const blob = await r.blob();
@@ -59,15 +120,21 @@ async function boot(){
 function buildUI(src){
   wrap.innerHTML = `
     <div class="disc">🎧</div>
+    <h1 id="title">Now Playing</h1>
     <input type="range" id="seek" min="0" max="100" value="0" step="0.1">
     <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
     <div class="row">
-      <button class="sm" id="b15">⏪15</button>
+      <button class="sm" id="b15">⏪ 15</button>
       <button id="play">▶️</button>
-      <button class="sm" id="f15">15⏩</button>
+      <button class="sm" id="f15">15 ⏩</button>
     </div>
+    <div class="lbl">Playback speed</div>
     <div class="row speeds" id="speeds"></div>
-    <div class="row speeds" id="sleep"></div>`;
+    <div class="lbl">Sleep timer</div>
+    <div class="row speeds" id="sleep"></div>
+    <div class="brand">Books Provider · curated &amp; cared for by
+      <a href="https://t.me/bookslibraryofficial">@bookslibraryofficial</a> &amp;
+      <a href="https://t.me/trinityXmods">@trinityXmods</a></div>`;
   audio = new Audio(src);
   const seek=document.getElementById("seek"), cur=document.getElementById("cur"),
         dur=document.getElementById("dur"), play=document.getElementById("play");

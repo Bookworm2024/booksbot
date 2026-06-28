@@ -24,12 +24,17 @@ async def _hub(uid: int):
     lang = await get_lang(uid)
     cur = await get_currency(uid)
     return (
-        "<b>🌐 Language &amp; Currency</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"🗣 Language: <b>{LANGUAGES.get(lang, lang)}</b>\n"
-        f"💱 Currency: <b>{cur}</b>",
-        kb([btn("🗣 Language", "loc_lang", style="primary"),
-            btn("💱 Currency", "loc_cur", style="primary")],
-           [btn("🔙 Account", "menu_account", style="danger")]))
+        "🌐 <b>Language &amp; Currency</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Make the bot speak your language and show prices the way you think about them.</i>\n\n"
+        "<blockquote>"
+        f"🗣 Language · <b>{LANGUAGES.get(lang, lang)}</b>\n"
+        f"💱 Currency · <b>{cur}</b>"
+        "</blockquote>\n"
+        "<i>💡 Currency is for display only — it never changes how you actually pay.</i>",
+        kb([btn("🗣 Change Language", "loc_lang", style="primary"),
+            btn("💱 Change Currency", "loc_cur", style="primary")],
+           [btn("🔙 Back to Account", "menu_account", style="danger")]))
 
 
 @router.callback_query(F.data == "menu_locale")
@@ -59,7 +64,12 @@ async def cb_lang(call: CallbackQuery) -> None:
     if row:
         rows.append(row)
     rows.append([btn("🔙 Back", "menu_locale", style="danger")])
-    await call.message.edit_text(f"🗣 <b>{t('pick_lang', lang)}</b>", reply_markup=kb(*rows))
+    await call.message.edit_text(
+        f"🗣 <b>{t('pick_lang', lang)}</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Tap a language to translate the bot's main surfaces instantly.</i>\n\n"
+        "<i>💡 The ✅ marks your current choice — you can switch back any time.</i>",
+        reply_markup=kb(*rows))
 
 
 @router.callback_query(F.data.startswith("loc_setlang:"))
@@ -90,9 +100,14 @@ async def cb_cur(call: CallbackQuery) -> None:
         rows.append(row)
     rows.append([btn("🔙 Back", "menu_locale", style="danger")])
     await call.message.edit_text(
-        "💱 <b>Display Currency</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"Min purchase ({MIN_BGM_PURCHASE} BGM) ≈ <b>{fmt_cur(min_cost_usd, cur)}</b>\n"
-        "<i>Display only — you still pay via UPI (₹) or crypto ($).</i>",
+        "💱 <b>Display Currency</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>See 💎 BGM prices in the currency you think in — clearer at a glance.</i>\n\n"
+        "<blockquote>"
+        f"📊 Smallest top-up · <code>{MIN_BGM_PURCHASE} BGM</code> ≈ <b>{fmt_cur(min_cost_usd, cur)}</b>\n"
+        "💡 This is a preview only — checkout still settles in UPI (₹) or crypto ($)."
+        "</blockquote>\n"
+        "<i>Tap a currency below — the ✅ shows your current pick.</i>",
         reply_markup=kb(*rows))
 
 
@@ -102,5 +117,5 @@ async def cb_setcur(call: CallbackQuery) -> None:
     if code not in CURRENCIES:
         await call.answer(); return
     await set_currency(call.from_user.id, code)
-    await call.answer(f"Currency: {code} ✅")
+    await call.answer(f"Prices now shown in {code} ✅")
     await cb_cur(call)

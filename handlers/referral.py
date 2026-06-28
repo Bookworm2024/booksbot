@@ -26,12 +26,20 @@ async def _refer_view(uid: int):
     count = int(doc.get("ref_count") or 0)
     link = f"https://t.me/{BOT_USERNAME}?start={uid}"
     text = (
-        "<b>🎁 Refer &amp; Earn</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        "Invite friends and earn <b>+0.5 BGM</b> each (they get <b>+0.25 BGM</b>).\n"
-        "Reward pays out once they join the required channels.\n\n"
-        f"🔗 <b>Your link:</b>\n<code>{link}</code>\n\n"
-        f"📊 <b>Successful referrals:</b> <b>{count}</b>"
+        "🎁 <b>Refer &amp; Earn</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Share the library you love — and we'll reward you for it.</i>\n"
+        "<blockquote>"
+        "💎 You earn <b>+0.5 BGM</b> for every friend who joins.\n"
+        "🎁 They start with a <b>+0.25 BGM</b> welcome gift.\n"
+        "✨ Rewards land the moment they clear the join-gate.\n"
+        "🏆 Hit referral milestones for bonus BGM along the way."
+        "</blockquote>\n"
+        "🔗 <b>Your personal invite link</b>\n"
+        f"<code>{link}</code>\n"
+        "<i>Tap to copy, then share it anywhere.</i>\n\n"
+        f"📊 <b>Verified referrals:</b> <code>{count}</code>\n"
+        "<i>💡 Climb the contest and leaderboard to earn even more.</i>"
     )
     return text, kb([btn("🏁 Monthly Contest", "ref_contest", style="success")],
                     [btn("🏆 Leaderboard", "ref_leaderboard", style="primary"),
@@ -62,21 +70,23 @@ async def cb_contest(call: CallbackQuery) -> None:
     top = await top_month(month, 10)
     db = await MongoManager.get()
     medals = ["🥇", "🥈", "🥉"] + ["🏅"] * 7
-    lines = [f"🏁 <b>Referral Contest</b> · {month}",
-             "<i>Most referrals this month wins BGM!</i>",
-             "🥇 <b>%s</b> · 🥈 <b>%s</b> · 🥉 <b>%s</b> BGM" % tuple(fmt_amount(p) for p in PRIZES),
-             "━━━━━━━━━━━━━━━━━━"]
+    lines = [f"🏁 <b>Monthly Referral Contest</b> · <code>{month}</code>",
+             "━━━━━━━━━━━━━━━━━━━━",
+             "<i>Invite the most friends this month and the podium takes home BGM.</i>",
+             "🏆 <b>Prize pool</b> — 🥇 <code>%s</code> · 🥈 <code>%s</code> · 🥉 <code>%s</code> 💎 BGM" % tuple(fmt_amount(p) for p in PRIZES),
+             "━━━━━━━━━━━━━━━━━━━━"]
     if not top:
-        lines.append("No referrals yet this month — be the first! 🚀")
+        lines.append("<blockquote>🚀 The board is wide open — no referrals yet this month.\nShare your link now and claim the top spot.</blockquote>")
     else:
+        lines.append("👑 <b>This month's leaders</b>")
         for i, t in enumerate(top):
             u = await db.find_one_global("users", {"user_id": t.get("user_id")},
                                          {"first_name": 1}) or {}
             who = escape((u.get("first_name") or "User")[:18])
-            lines.append(f"{medals[i]} {who} — <b>{int(t.get('count') or 0)}</b>")
+            lines.append(f"{medals[i]} {who} — <code>{int(t.get('count') or 0)}</code>")
     mine, rank = await my_stats(call.from_user.id, month)
     if mine:
-        lines.append(f"\n👤 You: <b>{mine}</b> referral(s) · rank <b>#{rank}</b>")
+        lines.append(f"\n👤 <b>Your standing:</b> <code>{mine}</code> referral(s) · rank <code>#{rank}</code>\n<i>💡 Keep sharing — every join climbs you higher.</i>")
     await call.message.edit_text(
         "\n".join(lines),
         reply_markup=kb([btn("🔄 Refresh", "ref_contest", style="primary")],
@@ -91,12 +101,15 @@ async def cb_leaderboard(call: CallbackQuery) -> None:
                                sort=[("ref_count", -1)], limit=10,
                                proj={"user_id": 1, "first_name": 1, "ref_count": 1})
     if not top:
-        body = "No referrals yet — be the first! 🚀"
+        body = "<blockquote>🚀 No champions yet — this hall of fame is waiting for its first name.\nShare your link and be the one to set the pace.</blockquote>"
     else:
         medals = ["🥇", "🥈", "🥉"] + ["🏅"] * 7
-        body = "\n".join(
-            f"{medals[i]} {escape((t.get('first_name') or 'User')[:18])} — <b>{int(t.get('ref_count',0))}</b>"
+        body = "👑 <b>All-time top inviters</b>\n" + "\n".join(
+            f"{medals[i]} {escape((t.get('first_name') or 'User')[:18])} — <code>{int(t.get('ref_count',0))}</code>"
             for i, t in enumerate(top))
     await call.message.edit_text(
-        "<b>🏆 Referral Leaderboard</b>\n━━━━━━━━━━━━━━━━━━\n" + body,
+        "🏆 <b>Referral Leaderboard</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Our most generous members — the readers who keep growing the library.</i>\n\n" + body +
+        "\n\n<i>💡 Every verified friend moves you up the ranks.</i>",
         reply_markup=kb([btn("🔙 Back", "acc_refer", style="danger")]))

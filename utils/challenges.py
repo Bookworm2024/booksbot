@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 
 # key → (emoji, title, description, counter field, target, reward BGM)
 CHALLENGES = [
-    ("read5",   "📚", "Bookworm",      "Download 5 books this month",      "chal_downloads", 5,  1.0),
-    ("read20",  "📖", "Devourer",      "Download 20 books this month",     "chal_downloads", 20, 3.0),
-    ("game10",  "🎮", "Game On",       "Play 10 games this month",         "chal_games",     10, 1.0),
-    ("spin10",  "🎡", "Lucky Spinner", "Spin the wheel 10 times",          "chal_spins",     10, 1.0),
-    ("claim15", "🪙", "Daily Devotee", "Claim daily BCN 15 times",         "chal_claims",    15, 1.5),
+    ("read5",   "📚", "Bookworm",      "Add 5 books to your shelf this month",   "chal_downloads", 5,  1.0),
+    ("read20",  "📖", "Devourer",      "Collect 20 books this month",            "chal_downloads", 20, 3.0),
+    ("game10",  "🎮", "Game On",       "Play 10 games this month",               "chal_games",     10, 1.0),
+    ("spin10",  "🎡", "Lucky Spinner", "Take 10 spins of the wheel",             "chal_spins",     10, 1.0),
+    ("claim15", "🪙", "Daily Devotee", "Claim your daily BCN on 15 days",        "chal_claims",    15, 1.5),
 ]
 
 _FIELDS = {"download": "chal_downloads", "play_game": "chal_games",

@@ -54,17 +54,25 @@ async def _view(uid: int):
     if goal:
         pct = min(100, int(done / goal * 100))
         bars = pct // 10
-        prog = f"{'🟩' * bars}{'⬜' * (10 - bars)} <b>{done}/{goal}</b> ({pct}%)"
+        prog = (f"{'🟩' * bars}{'⬜' * (10 - bars)}\n"
+                f"<b>{done}</b> of <b>{goal}</b> books  ·  <code>{pct}%</code> of the way there")
         if done >= goal:
-            prog += "\n🎉 <b>Goal reached — amazing!</b>"
+            prog += "\n\n🎉 <b>Goal reached — what a year.</b> Every book from here is a bonus."
     else:
-        prog = "No goal set yet — set one to track your year!"
+        prog = ("<i>No goal set yet.</i>\n"
+                "Pick a number you'd love to reach this year and we'll track every "
+                "book toward it for you.")
 
-    text = (f"🎯 <b>Reading Goal · {year}</b>\n━━━━━━━━━━━━━━━━━━\n{prog}\n\n"
-            f"📚 <b>{year} Wrap-up</b>\n"
-            f"📥 Books this year: <b>{done}</b>\n"
-            f"📅 Days read: <b>{days}</b> · ⭐ Favorites: <b>{favs}</b>\n"
-            f"🏷 Top genres: {top}")
+    text = (f"🎯 <b>Reading Goal · {year}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>Your year in books, counted as you go.</i>\n\n"
+            f"<blockquote>{prog}</blockquote>\n"
+            f"📊 <b>Your {year} so far</b>\n"
+            f"<blockquote>📥 Books this year:  <b>{done}</b>\n"
+            f"📅 Days you read:  <b>{days}</b>\n"
+            f"⭐ Favorites saved:  <b>{favs}</b>\n"
+            f"🏷 Top genres:  {top}</blockquote>\n"
+            "<i>💡 Each book you download this year nudges the bar a little higher.</i>")
     return text, kb([btn("🎯 Set / Change Goal", "goal_set", style="success")],
                     [btn("🔙 Library", "menu_library", style="danger")])
 
@@ -86,22 +94,34 @@ async def cb_goal(call: CallbackQuery) -> None:
 async def cb_set(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
     await state.set_state(GoalFSM.setting)
-    await call.message.edit_text("🎯 How many books do you want to read this year? "
-                                 "Send a number (1–999). /cancel to abort.")
+    await call.message.edit_text(
+        "🎯 <b>Set Your Reading Goal</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>One number, and we'll track the whole year toward it.</i>\n\n"
+        "<blockquote>How many books would you love to finish this year?\n\n"
+        "Send any number from <code>1</code> to <code>999</code>. You can change it "
+        "anytime — send <code>/cancel</code> to step back without setting one.</blockquote>")
 
 
 @router.message(GoalFSM.setting, F.text)
 async def on_set(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     if raw.lower() == "/cancel":
-        await state.clear(); await message.answer("❌ Cancelled."); return
+        await state.clear()
+        await message.answer("❌ No problem — your goal is unchanged. Come back whenever "
+                             "you're ready to set one.")
+        return
     await state.clear()
     if not raw.isdigit() or not (1 <= int(raw) <= 999):
-        await message.answer("⚠️ Send a whole number between 1 and 999.")
+        await message.answer("⚠️ <b>That's not quite a goal yet</b>\n\n"
+                             "<blockquote>Send a whole number between <code>1</code> and "
+                             "<code>999</code> — that's your target for the year. "
+                             "Try again, or send <code>/cancel</code> to step back.</blockquote>")
         return
     db = await MongoManager.get()
     await db.safe_update("users", {"user_id": message.chat.id},
                          {"$set": {"read_goal": int(raw)}})
     text, markup = await _view(message.chat.id)
-    await message.answer(f"✅ Goal set: <b>{raw}</b> books this year!\n\n" + text,
+    await message.answer(f"✅ <b>Goal set — {raw} books this year.</b> "
+                         "We'll count every one for you.\n\n" + text,
                          reply_markup=markup)

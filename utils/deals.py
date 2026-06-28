@@ -50,4 +50,5 @@ async def banner() -> str:
         return ""
     mins = int((d["until"] - _now()).total_seconds() // 60)
     when = f"{mins//60}h {mins%60}m" if mins >= 60 else f"{mins}m"
-    return f"🔥 <b>FLASH SALE:</b> +{d['pct']}% bonus BGM on all purchases — ends in {when}!"
+    return (f"🔥 <b>Flash Sale</b> · <code>+{d['pct']}%</code> bonus 💎 BGM on every top-up — "
+            f"<i>ends in {when}</i>")

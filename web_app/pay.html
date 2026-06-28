@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Books Provider — Secure Payment</title>
+<meta name="theme-color" content="#0a0f1c">
+<title>Books Provider — Secure Checkout</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -13,47 +14,59 @@
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 <style>
   :root{
-    --bg:#0b1120; --panel:rgba(17,24,39,.72); --border:rgba(52,211,153,.16);
+    --bg:#0a0f1c; --panel:rgba(15,23,42,.74); --border:rgba(52,211,153,.18);
     --emerald:#34d399; --teal:#22d3ee; --gold:#fbbf24; --red:#f43f5e;
+    --ink:#f4f8fb; --muted:#94a3b8; --faint:#64748b;
     --ui:'Outfit',sans-serif; --mono:'Space Mono',monospace;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body{background:var(--bg);color:#f8fafc;font-family:var(--ui);margin:0;min-height:100vh;overflow-x:hidden;}
-  .glow{position:fixed;width:60vw;height:60vw;border-radius:50%;filter:blur(120px);opacity:.14;z-index:0;pointer-events:none;}
-  .glow-a{top:-20%;left:-10%;background:var(--emerald);}
-  .glow-b{bottom:-20%;right:-10%;background:var(--teal);}
-  .wrap{position:relative;z-index:10;max-width:480px;margin:0 auto;padding:20px 16px 40px;min-height:100vh;display:flex;flex-direction:column;}
-  .panel{background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--border);border-radius:20px;padding:22px;position:relative;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);}
-  .panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--emerald),transparent);opacity:.5;}
+  body{background:
+      radial-gradient(900px 520px at 50% -8%, rgba(52,211,153,.06), transparent 70%),
+      var(--bg);
+    color:var(--ink);font-family:var(--ui);margin:0;min-height:100vh;overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;letter-spacing:.1px;}
+  .glow{position:fixed;width:62vw;height:62vw;border-radius:50%;filter:blur(130px);opacity:.16;z-index:0;pointer-events:none;}
+  .glow-a{top:-22%;left:-12%;background:var(--emerald);}
+  .glow-b{bottom:-22%;right:-12%;background:var(--teal);}
+  .wrap{position:relative;z-index:10;max-width:480px;margin:0 auto;padding:22px 16px 44px;min-height:100vh;display:flex;flex-direction:column;}
+  .panel{background:var(--panel);backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);border:1px solid var(--border);border-radius:22px;padding:24px;position:relative;overflow:hidden;box-shadow:0 18px 48px -12px rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);}
+  .panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--emerald),var(--teal),transparent);opacity:.55;}
   .mono{font-family:var(--mono);}
-  .skeleton{background:linear-gradient(90deg,rgba(255,255,255,.05) 25%,rgba(255,255,255,.1) 50%,rgba(255,255,255,.05) 75%);background-size:200% 100%;animation:sk 1.5s infinite;color:transparent!important;border-radius:6px;}
-  .btn{background:linear-gradient(135deg,rgba(52,211,153,.12),rgba(34,211,238,.12));border:1px solid var(--emerald);border-radius:14px;color:var(--emerald);font-weight:700;padding:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:10px;transition:.25s;cursor:pointer;text-transform:uppercase;letter-spacing:1px;}
-  .btn:active{transform:scale(.98);background:rgba(52,211,153,.2);}
-  .btn:disabled{border-color:#334155;color:#64748b;background:transparent;pointer-events:none;}
-  .btn-d{background:rgba(244,63,94,.06);border:1px solid rgba(244,63,94,.3);color:var(--red);border-radius:14px;font-weight:600;padding:14px;width:100%;transition:.2s;cursor:pointer;}
-  .btn-d:active{background:rgba(244,63,94,.16);transform:scale(.98);}
-  .seg{display:flex;background:rgba(0,0,0,.4);border-radius:12px;padding:4px;margin-bottom:14px;border:1px solid rgba(255,255,255,.05);}
-  .seg-b{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;color:#94a3b8;border-radius:8px;transition:.25s;cursor:pointer;}
-  .seg-b.active{background:var(--panel);color:var(--emerald);border:1px solid var(--border);}
-  .inp{width:100%;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:18px;font-family:var(--mono);font-size:19px;text-align:center;color:#fff;outline:none;letter-spacing:2px;transition:.25s;}
-  .inp:focus{border-color:var(--emerald);background:rgba(52,211,153,.03);}
-  .inp.err{border-color:var(--red);animation:shake .4s;color:var(--red);}
+  .skeleton{background:linear-gradient(90deg,rgba(255,255,255,.05) 25%,rgba(255,255,255,.12) 50%,rgba(255,255,255,.05) 75%);background-size:200% 100%;animation:sk 1.4s ease-in-out infinite;color:transparent!important;border-radius:7px;}
+  .btn{background:linear-gradient(135deg,rgba(52,211,153,.22),rgba(34,211,238,.18));border:1px solid rgba(52,211,153,.55);border-radius:15px;color:#dffaf0;font-weight:700;font-size:14px;padding:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:10px;transition:transform .15s ease,box-shadow .25s ease,background .25s ease;cursor:pointer;text-transform:uppercase;letter-spacing:1.2px;box-shadow:0 10px 26px -10px rgba(52,211,153,.5),inset 0 1px 0 rgba(255,255,255,.12);}
+  .btn:hover{box-shadow:0 14px 34px -10px rgba(52,211,153,.65),inset 0 1px 0 rgba(255,255,255,.16);}
+  .btn:active{transform:scale(.98);background:linear-gradient(135deg,rgba(52,211,153,.3),rgba(34,211,238,.26));}
+  .btn:disabled{border-color:#2a3650;color:#5b6577;background:rgba(255,255,255,.02);box-shadow:none;pointer-events:none;}
+  .btn-d{background:rgba(244,63,94,.07);border:1px solid rgba(244,63,94,.32);color:#fb7185;border-radius:15px;font-weight:600;letter-spacing:.4px;padding:14px;width:100%;transition:.2s;cursor:pointer;}
+  .btn-d:active{background:rgba(244,63,94,.18);transform:scale(.98);}
+  .btn-ghost{background:rgba(148,163,184,.08);border:1px solid rgba(148,163,184,.22);color:var(--ink);font-weight:600;transition:.2s;cursor:pointer;}
+  .btn-ghost:active{transform:scale(.98);background:rgba(148,163,184,.16);}
+  .seg{display:flex;background:rgba(0,0,0,.42);border-radius:13px;padding:4px;margin-bottom:14px;border:1px solid rgba(255,255,255,.06);}
+  .seg-b{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;color:var(--muted);border-radius:9px;transition:.25s;cursor:pointer;letter-spacing:.3px;}
+  .seg-b.active{background:rgba(52,211,153,.1);color:var(--emerald);border:1px solid var(--border);box-shadow:0 2px 10px -4px rgba(52,211,153,.4);}
+  .inp{width:100%;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:18px;font-family:var(--mono);font-size:19px;text-align:center;color:#fff;outline:none;letter-spacing:2px;transition:.25s;}
+  .inp:focus{border-color:var(--emerald);background:rgba(52,211,153,.04);box-shadow:0 0 0 4px rgba(52,211,153,.1);}
+  .inp.err{border-color:var(--red);animation:shake .4s;color:var(--red);box-shadow:0 0 0 4px rgba(244,63,94,.12);}
+  .infobox{width:100%;background:linear-gradient(180deg,rgba(0,0,0,.4),rgba(0,0,0,.2));border:1px solid rgba(255,255,255,.07);border-radius:14px;}
   .step{display:flex;justify-content:space-between;position:relative;margin-bottom:26px;}
-  .step-l{position:absolute;top:16px;left:16.5%;width:67%;height:2px;background:rgba(255,255,255,.1);z-index:0;}
-  .step-f{position:absolute;top:16px;left:16.5%;width:0%;height:2px;background:var(--emerald);z-index:0;transition:width .4s;box-shadow:0 0 10px var(--emerald);}
+  .step-l{position:absolute;top:16px;left:16.5%;width:67%;height:2px;background:rgba(255,255,255,.12);z-index:0;border-radius:2px;}
+  .step-f{position:absolute;top:16px;left:16.5%;width:0%;height:2px;background:linear-gradient(90deg,var(--emerald),var(--teal));z-index:0;transition:width .45s cubic-bezier(.16,1,.3,1);box-shadow:0 0 10px var(--emerald);border-radius:2px;}
   .node{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:8px;width:33.33%;}
-  .circ{width:34px;height:34px;border-radius:50%;background:var(--bg);border:2px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#64748b;transition:.4s;}
-  .nlab{font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:1px;transition:.4s;}
-  .node.active .circ{border-color:var(--emerald);background:rgba(52,211,153,.12);color:var(--emerald);box-shadow:0 0 14px rgba(52,211,153,.3);}
+  .circ{width:34px;height:34px;border-radius:50%;background:var(--bg);border:2px solid rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--faint);transition:.4s;}
+  .nlab{font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:1px;transition:.4s;}
+  .node.active .circ{border-color:var(--emerald);background:rgba(52,211,153,.14);color:var(--emerald);box-shadow:0 0 16px rgba(52,211,153,.35);}
   .node.active .nlab{color:var(--emerald);}
-  .node.done .circ{border-color:var(--emerald);background:var(--emerald);color:#062;}
-  .node.done .nlab{color:#f8fafc;}
-  .ovl{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(5px);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;}
+  .node.done .circ{border-color:var(--emerald);background:var(--emerald);color:#053;box-shadow:0 0 14px rgba(52,211,153,.4);}
+  .node.done .nlab{color:var(--ink);}
+  .ovl{position:fixed;inset:0;background:rgba(3,7,18,.86);backdrop-filter:blur(6px);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;}
   .ovl.show{opacity:1;pointer-events:auto;}
-  .modal{background:#0f172a;border:1px solid var(--border);border-radius:24px;width:90%;max-width:380px;padding:28px 22px;text-align:center;transform:translateY(24px) scale(.96);transition:.3s;}
+  .modal{background:linear-gradient(180deg,#111c33,#0c1426);border:1px solid var(--border);border-radius:24px;width:90%;max-width:380px;padding:30px 24px;text-align:center;transform:translateY(24px) scale(.96);transition:.32s cubic-bezier(.16,1,.3,1);box-shadow:0 24px 60px -16px rgba(0,0,0,.8);}
   .ovl.show .modal{transform:none;}
-  .radar{position:relative;width:140px;height:140px;border-radius:50%;border:1px solid rgba(52,211,153,.3);margin:0 auto;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 30px rgba(52,211,153,.1);background:repeating-radial-gradient(transparent,transparent 15px,rgba(52,211,153,.05) 16px);}
-  .sweep{position:absolute;top:0;left:50%;width:50%;height:50%;background:linear-gradient(90deg,transparent 50%,rgba(52,211,153,.4) 100%);transform-origin:0 100%;border-radius:0 100% 0 0;animation:scan 2s linear infinite;}
+  .radar{position:relative;width:140px;height:140px;border-radius:50%;border:1px solid rgba(52,211,153,.32);margin:0 auto;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 34px rgba(52,211,153,.12);background:repeating-radial-gradient(transparent,transparent 15px,rgba(52,211,153,.05) 16px);}
+  .sweep{position:absolute;top:0;left:50%;width:50%;height:50%;background:linear-gradient(90deg,transparent 50%,rgba(52,211,153,.42) 100%);transform-origin:0 100%;border-radius:0 100% 0 0;animation:scan 2s linear infinite;}
+  .trust{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--faint);font-size:10.5px;font-weight:600;letter-spacing:.4px;}
+  .credit{text-align:center;color:var(--faint);font-size:11px;line-height:1.6;letter-spacing:.2px;}
+  .credit a{color:var(--emerald);text-decoration:none;font-weight:600;}
   @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-6px)}}
   @keyframes scan{from{transform:rotate(0)}to{transform:rotate(360deg)}}
@@ -71,11 +84,11 @@
     <div class="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto mb-4">
       <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
     </div>
-    <h3 class="text-xl font-bold text-white mb-2">Abort Payment?</h3>
-    <p class="text-sm text-slate-400 mb-6">Cancel this order? Only do this if you have <b>not</b> paid yet.</p>
+    <h3 class="text-xl font-bold text-white mb-2">Cancel this order?</h3>
+    <p class="text-sm text-slate-400 mb-6 leading-relaxed">Only cancel if you have <b class="text-white">not paid yet</b>. If you've already sent the money, keep this open — your BookGems will arrive automatically.</p>
     <div class="flex gap-3">
-      <button onclick="closeCancel()" class="flex-1 bg-slate-800 text-white rounded-xl py-3 font-semibold">Go Back</button>
-      <button onclick="doCancel()" id="confirm-cancel" class="flex-1 bg-red-500/20 text-red-400 border border-red-500/50 rounded-xl py-3 font-semibold">Yes, Cancel</button>
+      <button onclick="closeCancel()" class="flex-1 btn-ghost rounded-xl py-3 font-semibold">Keep Order</button>
+      <button onclick="doCancel()" id="confirm-cancel" class="flex-1 bg-red-500/20 text-red-400 border border-red-500/50 rounded-xl py-3 font-semibold">Cancel Order</button>
     </div>
   </div>
 </div>
@@ -83,11 +96,11 @@
 <div class="wrap">
   <header class="flex justify-between items-center mb-6 fade">
     <div class="flex items-center gap-3">
-      <div class="w-11 h-11 rounded-xl bg-[#0f172a] border border-emerald-500/30 shadow-[0_0_15px_rgba(52,211,153,.2)] flex items-center justify-center text-2xl">📚</div>
+      <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#10243a] to-[#0c1426] border border-emerald-500/30 shadow-[0_0_18px_rgba(52,211,153,.22)] flex items-center justify-center text-2xl">📚</div>
       <div>
-        <h1 class="text-lg font-bold text-white leading-tight">Books Provider</h1>
-        <div class="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.2em] flex items-center gap-1">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Secure Payment
+        <h1 class="text-lg font-bold text-white leading-tight tracking-tight">Books Provider</h1>
+        <div class="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.2em] flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Secure Checkout
         </div>
       </div>
     </div>
@@ -99,15 +112,19 @@
 
   <main id="view-main" class="flex flex-col gap-5">
     <div class="panel text-center fade">
-      <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Amount to Pay</p>
+      <p class="text-[11px] font-bold text-slate-400 uppercase tracking-[0.18em] mb-2">Amount Due</p>
       <div class="flex items-baseline justify-center gap-1.5">
         <span id="hero-sym" class="text-3xl font-medium text-slate-400 skeleton">₹</span>
-        <span id="hero-amt" class="text-5xl font-bold text-white tracking-tight skeleton">0.00</span>
+        <span id="hero-amt" class="text-5xl font-extrabold text-white tracking-tight skeleton">0.00</span>
       </div>
       <div id="hero-bgm" class="mt-2 text-sm font-bold text-emerald-300 skeleton">— BGM</div>
-      <div class="mt-3 inline-flex items-center gap-1.5 bg-slate-800/80 border border-slate-700 rounded-full px-3 py-1">
+      <div class="mt-3 inline-flex items-center gap-1.5 bg-slate-800/70 border border-slate-700 rounded-full px-3 py-1">
         <div id="m-dot" class="w-2 h-2 rounded-full bg-slate-500"></div>
         <span id="m-badge" class="text-[11px] font-bold text-slate-300 uppercase tracking-wider skeleton">Initializing…</span>
+      </div>
+      <div class="trust mt-4 pt-4 border-t border-dashed border-slate-700/70">
+        <svg class="w-3.5 h-3.5 text-emerald-400/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Encrypted &amp; verified · Funds go straight to Books Provider
       </div>
     </div>
 
@@ -121,24 +138,26 @@
       </div>
 
       <div id="s1" class="panel flex flex-col items-center">
-        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4">Step 1 · Make Payment</h3>
-        <div class="bg-white p-3 rounded-2xl mb-5"><div id="upi-qr" class="w-44 h-44 flex items-center justify-center bg-slate-100 rounded-lg overflow-hidden"></div></div>
-        <div class="w-full bg-[#0a0f1a] border border-slate-800 rounded-xl p-4 mb-5">
-          <div class="flex justify-between items-center mb-1">
-            <span class="text-[10px] text-slate-400 uppercase tracking-widest">UPI ID</span>
-            <span class="text-[9px] text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-1.5 py-0.5 rounded">VERIFIED</span>
+        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">Step 1 · Send the Payment</h3>
+        <p class="text-xs text-slate-400 text-center mb-4">Scan with any UPI app, or copy the ID below.</p>
+        <div class="bg-white p-3 rounded-2xl mb-5 shadow-[0_8px_24px_-8px_rgba(0,0,0,.6)]"><div id="upi-qr" class="w-44 h-44 flex items-center justify-center bg-slate-100 rounded-lg overflow-hidden"></div></div>
+        <div class="infobox p-4 mb-5">
+          <div class="flex justify-between items-center mb-1.5">
+            <span class="text-[10px] text-slate-400 uppercase tracking-widest">Pay to this UPI ID</span>
+            <span class="text-[9px] font-bold text-emerald-400 bg-emerald-400/10 border border-emerald-400/25 px-1.5 py-0.5 rounded">✓ VERIFIED</span>
           </div>
           <div class="flex justify-between items-center cursor-pointer group" onclick="copyText('upi-id')">
             <code id="upi-id" class="mono text-[15px] font-bold text-emerald-400 skeleton">loading@upi</code>
-            <svg class="w-5 h-5 text-slate-500 group-active:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            <svg class="w-5 h-5 text-slate-500 group-active:text-emerald-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
           </div>
+          <div class="text-[10px] text-slate-500 mt-1.5">Tap to copy</div>
         </div>
-        <ul class="w-full text-xs text-slate-400 space-y-2.5 mb-6">
-          <li class="flex items-start gap-2"><span class="text-emerald-400 font-bold">•</span> Open FamPay, GPay, PhonePe or Paytm.</li>
-          <li class="flex items-start gap-2"><span class="text-emerald-400 font-bold">•</span> Scan the QR or copy the UPI ID above.</li>
-          <li class="flex items-start gap-2"><span class="text-emerald-400 font-bold">•</span> Pay <b>exactly</b> the amount shown at the top.</li>
+        <ul class="w-full text-xs text-slate-400 space-y-2.5 mb-6 leading-relaxed">
+          <li class="flex items-start gap-2.5"><span class="text-emerald-400 font-bold mt-px">1</span> Open FamPay, GPay, PhonePe or Paytm.</li>
+          <li class="flex items-start gap-2.5"><span class="text-emerald-400 font-bold mt-px">2</span> Scan the QR, or paste the UPI ID above.</li>
+          <li class="flex items-start gap-2.5"><span class="text-emerald-400 font-bold mt-px">3</span> Pay the <b class="text-white">exact</b> amount shown at the top.</li>
         </ul>
-        <button onclick="goStep(2)" class="btn">Payment Done
+        <button onclick="goStep(2)" class="btn">I've Paid — Continue
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
         </button>
       </div>
@@ -147,34 +166,34 @@
         <button onclick="goStep(1)" class="absolute top-4 left-4 text-slate-400 p-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
         </button>
-        <h3 class="text-lg font-bold text-white mb-2 mt-2">Submit Payment ID</h3>
-        <p class="text-xs text-slate-400 text-center mb-5 px-4">Enter the reference from your receipt so we can match your transfer.</p>
+        <h3 class="text-lg font-bold text-white mb-2 mt-2">Confirm Your Transfer</h3>
+        <p class="text-xs text-slate-400 text-center mb-5 px-4 leading-relaxed">Enter the reference number from your payment receipt so we can match it to your order.</p>
         <div class="seg w-full">
-          <div class="seg-b active" id="tab-bank" onclick="switchTab('bank')">Bank Apps</div>
+          <div class="seg-b active" id="tab-bank" onclick="switchTab('bank')">Bank / UPI Apps</div>
           <div class="seg-b" id="tab-fam" onclick="switchTab('fam')">FamPay</div>
         </div>
         <div class="w-full relative mb-3">
           <input type="text" id="utr" class="inp uppercase" placeholder="12-DIGIT UTR" autocomplete="off" oninput="onUtr()">
           <div id="utr-fb" class="absolute -bottom-5 right-2 text-[10px] font-bold text-slate-500">Awaiting input</div>
         </div>
-        <div id="help-bank" class="w-full bg-[#0a0f1a] border border-slate-800 rounded-xl p-4 mb-5 mt-4">
-          <p class="text-[11px] text-slate-400 leading-relaxed"><strong class="text-emerald-400">Where to find UTR?</strong><br>A <b>12-digit number</b> in your transaction history, labelled <i>UTR, UPI Ref No, or Transaction ID</i>.</p>
+        <div id="help-bank" class="infobox p-4 mb-5 mt-4">
+          <p class="text-[11px] text-slate-400 leading-relaxed"><strong class="text-emerald-400">Where do I find the UTR?</strong><br>It's the <b class="text-slate-200">12-digit number</b> in your transaction details, shown as <i>UTR, UPI Ref No.</i> or <i>Transaction ID</i>.</p>
         </div>
-        <div id="help-fam" class="hide w-full bg-[#0a0f1a] border border-slate-800 rounded-xl p-4 mb-5 mt-4">
-          <p class="text-[11px] text-slate-400 leading-relaxed"><strong class="text-emerald-400">Where to find FamPay ID?</strong><br>Open FamApp history, tap the transaction, copy the ID — it starts with <b>FMPIB…</b></p>
+        <div id="help-fam" class="hide infobox p-4 mb-5 mt-4">
+          <p class="text-[11px] text-slate-400 leading-relaxed"><strong class="text-emerald-400">Where do I find the FamPay ID?</strong><br>Open your FamApp history, tap the transaction, and copy the ID — it starts with <b class="text-slate-200">FMPIB…</b></p>
         </div>
-        <button id="submit-utr" onclick="submitUtr()" disabled class="btn">Verify Payment</button>
+        <button id="submit-utr" onclick="submitUtr()" disabled class="btn">Confirm Payment</button>
       </div>
 
       <div id="s3" class="hide panel flex flex-col items-center py-8 text-center">
         <div class="radar mb-8" id="radar"><div class="sweep"></div>
           <svg class="w-8 h-8 text-emerald-400 relative z-10 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         </div>
-        <h3 id="radar-t" class="text-sm font-bold text-emerald-400 uppercase tracking-widest mb-3">Verifying Payment</h3>
-        <p class="text-xs text-slate-400 leading-relaxed px-4 mb-6">Checking reference <b class="text-white mono" id="show-utr">…</b><br>You can safely close this — we'll credit your BGM and notify you in the bot the moment it lands.</p>
+        <h3 id="radar-t" class="text-sm font-bold text-emerald-400 uppercase tracking-widest mb-3">Verifying Your Payment</h3>
+        <p class="text-xs text-slate-400 leading-relaxed px-4 mb-6">Matching reference <b class="text-white mono" id="show-utr">…</b><br>Feel free to close this window — we'll credit your BookGems and ping you in the bot the moment it clears.</p>
         <div id="radar-badge" class="bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
           <div class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></div>
-          <span class="text-[10px] font-bold text-emerald-200 uppercase tracking-wider">Awaiting settlement</span>
+          <span class="text-[10px] font-bold text-emerald-200 uppercase tracking-wider">Confirming with bank</span>
         </div>
       </div>
     </div>
@@ -182,18 +201,18 @@
     <!-- Crypto flow -->
     <div id="flow-crypto" class="hide flex-col gap-5 fade">
       <div class="panel flex flex-col items-center text-center">
-        <div class="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center mb-5 border border-amber-500/30 text-3xl">🪙</div>
-        <h3 class="text-lg font-bold text-white mb-2">Crypto Checkout</h3>
-        <p class="text-xs text-slate-400 mb-4 px-2">Pay with any coin enabled on OxaPay — USDT (TRC-20/ERC-20/BEP-20), BTC, ETH, USDC, BNB, TRX, LTC, DOGE & more. BGM is credited automatically once the network confirms.</p>
-        <div class="w-full bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 mb-5 text-left">
-          <p class="text-[11px] text-amber-200 leading-relaxed">ℹ️ <b>OxaPay is an independent payment platform.</b> A small processing fee may be added on top of the amount above — the exact total is shown on the OxaPay page before you confirm. <span class="text-amber-300/70">Your wallet also pays the standard blockchain network (gas) fee, which varies by coin.</span></p>
+        <div class="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center mb-5 border border-amber-500/30 text-3xl shadow-[0_0_18px_rgba(251,191,36,.18)]">🪙</div>
+        <h3 class="text-lg font-bold text-white mb-2">Pay with Crypto</h3>
+        <p class="text-xs text-slate-400 mb-4 px-2 leading-relaxed">Use any coin supported by OxaPay — USDT (TRC-20 / ERC-20 / BEP-20), BTC, ETH, USDC, BNB, TRX, LTC, DOGE and more. Your BookGems are credited automatically the moment the network confirms.</p>
+        <div class="w-full bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 mb-5 text-left">
+          <p class="text-[11px] text-amber-200 leading-relaxed">ℹ️ <b>OxaPay is an independent payment platform.</b> A small processing fee may be added to the amount above — you'll see the exact total on the OxaPay page before you confirm. <span class="text-amber-300/70">Your wallet also pays the usual blockchain network (gas) fee, which varies by coin.</span></p>
         </div>
-        <button id="crypto-open" onclick="openCheckout()" class="btn">Open OxaPay Checkout
+        <button id="crypto-open" onclick="openCheckout()" class="btn">Continue to OxaPay
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m6.328-2.828a4 4 0 015.656 0l1.5 1.5a4 4 0 010 5.656l-1.5 1.5"/></svg>
         </button>
         <div id="crypto-wait" class="hide mt-5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
           <div class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></div>
-          <span class="text-[10px] font-bold text-emerald-200 uppercase tracking-wider">Waiting for confirmation</span>
+          <span class="text-[10px] font-bold text-emerald-200 uppercase tracking-wider">Awaiting network confirmation</span>
         </div>
       </div>
     </div>
@@ -205,20 +224,28 @@
         <div class="text-[9px] mono text-slate-500" id="rid">ID: ——</div>
       </div>
       <div class="space-y-3">
-        <div class="flex justify-between items-center"><span class="text-xs text-slate-300">BookGems</span><span class="text-xs mono text-white skeleton" id="l-bgm">—</span></div>
+        <div class="flex justify-between items-center"><span class="text-xs text-slate-300">💎 BookGems (BGM)</span><span class="text-xs mono text-white skeleton" id="l-bgm">—</span></div>
         <div class="flex justify-between items-center"><span class="text-xs text-slate-300">Bonus BGM</span><span class="text-xs mono text-emerald-400 skeleton" id="l-bonus">+0</span></div>
       </div>
       <div class="mt-4 pt-4 border-t border-slate-700 flex justify-between items-end">
-        <span class="text-sm font-bold text-white uppercase tracking-wider">Total</span>
-        <span id="l-total" class="text-xl font-bold text-emerald-400 skeleton">—</span>
+        <span class="text-sm font-bold text-white uppercase tracking-wider">You Receive</span>
+        <span id="l-total" class="text-xl font-extrabold text-emerald-400 skeleton">—</span>
       </div>
     </div>
 
     <div class="flex gap-3 mt-2 fade">
-      <button onclick="openCancel()" class="btn-d flex-1">Abort</button>
-      <button onclick="tg.showAlert('If your funds are debited but BGM is not credited within ~15 minutes, contact support in the bot with your UTR / transaction ID.')" class="bg-slate-800 border border-slate-700 text-white font-semibold px-4 flex items-center justify-center rounded-[14px]">
-        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <button onclick="openCancel()" class="btn-d flex-1">Cancel Order</button>
+      <button onclick="tg.showAlert('Already paid but no BookGems after ~15 minutes? Message support inside the bot with your UTR / transaction ID and we will sort it out right away.')" class="btn-ghost px-4 flex items-center justify-center rounded-[15px]">
+        <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       </button>
+    </div>
+
+    <div class="credit mt-5 fade">
+      <div class="trust mb-1.5">
+        <svg class="w-3 h-3 text-emerald-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        256-bit encrypted · Powered by Books Provider
+      </div>
+      Operated with care by <a>@bookslibraryofficial</a> &amp; <a>@trinityXmods</a> and team
     </div>
   </main>
 
@@ -229,9 +256,10 @@
         <svg class="w-12 h-12 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
       </div>
     </div>
-    <h2 class="text-3xl font-bold text-white mb-3">Payment Verified</h2>
-    <p id="success-sub" class="text-sm text-slate-400 mb-8 max-w-[280px] mx-auto leading-relaxed">Your BookGems have been credited to your wallet.</p>
-    <button onclick="tg.close()" class="btn">Back to Bot</button>
+    <h2 class="text-3xl font-bold text-white mb-3">Payment Confirmed</h2>
+    <p id="success-sub" class="text-sm text-slate-400 mb-8 max-w-[280px] mx-auto leading-relaxed">Your BookGems are in your wallet. Happy reading!</p>
+    <button onclick="tg.close()" class="btn">Return to Books Provider</button>
+    <p class="credit mt-6">Thank you for supporting <a>@bookslibraryofficial</a> &amp; <a>@trinityXmods</a></p>
   </div>
 
   <div id="view-end" class="hide flex-grow flex-col justify-center items-center text-center px-4 fade">
@@ -239,15 +267,16 @@
       <svg class="w-12 h-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
     </div>
     <h2 id="end-t" class="text-3xl font-bold text-white mb-3">Order Closed</h2>
-    <p id="end-d" class="text-sm text-slate-400 mb-8 max-w-[280px] mx-auto leading-relaxed">This order was cancelled. No BGM was charged.</p>
-    <button onclick="tg.close()" class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl py-4 font-bold text-sm">Close</button>
+    <p id="end-d" class="text-sm text-slate-400 mb-8 max-w-[280px] mx-auto leading-relaxed">This order was cancelled. No BookGems were charged.</p>
+    <button onclick="tg.close()" class="btn-ghost w-full rounded-xl py-4 font-bold text-sm">Back to Books Provider</button>
+    <p class="credit mt-6">Need a hand? Reach <a>@bookslibraryofficial</a> or <a>@trinityXmods</a> in the bot</p>
   </div>
 </div>
 
 <script>
 const tg = window.Telegram.WebApp;
 tg.expand(); tg.ready();
-try { tg.setHeaderColor('#0b1120'); tg.setBackgroundColor('#0b1120'); } catch(e){}
+try { tg.setHeaderColor('#0a0f1c'); tg.setBackgroundColor('#0a0f1c'); } catch(e){}
 
 const q = new URLSearchParams(location.search);
 const orderId = q.get('order_id');
@@ -324,12 +353,12 @@ async function submitUtr(){
     try{tg.HapticFeedback.notificationOccurred('error');}catch(_){}
     i.classList.add('err'); setTimeout(()=>i.classList.remove('err'),400);
     b.innerText = e.message && e.message!=='failed' ? e.message : 'Error — try again';
-    setTimeout(()=>{ b.disabled=false; b.innerText='Verify Payment'; },2200);
+    setTimeout(()=>{ b.disabled=false; b.innerText='Confirm Payment'; },2200);
   }
 }
 
 function openCheckout(){
-  if(!payUrl){ tg.showAlert('Checkout link not ready yet — please wait a moment and retry.'); return; }
+  if(!payUrl){ tg.showAlert('Your checkout link is almost ready — please wait a moment and try again.'); return; }
   document.getElementById('crypto-wait').classList.remove('hide');
   try{ tg.openLink(payUrl); }catch(e){ location.href=payUrl; }
 }
@@ -337,13 +366,13 @@ function openCheckout(){
 function openCancel(){ try{tg.HapticFeedback.impactOccurred('medium');}catch(e){} document.getElementById('cancel-modal').classList.add('show'); }
 function closeCancel(){ document.getElementById('cancel-modal').classList.remove('show'); }
 async function doCancel(){
-  const b=document.getElementById('confirm-cancel'); b.disabled=true; b.innerText='Aborting…';
+  const b=document.getElementById('confirm-cancel'); b.disabled=true; b.innerText='Cancelling…';
   try{
     const r=await fetch('/api/pay/cancel',{method:'POST',headers:H,body:JSON.stringify({order_id:orderId})});
     const d=await r.json().catch(()=>null);
     if(!r.ok||!d||!d.success) throw new Error((d&&d.error)||'Cancel failed');
-    closeCancel(); terminalEnd('Aborted','This order was cancelled. No BGM was charged.');
-  }catch(e){ b.disabled=false; b.innerText='Yes, Cancel'; try{tg.showAlert('Could not cancel: '+(e.message||'error')+'. It may already be processing — check the bot.');}catch(_){}}
+    closeCancel(); terminalEnd('Order Cancelled','No worries — this order was cancelled and no BookGems were charged.');
+  }catch(e){ b.disabled=false; b.innerText='Cancel Order'; try{tg.showAlert('We couldn\'t cancel this just yet: '+(e.message||'error')+'. It may already be processing — please check the bot.');}catch(_){}}
 }
 
 let gTimer=null;
@@ -366,10 +395,10 @@ function schedule(ms){ clearTimeout(pollTimer); pollTimer=setTimeout(poll,ms); }
 async function poll(){
   try{
     const r=await fetch('/api/pay/status?order_id='+encodeURIComponent(orderId),{headers:{'X-Telegram-Init-Data':INIT}});
-    if(!r.ok){ if(r.status===401||r.status===403||r.status===404){ terminalEnd('Invalid Link','We could not load this order. Reopen it from the bot.'); return; } schedule(4000); return; }
+    if(!r.ok){ if(r.status===401||r.status===403||r.status===404){ terminalEnd('Link Expired','We couldn\'t load this order. Please reopen the payment from the bot.'); return; } schedule(4000); return; }
     const d=await r.json();
     if(d.status==='paid'){ terminalSuccess(); return; }
-    if(['cancelled','expired','failed'].includes(d.status)){ terminalEnd('Order Closed','This order is no longer active. No BGM was charged.'); return; }
+    if(['cancelled','expired','failed'].includes(d.status)){ terminalEnd('Order Closed','This order is no longer active. No BookGems were charged.'); return; }
 
     if(!built){
       built=true;
@@ -412,7 +441,7 @@ async function poll(){
 }
 
 if(orderId) poll();
-else terminalEnd('Invalid Link','Missing order reference — reopen this page from the bot.');
+else terminalEnd('Link Expired','This payment link is missing its order reference. Please reopen it from the bot.');
 </script>
 </body>
 </html>

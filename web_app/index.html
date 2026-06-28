@@ -6,26 +6,128 @@
   <title>Books Provider — Mini App</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    :root { color-scheme: light dark; }
-    body {
-      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: var(--tg-theme-bg-color, #0f1115);
-      color: var(--tg-theme-text-color, #e8e8e8);
-      display: grid; place-items: center; min-height: 100vh; text-align: center;
+    :root {
+      color-scheme: light dark;
+      --accent: var(--tg-theme-button-color, #3390ec);
+      --accent-text: var(--tg-theme-button-text-color, #ffffff);
+      --ink: var(--tg-theme-text-color, #e8e8e8);
+      --muted: var(--tg-theme-hint-color, #8b95a3);
+      --surface: var(--tg-theme-secondary-bg-color, #1a1e26);
+      --link: var(--tg-theme-link-color, #6ab3f3);
     }
-    .card { padding: 2rem; max-width: 22rem; }
-    h1 { font-size: 1.4rem; margin: 0 0 .5rem; }
-    p  { opacity: .75; line-height: 1.5; }
-    .credit { font-size: .8rem; opacity: .6; margin-top: 1.25rem; }
-    .credit a { color: var(--tg-theme-link-color, #6ab3f3); text-decoration: none; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background:
+        radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
+        var(--tg-theme-bg-color, #0f1115);
+      color: var(--ink);
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    .card {
+      max-width: 23rem;
+      width: 100%;
+      animation: rise .55s cubic-bezier(.22,.61,.36,1) both;
+    }
+    .crest {
+      width: 84px;
+      height: 84px;
+      margin: 0 auto 1.25rem;
+      display: grid;
+      place-items: center;
+      font-size: 2.4rem;
+      border-radius: 24px;
+      background: linear-gradient(160deg,
+        color-mix(in srgb, var(--accent) 26%, var(--surface)),
+        var(--surface));
+      box-shadow:
+        0 10px 30px -10px color-mix(in srgb, var(--accent) 50%, transparent),
+        inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+    }
+    h1 {
+      font-size: 1.55rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin: 0 0 .15rem;
+    }
+    .tagline {
+      font-size: .8rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 1rem;
+      opacity: .9;
+    }
+    p {
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 1rem;
+      margin: 0 auto 1.4rem;
+      max-width: 21rem;
+    }
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      justify-content: center;
+      margin-bottom: 1.6rem;
+    }
+    .pill {
+      font-size: .82rem;
+      font-weight: 600;
+      padding: .42rem .8rem;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--surface) 80%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+      color: var(--ink);
+      white-space: nowrap;
+    }
+    .credit {
+      font-size: .82rem;
+      line-height: 1.5;
+      color: var(--muted);
+      margin-top: 1.5rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
+    }
+    .credit a {
+      color: var(--link);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .credit a:hover { text-decoration: underline; }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .card { animation: none; }
+    }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>📚 Books Provider</h1>
-    <p>The home of the eBook reader, audiobook player and games — free books,
-       audiobooks &amp; rewards, right inside Telegram.</p>
-    <p class="credit">👑 Owned &amp; managed by
+    <div class="crest">📚</div>
+    <p class="tagline">Books Provider</p>
+    <h1>Your library, beautifully in Telegram</h1>
+    <p>Read eBooks, listen to audiobooks, and play for rewards — thousands of titles,
+       a premium reader, and daily perks, all in one place.</p>
+    <div class="pills">
+      <span class="pill">📖 Universal reader</span>
+      <span class="pill">🎧 Audiobooks</span>
+      <span class="pill">🎮 Games &amp; rewards</span>
+      <span class="pill">💎 Earn &amp; unlock</span>
+    </div>
+    <p class="credit">👑 Crafted, owned &amp; operated by
        <a href="https://t.me/bookslibraryofficial">@bookslibraryofficial</a> &amp;
        <a href="https://t.me/trinityXmods">@trinityXmods</a> and their team.</p>
   </div>

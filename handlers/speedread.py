@@ -101,8 +101,8 @@ def _reward(wpm: int, correct: bool) -> float:
 
 
 def _again_kb():
-    return kb([btn("⚡ Play Again", "sr_new", style="success"),
-               btn("🎮 Games", "menu_games", style="primary")])
+    return kb([btn("⚡ Read Again", "sr_new", style="success"),
+               btn("🎮 Games Lounge", "menu_games", style="primary")])
 
 
 class SpeedFSM(StatesGroup):
@@ -120,14 +120,27 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
     from utils.flags import is_on
     send = message.edit_text if edit else message.answer
     if not await is_on("games"):
-        await send("🎮 <b>Games are paused</b> — check back soon!",
-                   reply_markup=kb([btn("🔙 Back", "menu_home", style="danger")]))
+        await send(
+            "🎮 <b>Games Lounge — Resting</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>Our games are taking a short intermission while we polish "
+            "them up. Your library stays open in the meantime — search a title, open "
+            "the reader, or check Discover for something new.</blockquote>\n"
+            "<i>💡 Do check back soon — the tables reopen shortly.</i>",
+            reply_markup=kb([btn("🔙 Back to Menu", "menu_home", style="danger")]))
         return
     db = await MongoManager.get()
     prev = await _plays_today(db, uid)
     if prev >= _DAILY:
-        await send(f"⚡ <b>Speed Read</b>\n\nDaily limit reached ({_DAILY}/day). Back tomorrow!",
-                   reply_markup=kb([btn("🎮 Games", "menu_games", style="primary")]))
+        await send(
+            "⚡ <b>Speed Read — Come Back Tomorrow</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>You've finished all <code>{_DAILY}</code> reads for today — "
+            "great pace. Your free runs refresh at midnight, ready to put your "
+            "words-per-minute to the test again.</blockquote>\n"
+            "<i>💡 In the meantime, the other games are open — pick one from the "
+            "lounge.</i>",
+            reply_markup=kb([btn("🎮 Games Lounge", "menu_games", style="primary")]))
         return
     await db.safe_update("users", {"user_id": uid},
                          {"$set": {"sr_day": _today(), "sr_plays": prev + 1}})
@@ -138,10 +151,13 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
     await state.update_data(words=words, question=question, options=options,
                             answer=answer, started=_now().timestamp())
     await send(
-        "⚡ <b>Speed Read</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"Read this passage, then tap <b>✅ Done</b>. ({words} words)\n\n"
-        f"<blockquote>{passage}</blockquote>\n\n"
-        "⏱ Timing starts now — a comprehension question follows.",
+        "⚡ <b>Speed Read</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Read at your natural pace — {words} words, one quick question after.</i>\n\n"
+        f"<blockquote>{passage}</blockquote>\n"
+        "<blockquote>⏱ The clock is running. As soon as you reach the end, tap "
+        "<b>✅ Done Reading</b> and a short comprehension check unlocks your reward — "
+        "the faster you read with full understanding, the more 💎 BGM you earn.</blockquote>",
         reply_markup=kb([btn("✅ Done Reading", "sr_done", style="success")]))
 
 
@@ -176,9 +192,14 @@ async def cb_done(call: CallbackQuery, state: FSMContext) -> None:
     rows = [[btn(f"{chr(65 + i)}. {opt}", f"sr:{i}", style="primary")]
             for i, opt in enumerate(options)]
     await call.message.edit_text(
-        f"⏱ <b>{wpm} WPM</b> ({words} words in {elapsed:.1f}s)\n"
+        "⏱ <b>Timed!</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        f"📖 <b>Comprehension check:</b>\n{data.get('question', '')}",
+        f"<blockquote>You read at <code>{wpm} WPM</code> — {words} words in "
+        f"{elapsed:.1f}s. Solid.</blockquote>\n"
+        "📖 <b>Comprehension check</b>\n"
+        f"<i>One quick question to confirm the read — answer correctly to claim "
+        f"your 💎 BGM.</i>\n\n"
+        f"{data.get('question', '')}",
         reply_markup=kb(*rows))
 
 
@@ -196,7 +217,9 @@ async def cb_answer(call: CallbackQuery, state: FSMContext) -> None:
     correct = pick == answer
     cheated = wpm > _CHEAT_WPM
     rwd = 0.0 if cheated else _reward(wpm, correct)
-    await call.answer("✅ Correct!" if correct else "❌ Not quite")
+    await call.answer(
+        "✅ Correct — reward on its way!" if correct
+        else "❌ Not quite — see the answer below.")
     if rwd > 0:
         await add_bgm(call.from_user.id, rwd)
         db = await MongoManager.get()
@@ -206,13 +229,29 @@ async def cb_answer(call: CallbackQuery, state: FSMContext) -> None:
         await mark(call.from_user.id, "play_game")
     right = options[answer] if 0 <= answer < len(options) else "—"
     if cheated:
-        verdict = "⚡ Too fast to be a real read — no reward this time."
+        verdict = (
+            "⚡ <b>That was a little too quick</b>\n"
+            "<blockquote>The timer clocked a pace faster than a genuine read, so we "
+            "couldn't score this one. Give the next passage a proper read-through and "
+            "the 💎 BGM is all yours.</blockquote>\n"
+            "<i>💡 No rush — comprehension counts more than speed here.</i>")
     elif correct:
-        verdict = f"🎉 <b>Correct!</b> Speed <b>{wpm} WPM</b>\n💎 <b>+{fmt_amount(rwd)} BGM</b>"
+        verdict = (
+            "✨ <b>Read &amp; Understood</b>\n"
+            f"<blockquote>Clocked at <code>{wpm} WPM</code> with the right answer — "
+            f"that's the sweet spot.\n"
+            f"💎 <b>+{fmt_amount(rwd)} BGM</b> has landed in your wallet.</blockquote>\n"
+            "<i>💡 Keep the streak going — line up another passage.</i>")
     else:
-        verdict = f"❌ <b>Wrong.</b> The answer was <b>{right}</b>."
+        verdict = (
+            "❌ <b>Not quite</b>\n"
+            f"<blockquote>The right answer was <b>{right}</b>. Speed is only half the "
+            "game — a careful read seals the reward next time.</blockquote>\n"
+            "<i>💡 Try another passage and take it line by line.</i>")
     await call.message.edit_text(
-        f"⚡ <b>Speed Read — Result</b>\n━━━━━━━━━━━━━━━━━━\n{verdict}",
+        "⚡ <b>Speed Read — Result</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"{verdict}",
         reply_markup=_again_kb())
 
 
@@ -222,4 +261,6 @@ async def cb_answer(call: CallbackQuery, state: FSMContext) -> None:
 # request.py's sr_prev/sr_next). Registered last → never shadows the in-flow handlers.
 @router.callback_query((F.data == "sr_done") | F.data.startswith("sr:"))
 async def cb_sr_expired(call: CallbackQuery) -> None:
-    await call.answer("⚡ Round expired — start a new Speed Read.", show_alert=True)
+    await call.answer(
+        "This Speed Read round has expired. Tap Read Again to start a fresh passage.",
+        show_alert=True)

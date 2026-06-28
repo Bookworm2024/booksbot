@@ -50,19 +50,29 @@ async def run_weekly_digest(bot) -> None:
             sent = 0
             for u in targets:
                 uid = u["user_id"]
-                lines = ["📰 <b>Your Weekly Digest</b>", "━━━━━━━━━━━━━━━━━━"]
+                lines = ["📰 <b>Your Weekly Digest</b>",
+                         "<i>A week of reading, curated for you.</i>",
+                         "━━━━━━━━━━━━━━━━━━━━",
+                         "<blockquote>Here's what's worth your attention this "
+                         "week — gathered from across the library and tailored "
+                         "to keep your shelf moving.</blockquote>"]
                 if new_count:
-                    lines.append(f"🆕 <b>{new_count}</b> new book(s) added this week")
+                    lines.append(f"🆕 <b>{new_count}</b> fresh title(s) arrived "
+                                 "this week — first in line is yours.")
                 if botd_name:
-                    lines.append(f"📖 Book of the Day: <b>{botd_name[:50]}</b>")
-                lines.append(f"🔥 Your streak: <b>{int(u.get('login_streak') or 0)} day(s)</b> — "
-                             "claim today to keep it going!")
-                lines.append("\n🎁 Don't miss your free daily reward + spin.")
+                    lines.append(f"📖 Today's <b>Book of the Day</b>: "
+                                 f"<i>{botd_name[:50]}</i>")
+                lines.append(f"🔥 Your reading streak: <b>{int(u.get('login_streak') or 0)} "
+                             "day(s)</b> — claim today and keep the run alive.")
+                lines.append("\n🎁 <b>Waiting for you:</b> your free daily reward "
+                             "and a spin of the wheel.")
+                lines.append("<i>💡 Open Discover for curated shelves, popular "
+                             "picks and what readers are loving now.</i>")
                 try:
                     await bot.send_message(
                         uid, "\n".join(lines),
-                        reply_markup=kb([btn("🎁 Daily Reward", "daily_reward", style="success"),
-                                         btn("🔭 Discover", "lib_discover", style="primary")]))
+                        reply_markup=kb([btn("🎁 Claim Daily Reward", "daily_reward", style="success"),
+                                         btn("🔭 Explore Discover", "lib_discover", style="primary")]))
                     sent += 1
                 except Exception:  # noqa: BLE001 — blocked/deactivated
                     pass

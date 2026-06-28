@@ -42,7 +42,13 @@ async def send_challenge(message, uid: int) -> None:
     db = await MongoManager.get()
     await db.safe_update("users", {"user_id": uid}, {"$set": {"captcha_target": target}})
     await message.answer(
-        f"🔒 <b>Quick check</b>\n\nTap the <b>{target}</b> below to continue.",
+        "🛡 <b>One quick check</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>A two-second tap keeps your library safe — then we'll take it from here.</i>\n\n"
+        f"<blockquote>Tap the <b>{target}</b> from the row below to confirm you're "
+        "human.\n\n"
+        "<i>🛡 We verify this privately on our side — nothing about you ever leaves "
+        "the bot.</i></blockquote>",
         reply_markup=kb([btn(e, f"cap:{e}", style="primary") for e in choices]))
 
 
@@ -54,14 +60,14 @@ async def cb_solve(call: CallbackQuery) -> None:
     doc = await db.find_one_global("users", {"user_id": uid}, {"captcha_target": 1})
     target = (doc or {}).get("captcha_target")
     if picked != target:
-        await call.answer("❌ Wrong — try again.", show_alert=True)
+        await call.answer("❌ Not quite — here's a fresh set. Tap the matching emoji to continue.", show_alert=True)
         await call.message.delete()
         await send_challenge(call.message, uid)
         return
     await db.safe_update("users", {"user_id": uid},
                          {"$set": {"captcha_at": datetime.now(timezone.utc),
                                    "captcha_target": None}})
-    await call.answer("✅ Verified")
+    await call.answer("✅ Verified — welcome in. Opening your library now.")
     await call.message.delete()
     # render the dashboard now (lazy import avoids a circular dependency)
     from handlers.start import _send_dashboard

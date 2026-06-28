@@ -33,5 +33,5 @@ def tiers_blurb() -> str:
     parts = []
     for threshold, frac in sorted(BONUS_TIERS):
         if frac > 0:
-            parts.append(f"{threshold}+ → +{int(frac*100)}%")
+            parts.append(f"<code>{threshold}+</code> earns <code>+{int(frac*100)}%</code>")
     return " · ".join(parts)

@@ -53,25 +53,31 @@ async def _view(uid: int, name: str):
     flair = d.get("equipped_flair") or ""
     display = escape(d.get("vanity") or name)   # name is the raw Telegram first_name
     text = (
-        f"<b>👤 {(flair + ' ') if flair else ''}{display}'s Profile</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        f"🏆 <b>Level {level}</b> · {prog['title']} · {xp} XP\n"
-        f"{bar} <i>{into}/100 to next</i>\n\n"
-        f"<b>Badges</b>\n{'  '.join(badges)}\n\n"
-        f"📥 Downloads: <b>{int(d.get('downloads') or 0)}</b>\n"
-        f"🎮 Games: <b>{int(d.get('games_played') or 0)}</b> · "
-        f"🎁 Referrals: <b>{int(d.get('ref_count') or 0)}</b>\n"
-        f"⭐ Favorites: <b>{favs}</b> · 🔥 Login: <b>{int(d.get('login_streak') or 0)}d</b> · "
-        f"🎮 Game streak: <b>{int(d.get('game_streak') or 0)}d</b>"
+        f"<b>👤 {(flair + ' ') if flair else ''}{display} — Reader Profile</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Your reading identity, level and lifetime story in one place.</i>\n\n"
+        f"🏆 <b>Level {level}</b> · <i>{prog['title']}</i> · <code>{xp}</code> XP\n"
+        f"{bar} <i>{into}/100 to your next level</i>\n\n"
+        "<blockquote>"
+        f"🏅 <b>Badges earned</b>\n{'  '.join(badges)}\n\n"
+        f"📚 <b>Lifetime stats</b>\n"
+        f"📥 Books unlocked · <code>{int(d.get('downloads') or 0)}</code>\n"
+        f"🎮 Games played · <code>{int(d.get('games_played') or 0)}</code>    "
+        f"🎁 Friends invited · <code>{int(d.get('ref_count') or 0)}</code>\n"
+        f"⭐ Favourites saved · <code>{favs}</code>    "
+        f"🔥 Login streak · <code>{int(d.get('login_streak') or 0)}d</code>    "
+        f"🎮 Game streak · <code>{int(d.get('game_streak') or 0)}d</code>"
+        "</blockquote>\n"
+        "<i>💡 Share your profile to invite friends — you both earn BGM when they join.</i>"
     )
     share = (f"I'm Level {level} on @{BOT_USERNAME} 📚 — free books, audiobooks & "
              f"games. Join me!")
     share_url = f"https://t.me/share/url?url=https://t.me/{BOT_USERNAME}&text={quote(share)}"
-    return text, kb([url_btn("📤 Share Profile", share_url, style="success")],
+    return text, kb([url_btn("📤 Share My Profile", share_url, style="success")],
                     [btn("📈 XP & Levels", "xp_view", style="primary"),
                      btn("🏅 Achievements", "acc_achievements", style="primary")],
-                    [btn("🎨 Customize", "acc_customize", style="primary")],
-                    [btn("🔙 Back", "menu_account", style="danger")])
+                    [btn("🎨 Customise Profile", "acc_customize", style="primary")],
+                    [btn("🔙 Back to Account", "menu_account", style="danger")])
 
 
 @router.message(Command("profile"))
@@ -93,7 +99,7 @@ async def cb_achievements(call: CallbackQuery) -> None:
     from utils.achievements import board
     text = await board(call.from_user.id)
     await call.message.edit_text(
-        text, reply_markup=kb([btn("🔙 Back", "acc_profile", style="primary")]))
+        text, reply_markup=kb([btn("🔙 Back to Profile", "acc_profile", style="primary")]))
 
 
 # ── XP & Levels ───────────────────────────────────────────────────────────────
@@ -102,19 +108,23 @@ async def _xp_view(uid: int) -> str:
     p = await get_progress(uid)
     return (
         "<b>📈 XP &amp; Levels</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        f"🏆 <b>Level {p['level']}</b> — {p['title']}\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Every action you take earns XP — and every level pays you back.</i>\n\n"
+        f"🏆 <b>Level {p['level']}</b> · <i>{p['title']}</i>\n"
         f"{p['bar']}\n"
-        f"⭐ <b>{p['xp']} XP</b> · <i>{p['remaining']} XP to Level {p['level'] + 1}</i> "
-        f"({title_for(p['level'] + 1)})\n\n"
-        "<b>Earn XP by:</b>\n"
-        "📥 Downloading a book — <b>+5</b>\n"
-        "🎮 Playing a game — <b>+3</b>\n"
-        "🪙 Claiming daily BCN — <b>+2</b>\n"
-        "🎡 Spinning the wheel — <b>+1</b>\n"
-        "⭐ Writing a review — <b>+4</b>\n"
-        "🎁 Referring a friend — <b>+20</b>\n\n"
-        f"<i>Every level-up pays a BGM bonus (next: +{level_reward(p['level'] + 1):g} BGM).</i>")
+        f"⭐ <code>{p['xp']}</code> XP · <i>{p['remaining']} XP to reach Level "
+        f"{p['level'] + 1}</i> ({title_for(p['level'] + 1)})\n\n"
+        "<blockquote>"
+        "<b>Ways to earn XP</b>\n"
+        "📥 Unlock a book · <b>+5</b>\n"
+        "🎮 Play a game · <b>+3</b>\n"
+        "🪙 Claim your daily BCN · <b>+2</b>\n"
+        "🎡 Spin the wheel · <b>+1</b>\n"
+        "⭐ Write a review · <b>+4</b>\n"
+        "🎁 Refer a friend · <b>+20</b>"
+        "</blockquote>\n"
+        f"<i>💡 Every level-up pays a 💎 BGM bonus — your next is "
+        f"<code>+{level_reward(p['level'] + 1):g} BGM</code>.</i>")
 
 
 @router.callback_query(F.data == "xp_view")
@@ -124,11 +134,11 @@ async def cb_xp(call: CallbackQuery) -> None:
     await call.message.edit_text(
         text, reply_markup=kb([btn("🏅 Achievements", "acc_achievements", style="primary"),
                                btn("🏆 Leaderboards", "lb_hub", style="primary")],
-                              [btn("🔙 Back", "acc_profile", style="danger")]))
+                              [btn("🔙 Back to Profile", "acc_profile", style="danger")]))
 
 
 @router.message(Command("level"))
 async def cmd_level(message: Message) -> None:
     text = await _xp_view(message.chat.id)
     await message.answer(text, reply_markup=kb(
-        [btn("👤 Profile", "acc_profile", style="primary")]))
+        [btn("👤 View My Profile", "acc_profile", style="primary")]))

@@ -21,12 +21,17 @@ async def _view(uid: int):
     db = await MongoManager.get()
     doc = await db.find_one_global("users", {"user_id": uid}, {"notif": 1}) or {}
     on = doc.get("notif") is not False
-    text = ("<b>🔔 Notifications</b>\n━━━━━━━━━━━━━━━━━━\n"
-            f"Reminders: <b>{'🟢 ON' if on else '🔴 OFF'}</b>\n\n"
-            "<i>We only nudge you when your free daily rewards are waiting — never spam.</i>")
-    toggle = btn("🔴 Turn OFF", "notif_off", style="danger") if on \
-        else btn("🟢 Turn ON", "notif_on", style="success")
-    return text, kb([toggle], [btn("🔙 Back", "menu_account", style="primary")])
+    text = ("🔔 <b>Notification Preferences</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>Gentle reminders so you never leave free rewards on the table.</i>\n\n"
+            f"Reminders are currently <b>{'🟢 ON' if on else '🔴 OFF'}</b>\n\n"
+            "<blockquote>🎁 We nudge you when your free daily 🪙 BCN is ready to claim before it expires.\n"
+            "⏳ The occasional heads-up about a streak about to lapse or a reward you've earned.\n"
+            "🚫 Never marketing spam — only things that put value back in your wallet.</blockquote>\n"
+            "<i>💡 You're in control — switch this off any time and turn it back on whenever you like.</i>")
+    toggle = btn("🔴 Turn Reminders Off", "notif_off", style="danger") if on \
+        else btn("🟢 Turn Reminders On", "notif_on", style="success")
+    return text, kb([toggle], [btn("🔙 Back to Account", "menu_account", style="primary")])
 
 
 @router.message(Command("notifications"))
@@ -47,6 +52,6 @@ async def cb_toggle(call: CallbackQuery) -> None:
     db = await MongoManager.get()
     await db.safe_update("users", {"user_id": call.from_user.id},
                          {"$set": {"notif": call.data == "notif_on"}})
-    await call.answer("Updated")
+    await call.answer("Saved — your reminder preference is updated.")
     text, markup = await _view(call.from_user.id)
     await call.message.edit_text(text, reply_markup=markup)

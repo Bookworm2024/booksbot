@@ -41,19 +41,22 @@ async def inline_search(iq: InlineQuery) -> None:
         articles.append(InlineQueryResultArticle(
             id=str(i),
             title=f"{icon_for(f.get('ext',''))} {name[:60]}",
-            description=f".{ext} · tap to get it in the bot",
+            description=f"📄 .{ext} · tap to claim it in {BOT_NAME}",
             input_message_content=InputTextMessageContent(
-                message_text=f"📚 <b>{escape(name)}</b>\n📥 Get it on @{BOT_USERNAME}",
+                message_text=f"📚 <b>{escape(name)}</b>\n"
+                             f"<i>Found in the {BOT_NAME} library.</i>\n\n"
+                             f"📥 Tap below to get your copy on @{BOT_USERNAME}.",
                 parse_mode="HTML"),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
                 InlineKeyboardButton(text="📥 Get this book", url=link)]]),
         ))
     await iq.answer(articles, cache_time=10, is_personal=True,
-                    switch_pm_text=f"🔍 Open {BOT_NAME}", switch_pm_parameter="start")
+                    switch_pm_text=f"🔭 Open {BOT_NAME} to read & listen",
+                    switch_pm_parameter="start")
 
 
 @router.inline_query()  # empty query → prompt
 async def inline_empty(iq: InlineQuery) -> None:
     await iq.answer([], cache_time=5, is_personal=True,
-                    switch_pm_text="Type a book title to search…",
+                    switch_pm_text="🔭 Type a title or author to search the library…",
                     switch_pm_parameter="start")

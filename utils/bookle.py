@@ -77,7 +77,7 @@ async def get_or_create(uid: int) -> dict:
 async def guess(uid: int, raw: str) -> dict:
     g = (raw or "").strip().upper()
     if len(g) != LEN or not g.isalpha():
-        return {"error": "Enter a 5-letter word."}
+        return {"error": "Today's word is exactly 5 letters — letters only, no spaces or numbers. Pop in a 5-letter guess and we'll score it instantly."}
     db = await MongoManager.get()
     day = _today()
     sess = await db.find_one_global("bookle_sessions", {"uid": uid, "day": day})

@@ -57,32 +57,46 @@ async def _build() -> str:
         if uid is not None:
             buyers[uid] = buyers.get(uid, 0) + float(d.get("bgm") or 0)
     top = sorted(buyers.items(), key=lambda kv: kv[1], reverse=True)[:5]
-    top_lines = "\n".join(f"  {i}. <code>{u}</code> — {fmt_amount(b)} BGM"
-                          for i, (u, b) in enumerate(top, 1)) or "  —"
+    top_lines = "\n".join(f"  {i}. <code>{u}</code> — <code>{fmt_amount(b)}</code> 💎 BGM"
+                          for i, (u, b) in enumerate(top, 1)) or "  <i>No buyers yet — the first sale will appear here.</i>"
 
     # rough gross (INR + crypto converted at a nominal ₹85/$ for a single figure)
     gross_inr = inr_total + usd_total * 85
 
     return (
-        "<b>💰 Revenue Dashboard</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        f"🧾 <b>Paid orders:</b> <code>{orders}</code>\n"
-        f"💎 <b>BGM sold:</b> <code>{fmt_amount(bgm_sold)}</code>\n\n"
-        "<b>Collected</b>\n"
-        f"🏦 UPI: <code>₹{inr_total:,.2f}</code>\n"
-        f"🌐 Crypto: <code>${usd_total:,.2f}</code>\n"
-        f"≈ <b>Gross:</b> <code>₹{gross_inr:,.0f}</code>\n\n"
-        "<b>Today</b>\n"
-        f"🧾 Orders: <code>{orders_today}</code> · ₹{inr_today:,.0f} · ${usd_today:,.2f}\n\n"
-        "<b>🏆 Top buyers</b>\n"
+        "📊 <b>Revenue Dashboard</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Every paid order, all currencies, in one ledger.</i>\n\n"
+        "<blockquote>"
+        f"🧾 <b>Paid orders</b> · <code>{orders}</code>\n"
+        f"💎 <b>BGM sold</b> · <code>{fmt_amount(bgm_sold)}</code>"
+        "</blockquote>\n"
+        "💱 <b>Collected to date</b>\n"
+        "<blockquote>"
+        f"🏦 UPI (India) · <code>₹{inr_total:,.2f}</code>\n"
+        f"🌐 Crypto (OxaPay) · <code>${usd_total:,.2f}</code>\n"
+        f"≈ <b>Gross</b> · <code>₹{gross_inr:,.0f}</code>  <i>(crypto valued at ≈ ₹85/$)</i>"
+        "</blockquote>\n"
+        "⚡ <b>Today so far</b>\n"
+        "<blockquote>"
+        f"🧾 Orders · <code>{orders_today}</code>\n"
+        f"🏦 UPI · <code>₹{inr_today:,.0f}</code>   🌐 Crypto · <code>${usd_today:,.2f}</code>"
+        "</blockquote>\n"
+        "🏆 <b>Top buyers</b>\n"
+        "<blockquote>"
         f"{top_lines}"
+        "</blockquote>\n"
+        "<i>💡 Read-only snapshot — tap Refresh anytime for live totals.</i>"
     )
 
 
 @router.message(Command("revenue"))
 async def cmd_revenue(message: Message) -> None:
     if message.chat.id != SUPER_ADMIN_ID and message.chat.id not in ADMIN_IDS:
-        await message.answer("🚫 Access denied.")
+        await message.answer(
+            "🔒 <b>Admins only</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>The revenue ledger is reserved for the team — your account doesn't have access here.</i>")
         return
     await message.answer(await _build())
 
@@ -90,10 +104,10 @@ async def cmd_revenue(message: Message) -> None:
 @router.callback_query(F.data == "admin_revenue")
 async def cb_revenue(call: CallbackQuery) -> None:
     if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("🔒 Admins only — the revenue ledger is reserved for the team.", show_alert=True)
         return
     await call.answer()
     await call.message.edit_text(
         await _build(),
-        reply_markup=kb([btn("🔄 Refresh", "admin_revenue", style="primary")],
-                        [btn("🔙 Back", "admin_open", style="danger")]))
+        reply_markup=kb([btn("🔄 Refresh totals", "admin_revenue", style="primary")],
+                        [btn("🔙 Back to Admin", "admin_open", style="danger")]))

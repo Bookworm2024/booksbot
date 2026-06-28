@@ -117,23 +117,25 @@ async def _buy_view():
     usd_price = await get_float("bgm_price_usd")
     min_inr = int(MIN_BGM_PURCHASE * inr_price)
     fp_pct = await get_float("first_purchase_pct")
-    fp_line = f"🥳 <b>First purchase:</b> +{fmt_amount(fp_pct)}% bonus BGM!\n" if fp_pct > 0 else ""
+    fp_line = f"🥳 <b>First purchase:</b> +<code>{fmt_amount(fp_pct)}%</code> bonus BGM — our welcome to you.\n" if fp_pct > 0 else ""
     text = (
-        "<b>💎 Buy BookGems (BGM)</b>\n"
+        "💎 <b>Top Up BookGems</b>\n"
         + (f"{deal}\n" if deal else "")
         + "━━━━━━━━━━━━━━━━━━\n"
-        "Permanent tokens — never expire.\n\n"
-        f"🏦 <b>UPI (INR):</b> ₹{fmt_amount(inr_price)}/BGM · min {MIN_BGM_PURCHASE} (₹{min_inr})\n"
-        f"🌐 <b>Crypto:</b> ${fmt_amount(usd_price)}/BGM\n"
-        f"🎁 <b>Bonus BGM:</b> {tiers_blurb()}\n"
+        "<i>Your premium currency — buy once, keep forever.</i>\n"
+        "<blockquote>"
+        f"🏦 <b>UPI (INR)</b> · <code>₹{fmt_amount(inr_price)}</code>/BGM — minimum <code>{MIN_BGM_PURCHASE}</code> BGM (<code>₹{min_inr}</code>)\n"
+        f"🌐 <b>Crypto</b> · <code>${fmt_amount(usd_price)}</code>/BGM — pay in any coin you like\n"
+        f"🎁 <b>Buy more, save more</b> · {tiers_blurb()}\n"
         + fp_line +
-        "\n<i>Both auto-credit — UPI is verified from the payment receipt, crypto "
-        "on-chain.</i>"
+        "</blockquote>"
+        "<i>💡 Both methods credit your wallet automatically — UPI is verified straight "
+        "from your payment receipt, crypto the moment the network confirms. No waiting on us.</i>"
     )
     return text, kb(
-        [btn("💳 Pay via UPI (INR)", "pay_upi", style="success")],
-        [btn("🌐 Pay via Crypto", "pay_crypto", style="primary")],
-        [btn("🎟️ Apply Coupon", "pay_coupon", style="primary")],
+        [btn("💳 Pay with UPI (INR)", "pay_upi", style="success")],
+        [btn("🌐 Pay with Crypto", "pay_crypto", style="primary")],
+        [btn("🎟️ Apply a Coupon", "pay_coupon", style="primary")],
         [btn("🔙 Back", "menu_account", style="danger")],
     )
 
@@ -142,22 +144,31 @@ async def _buy_view():
 async def cb_coupon(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
     await state.set_state(PayFSM.awaiting_coupon)
-    await call.message.edit_text("🎟️ <b>Apply a Coupon</b>\n\nSend your coupon code "
-                                 "to add a bonus to your next purchase. /cancel to abort.")
+    await call.message.edit_text(
+        "🎟 <b>Apply a Coupon</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Have a promo code? Stack a little extra onto your next top-up.</i>\n"
+        "<blockquote>"
+        "✍️ Send your <b>coupon code</b> in your next message and we'll attach the bonus "
+        "to your following purchase.</blockquote>"
+        "<i>💡 Send /cancel any time to step back.</i>")
 
 
 @router.message(PayFSM.awaiting_coupon, F.text)
 async def on_coupon(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     if raw.lower() == "/cancel":
-        await state.clear(); await message.answer("❌ Cancelled."); return
+        await state.clear(); await message.answer("❌ No problem — coupon entry cancelled."); return
     await state.clear()
     from utils.coupons import validate
     ok, res = await validate(raw, message.chat.id)
     if not ok:
-        msg = {"unknown": "That coupon isn't valid.", "expired": "That coupon has expired.",
-               "exhausted": "That coupon is fully claimed.", "used": "You've already used that coupon."}
-        await message.answer(f"❌ {msg.get(res, 'Coupon not accepted.')}")
+        msg = {"unknown": "We couldn't find that code — double-check the spelling and try again.",
+               "expired": "That coupon has expired, so it can't be applied any more.",
+               "exhausted": "That coupon has been fully claimed — every spot is taken.",
+               "used": "You've already redeemed that coupon once."}
+        reason = msg.get(res, "That coupon couldn't be applied right now.")
+        await message.answer(f"❌ <b>Coupon not accepted.</b>\n<i>{reason}</i>")
         return
     db = await MongoManager.get()
     await db.safe_update("users", {"user_id": message.chat.id},
@@ -165,9 +176,14 @@ async def on_coupon(message: Message, state: FSMContext) -> None:
     kind = res.get("kind")
     val = res.get("value")
     desc = f"+{fmt_amount(val)}% bonus" if kind == "pct" else f"+{fmt_amount(val)} BGM bonus"
-    await message.answer(f"✅ <b>Coupon applied!</b> ({desc})\nIt'll be added to your next "
-                         "purchase. Open 💎 Buy BGM to pay.",
-                         reply_markup=kb([btn("💎 Buy BGM", "acc_buy", style="success")]))
+    await message.answer(
+        "🎟 <b>Coupon Locked In</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<i>You've earned a little extra — <b>{desc}</b>.</i>\n"
+        "<blockquote>"
+        "✨ It's reserved for your <b>next purchase</b> and applies automatically at checkout. "
+        "Open 💎 Top Up to put it to work.</blockquote>",
+        reply_markup=kb([btn("💎 Top Up Now", "acc_buy", style="success")]))
 
 
 # ── UPI (email auto-verified, like inflowads) ───────────────────────────────────
@@ -176,17 +192,26 @@ async def cb_upi(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
     if not _upi_enabled():
         await call.message.edit_text(
-            "💳 <b>UPI is temporarily unavailable.</b>\nPlease use crypto, or "
-            "reach out via /support.\n<i>(Admin: set IMAP_USER + IMAP_PASSWORD.)</i>",
-            reply_markup=kb([btn("🌐 Pay via Crypto", "pay_crypto", style="primary")],
+            "💳 <b>UPI Is Briefly Offline</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<i>Our UPI verifier is paused for the moment — your BGM are safe either way.</i>\n"
+            "<blockquote>"
+            "🌐 You can pay instantly with <b>crypto</b> instead, or reach our team via "
+            "/support and we'll sort it out for you.</blockquote>"
+            "<i>(Admin: set IMAP_USER + IMAP_PASSWORD to re-enable UPI auto-verify.)</i>",
+            reply_markup=kb([btn("🌐 Pay with Crypto", "pay_crypto", style="primary")],
                             [btn("🔙 Back", "acc_buy", style="danger")]))
         return
     await state.set_state(PayFSM.awaiting_amount)
     min_inr = int(MIN_BGM_PURCHASE * await get_float("bgm_price_inr"))
     await call.message.edit_text(
-        "<b>💳 UPI Payment</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"How many <b>BGM</b> do you want? (min {MIN_BGM_PURCHASE} = ₹{min_inr})\n\n"
-        "Send a number — /cancel to abort.")
+        "💳 <b>UPI Top-Up</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Tell us how many BookGems you'd like and we'll prepare your payment.</i>\n"
+        "<blockquote>"
+        f"💎 Enter the number of <b>BGM</b> to buy — minimum <code>{MIN_BGM_PURCHASE}</code> "
+        f"(<code>₹{min_inr}</code>).</blockquote>"
+        "<i>💡 Just send a number. Send /cancel to step back.</i>")
 
 
 @router.message(PayFSM.awaiting_amount, F.text)
@@ -194,10 +219,12 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     if raw.lower() == "/cancel":
         await state.clear()
-        await message.answer("❌ Cancelled.")
+        await message.answer("❌ No problem — top-up cancelled. Your wallet is unchanged.")
         return
     if not raw.isdigit() or int(raw) < MIN_BGM_PURCHASE:
-        await message.answer(f"⚠️ Enter a whole number ≥ {MIN_BGM_PURCHASE}.")
+        await message.answer(
+            f"⚠️ <b>Let's keep it a whole number.</b>\n<i>Please enter a round amount of "
+            f"<code>{MIN_BGM_PURCHASE}</code> BGM or more to continue.</i>")
         return
     bgm = int(raw)
     inr = round(bgm * await get_float("bgm_price_inr"), 2)
@@ -213,7 +240,7 @@ async def on_amount(message: Message, state: FSMContext) -> None:
         "status": "waiting", "submitted_utr": None, "created_at": _now(),
         "expires_at": (_now() + timedelta(seconds=_UPI_TTL_SEC)).isoformat(),
     })
-    bonus_line = f"🎁 <b>Bonus:</b> +{fmt_amount(bonus)} BGM!\n" if bonus else ""
+    bonus_line = f"🎁 <b>Bonus included:</b> +<code>{fmt_amount(bonus)}</code> BGM\n" if bonus else ""
 
     # Preferred: the dedicated Secure Payment Portal (Mini App) — UPI QR + in-app
     # UTR submission + live status. Falls back to the in-chat UTR flow when no
@@ -221,12 +248,15 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     if BOT_PUBLIC_URL:
         await state.clear()
         await message.answer(
-            f"<b>💳 Pay ₹{inr:.2f}</b> for <b>{bgm} BGM</b>\n{bonus_line}"
+            f"💳 <b>Pay ₹{inr:.2f}</b> for <code>{bgm}</code> <b>BGM</b>\n{bonus_line}"
             "━━━━━━━━━━━━━━━━━━\n"
-            "Tap below to open the <b>Secure Payment Portal</b> — scan the UPI QR, "
-            "pay, then submit your UTR right inside it. BGM is credited automatically.",
+            "<i>Everything happens inside one secure screen — scan, pay, done.</i>\n"
+            "<blockquote>"
+            "🔒 Tap below to open the <b>Secure Payment Portal</b>. Scan the UPI QR, pay, then "
+            "submit your UTR right there. We read your payment receipt and credit your BGM "
+            "automatically — no admin, no waiting.</blockquote>",
             reply_markup=kb(
-                [webapp_btn("💳 Open Secure Payment Portal", "pay.html",
+                [webapp_btn("🔒 Open Secure Payment Portal", "pay.html",
                             query=f"order_id={order_id}", style="success")],
                 [btn("🔙 Back", "acc_buy", style="danger")]))
         return
@@ -236,14 +266,16 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     await state.set_state(PayFSM.awaiting_utr)
     rows = []
     if PAYMENT_QR_URL:
-        rows.append([url_btn("📷 View QR", PAYMENT_QR_URL)])
+        rows.append([url_btn("📷 View QR Code", PAYMENT_QR_URL)])
     await message.answer(
-        f"<b>💳 Pay ₹{inr:.2f}</b> for <b>{bgm} BGM</b>\n{bonus_line}"
+        f"💳 <b>Pay ₹{inr:.2f}</b> for <code>{bgm}</code> <b>BGM</b>\n{bonus_line}"
         "━━━━━━━━━━━━━━━━━━\n"
-        f"🏦 <b>UPI ID:</b> <code>{UPI_ID}</code>\n\n"
-        f"1️⃣ Send <b>exactly ₹{inr:.2f}</b> to the UPI ID (or scan the QR).\n"
-        "2️⃣ Then send your <b>UTR / transaction reference</b> here.\n\n"
-        "<i>You'll be credited automatically — usually within 1–2 minutes.</i>",
+        f"🏦 <b>UPI ID:</b> <code>{UPI_ID}</code>\n"
+        "<blockquote>"
+        f"1️⃣ Send <b>exactly ₹{inr:.2f}</b> to the UPI ID above (or scan the QR).\n"
+        "2️⃣ Then paste your <b>UTR / transaction reference</b> back here.</blockquote>"
+        "<i>💡 We verify it against your payment receipt and credit your BGM automatically — "
+        "usually within 1–2 minutes.</i>",
         reply_markup=kb(*rows) if rows else None)
 
 
@@ -252,11 +284,13 @@ async def on_utr(message: Message, state: FSMContext) -> None:
     txt = (message.text or "").strip()
     if txt.lower() == "/cancel":
         await state.clear()
-        await message.answer("❌ Cancelled.")
+        await message.answer("❌ No problem — top-up cancelled. Your wallet is unchanged.")
         return
     utr = txt.upper()
     if not _UTR_OK.match(utr):
-        await message.answer("⚠️ Send a valid 12-digit UTR (or FMPIB id) from your receipt.")
+        await message.answer(
+            "⚠️ <b>That doesn't look like a valid reference.</b>\n<i>Please paste the "
+            "<b>12-digit UTR</b> (or FMPIB id) exactly as shown on your payment receipt.</i>")
         return
     data = await state.get_data()
     order_id = data.get("order_id")
@@ -264,12 +298,17 @@ async def on_utr(message: Message, state: FSMContext) -> None:
 
     # reject a UTR already consumed by a confirmed payment
     if await db.find_one_global("payments", {"submitted_utr": utr, "status": "paid"}):
-        await message.answer("❌ This transaction reference was already used.")
+        await message.answer(
+            "❌ <b>That reference is already on file.</b>\n<i>This transaction reference has "
+            "been used for a completed payment. If something looks off, reach us via /support.</i>")
         return
     order = await db.find_one_global("payments", {"order_id": order_id})
     if not order or order.get("status") not in ("waiting", "utr_submitted"):
         await state.clear()
-        await message.answer("⚠️ Session expired — start the purchase again via 💎 Buy BGM.")
+        await message.answer(
+            "⏳ <b>This checkout has timed out.</b>\n<i>No charge was made. Just tap 💎 Top Up "
+            "to start a fresh order — it only takes a moment.</i>",
+            reply_markup=kb([btn("💎 Top Up Again", "acc_buy", style="success")]))
         return
 
     await db.safe_update("payments", {"order_id": order_id},
@@ -287,8 +326,13 @@ async def on_utr(message: Message, state: FSMContext) -> None:
         return
 
     await message.answer(
-        "✅ <b>Reference recorded.</b>\nWe'll credit your BGM automatically the moment "
-        "the payment lands (usually 1–2 min). You can close this chat.")
+        "✅ <b>Reference Received</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Thank you — we'll take it from here.</i>\n"
+        "<blockquote>"
+        "🔎 We're matching your payment against the receipt now. The moment it lands "
+        "(usually within 1–2 minutes) your BGM are credited automatically and we'll ping you.</blockquote>"
+        "<i>💡 You're free to close this chat — nothing else is needed from you.</i>")
 
 
 async def _confirm_payment(doc: dict, bot, *, email_txn_id: str = "",
@@ -311,14 +355,17 @@ async def _confirm_payment(doc: dict, bot, *, email_txn_id: str = "",
     await add_bgm(flipped["user_id"], total)
     await db.safe_update("users", {"user_id": flipped["user_id"]},
                          {"$unset": {"cart_opened_at": ""}}, upsert=False)  # cart completed
-    bonus_line = f" (incl. +{fmt_amount(bonus)} bonus)" if bonus else ""
-    fp_line = f"\n🥳 First-purchase bonus: <b>+{fmt_amount(fp)} BGM</b>!" if fp else ""
-    cpn_line = f"\n🎟️ Coupon bonus: <b>+{fmt_amount(cpn)} BGM</b>!" if cpn else ""
+    bonus_line = f" <i>(includes +{fmt_amount(bonus)} bonus)</i>" if bonus else ""
+    fp_line = f"\n🥳 First-purchase welcome: <b>+{fmt_amount(fp)} BGM</b>" if fp else ""
+    cpn_line = f"\n🎟 Coupon bonus: <b>+{fmt_amount(cpn)} BGM</b>" if cpn else ""
     try:
         await bot.send_message(
             flipped["user_id"],
-            f"🎉 <b>Payment confirmed!</b>\n💎 <b>+{fmt_amount(total)} BGM</b>{bonus_line} added.{fp_line}{cpn_line}\n"
-            f"🧾 Ref: <code>{email_txn_id or flipped.get('submitted_utr','')}</code>")
+            "✨ <b>Payment Confirmed</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"💎 <b>+{fmt_amount(total)} BGM</b> are now in your wallet.{bonus_line}{fp_line}{cpn_line}\n"
+            f"🧾 <b>Reference:</b> <code>{email_txn_id or flipped.get('submitted_utr','')}</code>\n"
+            "<i>💡 Your BookGems never expire — enjoy your library.</i>")
     except Exception:  # noqa: BLE001
         pass
 
@@ -338,8 +385,11 @@ async def cb_crypto(call: CallbackQuery) -> None:
     await call.answer()
     if not _crypto_enabled():
         await call.message.edit_text(
-            "🌐 <b>Crypto payments</b> aren't enabled yet.\n"
-            "<i>Admin: set OXAPAY_MERCHANT_API_KEY and BOT_PUBLIC_URL.</i>",
+            "🌐 <b>Crypto Isn't Live Yet</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<i>This payment route is being switched on — please use UPI for now, or check "
+            "back shortly.</i>\n"
+            "<i>(Admin: set OXAPAY_MERCHANT_API_KEY and BOT_PUBLIC_URL to enable crypto.)</i>",
             reply_markup=kb([btn("🔙 Back", "acc_buy", style="danger")]))
         return
     usd_price = await get_float("bgm_price_usd")
@@ -347,15 +397,19 @@ async def cb_crypto(call: CallbackQuery) -> None:
     for u in _USD_PACKS:
         b = round(u / usd_price)
         bn = bonus_for(b)
-        extra = f" +{fmt_amount(bn)}🎁" if bn else ""
+        extra = f" +{fmt_amount(bn)} 🎁" if bn else ""
         rows.append([btn(f"💰 ${u} → {b:,} BGM{extra}", f"cm_buy:{u}", style="success")])
     rows.append([btn("🔙 Back", "acc_buy", style="danger")])
     await call.message.edit_text(
-        "🌐 <b>Crypto Payment (OxaPay)</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"${fmt_amount(usd_price)}/BGM · gateway minimum ${fmt_amount(MIN_USD_AMOUNT)}.\n"
-        f"💱 <b>Pay with:</b> {POPULAR_COINS}\n\n"
-        "Pick an amount — you'll get a secure OxaPay pay page where you choose "
-        "your coin. BGM is credited automatically once the network confirms.",
+        "🌐 <b>Pay with Crypto</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Fast, borderless, and credited the moment the network confirms.</i>\n"
+        "<blockquote>"
+        f"💎 <b>Rate:</b> <code>${fmt_amount(usd_price)}</code>/BGM · gateway minimum <code>${fmt_amount(MIN_USD_AMOUNT)}</code>\n"
+        f"💱 <b>Pay with:</b> {POPULAR_COINS}\n"
+        "🔒 Powered by <b>OxaPay</b> — an independent, no-KYC gateway.</blockquote>"
+        "<i>💡 Pick a pack below and you'll get a secure pay page where you choose your coin. "
+        "Your BGM are added automatically once the payment confirms on-chain.</i>",
         reply_markup=kb(*rows))
 
 
@@ -364,23 +418,26 @@ async def cb_cm_buy(call: CallbackQuery) -> None:
     try:
         usd = float(call.data.split(":", 1)[1])
     except (ValueError, IndexError):
-        await call.answer("Invalid selection.", show_alert=True)
+        await call.answer("That selection didn't go through — please tap a pack again.", show_alert=True)
         return
     if usd < MIN_USD_AMOUNT:
-        await call.answer("Amount below the gateway minimum.", show_alert=True)
+        await call.answer("That amount is below the gateway minimum — please pick a larger pack.", show_alert=True)
         return
     bgm = round(usd / await get_float("bgm_price_usd"))
     from utils.deals import deal_bonus
     bonus = bonus_for(bgm) + await deal_bonus(bgm)
-    await call.answer("Generating invoice…")
+    await call.answer("Preparing your secure invoice…")
     uid = call.from_user.id
     order_id = make_order_id(uid)
     webhook_url = f"{BOT_PUBLIC_URL}/oxapay-webhook"
     result = await create_invoice(order_id, usd, webhook_url)
     if not result or not result.get("url"):
         await call.message.edit_text(
-            "❌ Couldn't reach the payment gateway. Try again shortly.",
-            reply_markup=kb([btn("🔙 Back", "pay_crypto", style="danger")]))
+            "⚠️ <b>The Gateway Didn't Respond</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<i>We couldn't reach the payment gateway just now — nothing was charged. "
+            "Please give it a moment and try again.</i>",
+            reply_markup=kb([btn("🔄 Try Again", "pay_crypto", style="danger")]))
         return
     db = await MongoManager.get()
     pay_url = result.get("url")
@@ -397,12 +454,15 @@ async def cb_cm_buy(call: CallbackQuery) -> None:
     # checkout and shows live BGM-credit status in-app.
     if BOT_PUBLIC_URL:
         await call.message.edit_text(
-            f"🌐 <b>Pay ${usd:.2f}</b> in crypto → <b>{bgm:,} BGM</b>\n"
+            f"🌐 <b>Pay ${usd:.2f}</b> in crypto → <code>{bgm:,}</code> <b>BGM</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "Open the <b>Secure Payment Portal</b> to pick your coin and pay. "
-            "BGM lands automatically once the network confirms.",
+            "<i>One secure screen for everything — pick your coin, pay, watch it confirm.</i>\n"
+            "<blockquote>"
+            "🔒 Open the <b>Secure Payment Portal</b> to choose your coin and complete payment. "
+            "Your BGM are added automatically the moment the network confirms — you'll see it "
+            "update live.</blockquote>",
             reply_markup=kb(
-                [webapp_btn("💳 Open Secure Payment Portal", "pay.html",
+                [webapp_btn("🔒 Open Secure Payment Portal", "pay.html",
                             query=f"order_id={order_id}", style="success")],
                 [btn("🔙 Back", "acc_buy", style="danger")]))
         return
@@ -411,10 +471,12 @@ async def cb_cm_buy(call: CallbackQuery) -> None:
     rows = [[url_btn("💳 Open Pay Page", pay_url, style="success")],
             [btn("🔙 Back", "acc_buy", style="danger")]]
     await call.message.edit_text(
-        f"🌐 <b>Pay ${usd:.2f}</b> in crypto → <b>{bgm:,} BGM</b>\n"
+        f"🌐 <b>Pay ${usd:.2f}</b> in crypto → <code>{bgm:,}</code> <b>BGM</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "Tap to open the pay page (valid ~60 min) and pick your coin.\n"
-        "BGM lands automatically after confirmation.",
+        "<i>Choose your coin on the secure OxaPay page and you're set.</i>\n"
+        "<blockquote>"
+        "💳 Tap to open the pay page (valid for about <code>60 min</code>) and pick your coin. "
+        "Your BGM land automatically once the payment confirms on-chain.</blockquote>",
         reply_markup=kb(*rows))
 
 
@@ -454,13 +516,15 @@ async def oxapay_webhook(request: web.Request) -> web.Response:
     await add_bgm(order["user_id"], total)
     await db.safe_update("users", {"user_id": order["user_id"]},
                          {"$unset": {"cart_opened_at": ""}}, upsert=False)  # cart completed
-    fp_line = f"\n🥳 First-purchase bonus: +{fmt_amount(fp)} BGM!" if fp else ""
-    cpn_line = f"\n🎟️ Coupon bonus: +{fmt_amount(cpn)} BGM!" if cpn else ""
+    fp_line = f"\n🥳 First-purchase welcome: <b>+{fmt_amount(fp)} BGM</b>" if fp else ""
+    cpn_line = f"\n🎟 Coupon bonus: <b>+{fmt_amount(cpn)} BGM</b>" if cpn else ""
     bot = request.app["bot"]
     try:
         await bot.send_message(order["user_id"],
-                               f"🎉 <b>Crypto payment confirmed!</b>\n"
-                               f"💎 +{fmt_amount(total)} BGM added to your wallet.{fp_line}{cpn_line}")
+                               "✨ <b>Crypto Payment Confirmed</b>\n"
+                               "━━━━━━━━━━━━━━━━━━\n"
+                               f"💎 <b>+{fmt_amount(total)} BGM</b> are now in your wallet.{fp_line}{cpn_line}\n"
+                               "<i>💡 Your BookGems never expire — enjoy your library.</i>")
     except Exception:  # noqa: BLE001
         pass
     return web.Response(text="ok")

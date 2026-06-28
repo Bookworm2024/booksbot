@@ -30,6 +30,7 @@ _TIERS = [
     ("🟣 Epic", 2.0, 2, 6),
     ("🟡 Legendary", 5.0, 0, 3),
 ]
+# Rarity ladder shown to the reader: Common → Uncommon → Rare → Epic → Legendary.
 _BAG = [t for t in _TIERS for _ in range(t[3])]
 
 

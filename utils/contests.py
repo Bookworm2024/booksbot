@@ -86,12 +86,17 @@ async def settle(bot) -> None:
             if not uid or prize <= 0:
                 continue
             await add_bgm(uid, prize)
-            place = ["🥇 1st", "🥈 2nd", "🥉 3rd"][i]
+            place = ["🥇 1st place", "🥈 2nd place", "🥉 3rd place"][i]
             try:
                 await bot.send_message(
-                    uid, f"🏁 <b>Referral Contest — {month}</b>\n"
-                    f"You finished <b>{place}</b> with {int(w.get('count') or 0)} referrals!\n"
-                    f"🎁 Prize: <b>+{fmt_amount(prize)} BGM</b>")
+                    uid,
+                    "🏁 <b>Monthly Referral Contest — Results</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    f"<i>The results for <code>{month}</code> are in — and you made the podium.</i>\n"
+                    f"<blockquote>🏆 You finished <b>{place}</b>\n"
+                    f"📊 With <code>{int(w.get('count') or 0)}</code> verified referrals\n"
+                    f"🎁 Prize: <b>+{fmt_amount(prize)} 💎 BGM</b></blockquote>\n"
+                    "<i>💡 A new contest has already begun — your link is ready when you are.</i>")
             except Exception:  # noqa: BLE001
                 pass
         if winners:

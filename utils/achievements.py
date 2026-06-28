@@ -60,7 +60,13 @@ async def check_unlocks(bot, uid: int) -> set:
             continue
         try:
             await bot.send_message(
-                uid, f"🏅 <b>Achievement Unlocked!</b>\n<b>{a['name']}</b> — {a['desc']}")
+                uid,
+                "🏆 <b>Achievement Unlocked</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                f"<blockquote>{a['name']}\n"
+                f"<i>{a['desc']}</i></blockquote>\n"
+                "<i>✨ Beautifully done — it's now pinned to your trophy shelf. "
+                "More milestones are waiting.</i>")
         except Exception:  # noqa: BLE001 — user may have blocked the bot
             pass
     return new
@@ -77,6 +83,18 @@ async def board(uid: int) -> str:
             lines.append(f"✅ <b>{a['name']}</b> — {a['desc']}")
         else:
             cur = min(_value(d, favs, a["metric"]), a["target"])
-            lines.append(f"🔒 {a['name']} — {a['desc']} <i>({cur}/{a['target']})</i>")
-    return (f"🏅 <b>Achievements</b> — {len(got)}/{len(ACHIEVEMENTS)} unlocked\n"
-            "━━━━━━━━━━━━━━━━━━\n" + "\n".join(lines))
+            lines.append(
+                f"🔒 {a['name']} — <i>{a['desc']}</i> · <code>{cur}/{a['target']}</code>")
+    remaining = len(ACHIEVEMENTS) - len(got)
+    if remaining <= 0:
+        footer = ("\n\n<i>👑 Every trophy claimed — you've completed the full "
+                  "collection. A true Books Provider legend.</i>")
+    else:
+        footer = ("\n\n<i>💡 Each milestone unlocks on its own as you read, play "
+                  f"and invite — {remaining} still to earn.</i>")
+    return (f"🏆 <b>Your Achievements</b>\n"
+            f"<i>{len(got)} of {len(ACHIEVEMENTS)} trophies unlocked — your reading "
+            "legacy, one badge at a time.</i>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote expandable>" + "\n".join(lines) + "</blockquote>"
+            + footer)

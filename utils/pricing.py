@@ -57,7 +57,8 @@ async def hh_banner() -> str:
     off = int(round((1.0 - hh["factor"]) * 100))
     mins = int((hh["until"] - _now()).total_seconds() // 60)
     when = f"{mins // 60}h {mins % 60}m" if mins >= 60 else f"{mins}m"
-    return f"⚡ <b>HAPPY HOUR:</b> downloads {off}% off — ends in {when}!"
+    return (f"⚡ <b>Happy Hour</b> · <code>{off}%</code> off every download — "
+            f"<i>ends in {when}</i>")
 
 
 # ── Per-item surge ────────────────────────────────────────────────────────────

@@ -32,11 +32,11 @@ _SLEEP = 0.05          # ~20 msgs/sec — safely under Telegram limits
 
 # audience segments → human label; filter is built at run time (see _audience_filter)
 SEG_LABELS = {
-    "all":      "👥 All users",
+    "all":      "👥 Everyone",
     "vip":      "👑 VIP members",
-    "active":   "🟢 Active (7d)",
-    "inactive": "😴 Inactive (7d+)",
-    "legacy":   "📦 Imported (legacy)",
+    "active":   "🟢 Active this week",
+    "inactive": "😴 Win-back (quiet 7d+)",
+    "legacy":   "📦 Imported readers",
 }
 
 
@@ -78,12 +78,12 @@ def _bar(sent: int, total: int) -> str:
 def _progress_kb(bid: str, status: str):
     row = []
     if status == "running":
-        row.append(btn("⏸ Pause", f"bc_act:pause:{bid}", style="primary"))
+        row.append(btn("⏸ Pause delivery", f"bc_act:pause:{bid}", style="primary"))
     elif status == "paused":
-        row.append(btn("▶️ Resume", f"bc_act:resume:{bid}", style="success"))
+        row.append(btn("▶️ Resume delivery", f"bc_act:resume:{bid}", style="success"))
     if status in ("running", "paused"):
-        row.append(btn("🛑 Stop", f"bc_act:stop:{bid}", style="danger"))
-    return kb(row, [btn("🔄 Refresh", f"bc_refresh:{bid}", style="primary")])
+        row.append(btn("🛑 Stop campaign", f"bc_act:stop:{bid}", style="danger"))
+    return kb(row, [btn("🔄 Refresh progress", f"bc_refresh:{bid}", style="primary")])
 
 
 async def _progress_text(bid: str) -> tuple[str, str]:
@@ -92,10 +92,18 @@ async def _progress_text(bid: str) -> tuple[str, str]:
     status = b.get("status", "done")
     total, sent, failed = b.get("total", 0), b.get("sent", 0), b.get("failed", 0)
     icon = {"running": "⚡", "paused": "⏸", "stopped": "🛑", "done": "✅"}.get(status, "•")
-    text = (f"📡 <b>Broadcast {bid}</b>\n"
-            f"{icon} <b>{status.upper()}</b>\n{_bar(sent, total)}\n\n"
-            f"👥 Total: <code>{total}</code>\n✅ Sent: <code>{sent}</code>\n"
-            f"❌ Failed: <code>{failed}</code>")
+    phrase = {"running": "Delivering now", "paused": "Paused — ready to resume",
+              "stopped": "Stopped by you", "done": "Delivered"}.get(status, "Standing by")
+    text = (f"📡 <b>Campaign {bid}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"{icon} <b>{status.upper()}</b> · <i>{phrase}</i>\n"
+            f"{_bar(sent, total)}\n"
+            f"<blockquote>"
+            f"👥 Audience — <code>{total}</code> readers\n"
+            f"✅ Delivered — <code>{sent}</code>\n"
+            f"❌ Couldn't reach — <code>{failed}</code>"
+            f"</blockquote>\n"
+            f"<i>💡 Tap Refresh for the latest count — delivery runs in the background.</i>")
     return text, status
 
 
@@ -104,7 +112,14 @@ async def _progress_text(bid: str) -> tuple[str, str]:
 async def cmd_broadcast(message: Message, state: FSMContext) -> None:
     from utils.permissions import has
     if not await has(message.chat.id, "broadcast"):
-        await message.answer("🚫 Access denied.")
+        await message.answer(
+            "🛡 <b>Broadcast Studio</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>"
+            "This tool sends announcements to your readers, so it's reserved for "
+            "team members with the <b>broadcast</b> permission.\n\n"
+            "If you need access, ask a super admin to grant it from Admin → Permissions."
+            "</blockquote>")
         return
     await _open(message, state)
 
@@ -113,7 +128,7 @@ async def cmd_broadcast(message: Message, state: FSMContext) -> None:
 async def cb_broadcast(call: CallbackQuery, state: FSMContext) -> None:
     from utils.permissions import has
     if not await has(call.from_user.id, "broadcast"):
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("Broadcasting is reserved for admins with the broadcast permission. Ask a super admin for access.", show_alert=True)
         return
     await call.answer()
     await _open(call.message, state)
@@ -121,15 +136,29 @@ async def cb_broadcast(call: CallbackQuery, state: FSMContext) -> None:
 
 async def _open(message: Message, state: FSMContext) -> None:
     await state.set_state(BroadcastFSM.awaiting_content)
-    await message.answer("📡 <b>Broadcast</b>\n\nSend the message (text/photo/etc.) to "
-                         "broadcast to all users. /cancel to abort.")
+    await message.answer(
+        "📡 <b>Broadcast Studio</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Reach your readers with a single, polished message.</i>\n"
+        "<blockquote>"
+        "📝 <b>Step 1 — Compose</b>\n"
+        "Send the exact message you'd like to broadcast — text, a photo, a "
+        "document, anything Telegram supports. Formatting, buttons and media all "
+        "carry through exactly as you send them.\n\n"
+        "🎯 <b>Next</b>\n"
+        "You'll choose <b>who</b> receives it, then send <b>now</b> or schedule it "
+        "for later — with a live delivery board you can pause or stop at any time."
+        "</blockquote>\n"
+        "<i>💡 Send <code>/cancel</code> anytime to back out — nothing goes out until you confirm.</i>")
 
 
 @router.message(BroadcastFSM.awaiting_content)
 async def on_content(message: Message, state: FSMContext) -> None:
     if (message.text or "").strip().lower() == "/cancel":
         await state.clear()
-        await message.answer("❌ Cancelled.")
+        await message.answer(
+            "✅ <b>Broadcast cancelled</b>\n"
+            "<i>Nothing was sent — your readers heard nothing. Start again whenever you're ready.</i>")
         return
     # keep the source message coords; leave the content-capture state
     await state.set_state(None)
@@ -138,41 +167,59 @@ async def on_content(message: Message, state: FSMContext) -> None:
     rows = []
     for seg, label in SEG_LABELS.items():
         n = await _count_seg(db, seg)
-        rows.append([btn(f"{label} — {n}", f"bc_aud:{seg}", style="primary")])
-    rows.append([btn("❌ Cancel", "menu_home", style="danger")])
+        rows.append([btn(f"{label} · {n}", f"bc_aud:{seg}", style="primary")])
+    rows.append([btn("❌ Cancel broadcast", "menu_home", style="danger")])
     await message.answer(
-        "📡 <b>Choose audience</b>\n\nWho should receive the message above?",
+        "📡 <b>Step 2 — Choose your audience</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Send to everyone, or target exactly the readers who matter.</i>\n"
+        "<blockquote>"
+        "👥 <b>Everyone</b> — every reader on the bot\n"
+        "👑 <b>VIP members</b> — your premium subscribers\n"
+        "🟢 <b>Active this week</b> — opened the bot in the last 7 days\n"
+        "😴 <b>Win-back</b> — quiet for 7+ days, ready to re-engage\n"
+        "📦 <b>Imported readers</b> — your legacy, migrated audience"
+        "</blockquote>\n"
+        "<i>💡 The number beside each segment is its live size right now. Pick one to continue.</i>",
         reply_markup=kb(*rows))
 
 
 @router.callback_query(F.data.startswith("bc_aud:"))
 async def cb_audience(call: CallbackQuery, state: FSMContext) -> None:
     if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("This control is admin-only. Ask a super admin if you need broadcast access.", show_alert=True)
         return
     seg = call.data.split(":", 1)[1]
     if seg not in SEG_LABELS:
-        await call.answer("Unknown audience", show_alert=True)
+        await call.answer("That audience is no longer available — please pick another.", show_alert=True)
         return
     await state.update_data(seg=seg)
     await call.answer()
     db = await MongoManager.get()
     n = await _count_seg(db, seg)
     await call.message.edit_text(
-        f"⏰ <b>When to send?</b>\nAudience: <b>{SEG_LABELS[seg]}</b> · {n} users\n\n"
-        "Send now, or schedule for later:",
+        f"⏰ <b>Step 3 — When should it go out?</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Send instantly, or queue it for the perfect moment.</i>\n"
+        f"<blockquote>"
+        f"🎯 Audience — <b>{SEG_LABELS[seg]}</b>\n"
+        f"👥 Reaching — <code>{n}</code> readers\n\n"
+        f"🚀 <b>Send now</b> — delivery begins immediately\n"
+        f"⏰ <b>Schedule</b> — fires in 1, 6 or 24 hours, even if you step away"
+        f"</blockquote>\n"
+        f"<i>💡 Scheduled? Keep the message you composed in this chat until it fires.</i>",
         reply_markup=kb(
-            [btn("🚀 Send Now", "bc_when:0", style="success")],
-            [btn("⏰ +1h", "bc_when:1", style="primary"),
-             btn("⏰ +6h", "bc_when:6", style="primary"),
-             btn("⏰ +24h", "bc_when:24", style="primary")],
-            [btn("❌ Cancel", "menu_home", style="danger")]))
+            [btn("🚀 Send now", "bc_when:0", style="success")],
+            [btn("⏰ In 1 hour", "bc_when:1", style="primary"),
+             btn("⏰ In 6 hours", "bc_when:6", style="primary"),
+             btn("⏰ In 24 hours", "bc_when:24", style="primary")],
+            [btn("❌ Cancel broadcast", "menu_home", style="danger")]))
 
 
 @router.callback_query(F.data.startswith("bc_when:"))
 async def cb_when(call: CallbackQuery, state: FSMContext) -> None:
     if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("This control is admin-only. Ask a super admin if you need broadcast access.", show_alert=True)
         return
     try:
         hours = int(call.data.split(":", 1)[1])
@@ -182,7 +229,7 @@ async def cb_when(call: CallbackQuery, state: FSMContext) -> None:
     src_chat, src_msg = data.get("src_chat"), data.get("src_msg")
     seg = data.get("seg", "all")
     if not src_chat or not src_msg:
-        await call.answer("Session expired — resend the message.", show_alert=True)
+        await call.answer("This session timed out. Send your message again to start a fresh broadcast.", show_alert=True)
         return
     await state.clear()
     db = await MongoManager.get()
@@ -196,21 +243,25 @@ async def cb_when(call: CallbackQuery, state: FSMContext) -> None:
         base["status"] = "running"
         await db.safe_insert("broadcasts", base)
         asyncio.create_task(_run(call.bot, bid))
-        await call.answer("Launching…")
+        await call.answer("Launching your broadcast — we'll take it from here.")
         text, status = await _progress_text(bid)
         await call.message.edit_text(text, reply_markup=_progress_kb(bid, status))
     else:
         send_at = _now() + timedelta(hours=hours)
         base.update({"status": "scheduled", "send_at": send_at})
         await db.safe_insert("broadcasts", base)
-        await call.answer("Scheduled!")
+        await call.answer("Scheduled — we'll send it on time, even if you're away.")
         await call.message.edit_text(
-            f"⏰ <b>Broadcast Scheduled</b>\n"
-            f"🆔 <code>{bid}</code>\n"
-            f"👥 Audience: <b>{SEG_LABELS[seg]}</b> ({total})\n"
-            f"🕒 Fires: <b>{send_at.strftime('%d %b %H:%M UTC')}</b> (in {hours}h)\n\n"
-            "<i>Keep the source message in this chat until then.</i>",
-            reply_markup=kb([btn("🔙 Admin", "admin_open", style="primary")]))
+            f"⏰ <b>Campaign scheduled</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"<i>Queued and ready — it'll go out on its own.</i>\n"
+            f"<blockquote>"
+            f"🆔 Campaign — <code>{bid}</code>\n"
+            f"🎯 Audience — <b>{SEG_LABELS[seg]}</b> · <code>{total}</code> readers\n"
+            f"🕒 Fires — <b>{send_at.strftime('%d %b %H:%M UTC')}</b> · in {hours}h"
+            f"</blockquote>\n"
+            f"<i>💡 Keep the message you composed in this chat until then — that's the copy we'll deliver.</i>",
+            reply_markup=kb([btn("🔙 Back to Admin", "admin_open", style="primary")]))
 
 
 async def _run(bot, bid: str) -> None:
@@ -258,13 +309,17 @@ async def _run(bot, bid: str) -> None:
 @router.callback_query(F.data.startswith("bc_act:"))
 async def cb_action(call: CallbackQuery) -> None:
     if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("This control is admin-only. Ask a super admin if you need broadcast access.", show_alert=True)
         return
     _, action, bid = call.data.split(":")
     new = {"pause": "paused", "resume": "running", "stop": "stopped"}.get(action)
     db = await MongoManager.get()
     await db.safe_update("broadcasts", {"bid": bid}, {"$set": {"status": new}}, upsert=False)
-    await call.answer(f"{action.title()}d")
+    toast = {"pause": "Paused — delivery is on hold. Resume whenever you're ready.",
+             "resume": "Resumed — delivery is rolling again.",
+             "stop": "Stopped — no further messages will go out for this campaign."
+             }.get(action, f"{action.title()}d")
+    await call.answer(toast)
     text, status = await _progress_text(bid)
     await call.message.edit_text(text, reply_markup=_progress_kb(bid, status))
 

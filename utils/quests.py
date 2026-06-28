@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 #   metric "share" is a one-shot flag set when the user uses the share feature;
 #   "level" is derived from XP; the rest are plain user-doc counters.
 QUESTS = [
-    ("share",   "📣", "Spread the Word", "Share the bot with a friend", "share",         1,  0.5),
-    ("invite1", "🤝", "First Invite",     "Refer 1 friend",              "ref_count",     1,  1.0),
-    ("invite3", "👥", "Squad Builder",    "Refer 3 friends",             "ref_count",     3,  2.0),
-    ("invite7", "🌟", "Influencer",       "Refer 7 friends",             "ref_count",     7,  5.0),
-    ("level5",  "📈", "Rising Reader",    "Reach Level 5",               "level",         5,  2.0),
-    ("play25",  "🎮", "Game Buff",        "Play 25 games",               "games_played",  25, 2.0),
+    ("share",   "📣", "Spread the Word", "Share the bot once with a friend",   "share",         1,  0.5),
+    ("invite1", "🤝", "First Invite",     "Bring 1 reader on board",            "ref_count",     1,  1.0),
+    ("invite3", "👥", "Squad Builder",    "Grow your circle to 3 readers",      "ref_count",     3,  2.0),
+    ("invite7", "🌟", "Influencer",       "Welcome 7 readers to the library",   "ref_count",     7,  5.0),
+    ("level5",  "📈", "Rising Reader",    "Climb to Level 5",                   "level",         5,  2.0),
+    ("play25",  "🎮", "Game Buff",        "Play 25 games in the arcade",        "games_played",  25, 2.0),
 ]
 
 

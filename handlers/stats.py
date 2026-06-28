@@ -45,21 +45,31 @@ async def _build() -> str:
     bgm = await _sum("bookgem")
     bcn = await _sum("bookcoin")
     # Only show the organic/imported split once a legacy import has happened.
-    users_block = f"👥 <b>Users:</b> <code>{users:,}</code>\n"
+    users_block = f"👥 <b>Readers on board:</b> <code>{users:,}</code>\n"
     if imported:
-        users_block += (f"   └ 🌱 Organic: <code>{organic:,}</code> · "
-                        f"📦 Imported: <code>{imported:,}</code>\n")
+        users_block += (f"   └ 🌱 Grown here: <code>{organic:,}</code> · "
+                        f"📦 Brought over: <code>{imported:,}</code>\n")
     return (
-        "<b>📊 Bot Analytics</b>\n"
+        "📊 <b>The Library, by the Numbers</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
+        "<i>A live look at how big this community has grown.</i>\n"
+        "<blockquote>"
         + users_block +
-        f"📚 <b>Archive files:</b> <code>{files:,}</code>\n"
-        f"📥 <b>Downloads:</b> <code>{int(downloads):,}</code>\n\n"
-        "<b>📨 Requests</b>\n"
-        f"⏳ Pending: <code>{pend}</code> · ✅ Fulfilled: <code>{done}</code> · "
-        f"❌ Cancelled: <code>{canc}</code>\n\n"
-        "<b>💰 Tokens in circulation</b>\n"
-        f"💎 BGM: <code>{bgm:,.2f}</code> · 🪙 BCN: <code>{bcn:,.2f}</code>"
+        f"📚 <b>Titles in the archive:</b> <code>{files:,}</code>\n"
+        f"📥 <b>Books delivered:</b> <code>{int(downloads):,}</code>"
+        "</blockquote>\n"
+        "📨 <b>Request desk</b>\n"
+        "<blockquote>"
+        f"⏳ In progress: <code>{pend}</code> · "
+        f"✅ Fulfilled: <code>{done}</code> · "
+        f"❌ Cancelled: <code>{canc}</code>"
+        "</blockquote>\n"
+        "💰 <b>Tokens in circulation</b>\n"
+        "<blockquote>"
+        f"💎 BGM: <code>{bgm:,.2f}</code> · 🪙 BCN: <code>{bcn:,.2f}</code>\n"
+        "<i>BGM is the premium, permanent currency; BCN is the free daily token.</i>"
+        "</blockquote>\n"
+        "<i>💡 Counts refresh every time you open this card.</i>"
     )
 
 

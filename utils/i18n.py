@@ -27,7 +27,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Bem-vindo de volta", "ru": "С возвращением", "ar": "مرحبًا بعودتك",
     },
     "ready": {
-        "en": "Your reading companion is ready.",
+        "en": "Your library is ready when you are.",
         "es": "Tu compañero de lectura está listo.",
         "hi": "आपका पठन साथी तैयार है।",
         "pt": "Seu companheiro de leitura está pronto.",
@@ -35,7 +35,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "ar": "رفيق القراءة الخاص بك جاهز.",
     },
     "lang_set": {
-        "en": "Language updated", "es": "Idioma actualizado", "hi": "भाषा अपडेट हुई",
+        "en": "Language saved", "es": "Idioma actualizado", "hi": "भाषा अपडेट हुई",
         "pt": "Idioma atualizado", "ru": "Язык обновлён", "ar": "تم تحديث اللغة",
     },
     "pick_lang": {

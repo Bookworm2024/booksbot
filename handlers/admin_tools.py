@@ -40,23 +40,33 @@ def _is_admin(uid: int) -> bool:
 @router.callback_query(F.data == "admin_addbgm")
 async def cb_addbgm(call: CallbackQuery, state: FSMContext) -> None:
     if not _is_admin(call.from_user.id):
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
         return
     await call.answer()
     await state.set_state(ToolsFSM.addbgm_user)
-    await call.message.answer("➕ <b>Add BGM</b>\nSend the target <b>User ID</b>. /cancel to abort.")
+    await call.message.answer(
+        "➕ <b>Grant BGM</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>Credit 💎 BGM straight to a member's wallet — they're notified the "
+        "moment it lands.\n\n"
+        "Send the recipient's <b>User ID</b> to begin.</blockquote>\n"
+        "<i>Send <code>/cancel</code> anytime to step back.</i>")
 
 
 @router.message(ToolsFSM.addbgm_user, F.text)
 async def on_addbgm_user(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     if raw.lower() == "/cancel":
-        await state.clear(); await message.answer("❌ Cancelled."); return
+        await state.clear(); await message.answer("❌ <b>Cancelled.</b>\n<i>No changes were made.</i>"); return
     if not raw.isdigit():
-        await message.answer("⚠️ Send a numeric User ID."); return
+        await message.answer(
+            "⚠️ <b>That doesn't look like a User ID</b>\n"
+            "<i>A User ID is numbers only — please send just the digits.</i>"); return
     await state.update_data(target=int(raw))
     await state.set_state(ToolsFSM.addbgm_amount)
-    await message.answer("💎 How much BGM to add?")
+    await message.answer(
+        "💎 <b>Amount to grant</b>\n"
+        "<i>How much BGM should land in their wallet? Send the number.</i>")
 
 
 @router.message(ToolsFSM.addbgm_amount, F.text)
@@ -67,15 +77,25 @@ async def on_addbgm_amount(message: Message, state: FSMContext) -> None:
     ok, amount = valid_amount(raw)
     if not ok:
         await message.answer(
-            f"⚠️ Enter a positive number up to {fmt_amount(MAX_AMOUNT)} "
-            "(no <code>1e21</code> / <code>inf</code>).")
+            f"⚠️ <b>That amount won't work</b>\n"
+            f"<i>Enter a positive number up to <code>{fmt_amount(MAX_AMOUNT)}</code> — no "
+            "<code>1e21</code> or <code>inf</code> values.</i>")
         return
     target = data.get("target")
     await add_bgm(target, amount)
-    await message.answer(f"✅ Added <b>{fmt_amount(amount)} BGM</b> to <code>{target}</code>.")
+    await message.answer(
+        "✨ <b>Grant complete</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>💎 <b>{fmt_amount(amount)} BGM</b> credited to <code>{target}</code>.\n"
+        "Their wallet is updated and a notification is on its way.</blockquote>")
     try:
         await message.bot.send_message(
-            target, f"🎁 An admin granted you <b>+{fmt_amount(amount)} BGM</b>.")
+            target,
+            "🎁 <b>A gift has landed</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>The team just added <b>+{fmt_amount(amount)} BGM</b> 💎 to your "
+            "wallet — yours to spend across the library, games and rewards.</blockquote>\n"
+            "<i>💡 Tip: BGM never expires, so there's no rush to use it.</i>")
     except Exception:  # noqa: BLE001
         pass
 
@@ -84,19 +104,29 @@ async def on_addbgm_amount(message: Message, state: FSMContext) -> None:
 @router.message(Command("user"))
 async def cmd_user(message: Message, state: FSMContext) -> None:
     if not _is_admin(message.chat.id):
-        await message.answer("🚫 Access denied."); return
+        await message.answer("🛡 <b>Admins only</b>\n<i>This lookup is restricted to the team.</i>"); return
     await state.set_state(ToolsFSM.lookup)
-    await message.answer("👤 Send the <b>User ID</b> to look up:")
+    await message.answer(
+        "👤 <b>User Lookup</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>Pull a 360° profile — wallet, VIP tier, requests, downloads and "
+        "account status, all in one card.\n\n"
+        "Send the member's <b>User ID</b> to view it.</blockquote>")
 
 
 @router.callback_query(F.data == "admin_userinfo")
 async def cb_userinfo(call: CallbackQuery, state: FSMContext) -> None:
     if not _is_admin(call.from_user.id):
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
         return
     await call.answer()
     await state.set_state(ToolsFSM.lookup)
-    await call.message.answer("👤 Send the <b>User ID</b> to look up:")
+    await call.message.answer(
+        "👤 <b>User Lookup</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>Pull a 360° profile — wallet, VIP tier, requests, downloads and "
+        "account status, all in one card.\n\n"
+        "Send the member's <b>User ID</b> to view it.</blockquote>")
 
 
 @router.message(ToolsFSM.lookup, F.text)
@@ -104,12 +134,16 @@ async def on_lookup(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     await state.clear()
     if not raw.isdigit():
-        await message.answer("⚠️ Send a numeric User ID."); return
+        await message.answer(
+            "⚠️ <b>That doesn't look like a User ID</b>\n"
+            "<i>A User ID is numbers only — please send just the digits.</i>"); return
     uid = int(raw)
     db = await MongoManager.get()
     u = await db.find_one_global("users", {"user_id": uid})
     if not u:
-        await message.answer("❌ No such user."); return
+        await message.answer(
+            "🔍 <b>No member found</b>\n"
+            "<i>No account matches that ID — double-check the number and try again.</i>"); return
     bgm, bcn = await get_balances(uid)
     vip = await badge(uid) or "—"
     joined = u.get("joined_at")
@@ -117,20 +151,27 @@ async def on_lookup(message: Message, state: FSMContext) -> None:
     pending = await db.count_global("requests", {"user_id": uid, "status": "pending"})
     fulfilled = await db.count_global("requests", {"user_id": uid, "status": "fulfilled"})
     await message.answer(
-        f"👤 <b>User {uid}</b>\n"
+        f"👤 <b>Member Profile · {uid}</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        f"🧑 {u.get('first_name','—')} (@{u.get('username') or '—'})\n"
-        f"🚦 {'🚫 BANNED' if u.get('is_banned') else '✅ Active'}\n"
-        f"👑 VIP: {vip}\n"
-        f"💎 BGM: <code>{fmt_amount(bgm)}</code> · 🪙 BCN: <code>{fmt_amount(bcn)}</code>\n"
+        "<blockquote>"
+        f"🧑 <b>{u.get('first_name','—')}</b> (@{u.get('username') or '—'})\n"
+        f"🚦 Status: <b>{'🚫 Banned' if u.get('is_banned') else '✅ Active'}</b>\n"
+        f"👑 VIP tier: <b>{vip}</b>\n"
+        f"📅 Joined: <b>{joined_s}</b></blockquote>\n"
+        "<b>💼 Wallet</b>\n"
+        "<blockquote>"
+        f"💎 BGM: <code>{fmt_amount(bgm)}</code>\n"
+        f"🪙 BCN: <code>{fmt_amount(bcn)}</code>\n"
+        f"🎮 Earned in games: <code>{fmt_amount(u.get('game_bgm'))}</code> BGM</blockquote>\n"
+        "<b>📊 Activity</b>\n"
+        "<blockquote>"
         f"📥 Downloads: <code>{int(u.get('downloads') or 0)}</code>\n"
-        f"📚 eBook reqs: <code>{int(u.get('ebook_requests') or 0)}</code> · "
-        f"🎧 Audio: <code>{int(u.get('audiobook_requests') or 0)}</code>\n"
-        f"📨 Requests: ⏳{pending} · ✅{fulfilled}\n"
-        f"🎁 Referrals: <code>{int(u.get('ref_count') or 0)}</code>\n"
-        f"🎮 Game BGM: <code>{fmt_amount(u.get('game_bgm'))}</code>\n"
-        f"📅 Joined: {joined_s}",
-        reply_markup=kb([btn("➕ Add BGM", "admin_addbgm", style="success"),
+        f"📚 eBook requests: <code>{int(u.get('ebook_requests') or 0)}</code> · "
+        f"🎧 Audiobooks: <code>{int(u.get('audiobook_requests') or 0)}</code>\n"
+        f"📨 Request queue: ⏳ <code>{pending}</code> pending · ✅ <code>{fulfilled}</code> fulfilled\n"
+        f"🎁 Referrals: <code>{int(u.get('ref_count') or 0)}</code></blockquote>\n"
+        "<i>💡 Use the tools below to credit or correct this member's balance.</i>",
+        reply_markup=kb([btn("➕ Grant BGM", "admin_addbgm", style="success"),
                          btn("✏️ Set BGM", f"admin_setbgm:{uid}", style="primary")]))
 
 
@@ -138,100 +179,126 @@ async def on_lookup(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data.startswith("admin_setbgm:"))
 async def cb_setbgm(call: CallbackQuery, state: FSMContext) -> None:
     if not _is_admin(call.from_user.id):
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
         return
     try:
         target = int(call.data.split(":", 1)[1])
     except ValueError:
-        await call.answer("Bad target", show_alert=True)
+        await call.answer("That target ID isn't valid — please reopen the lookup.", show_alert=True)
         return
     await call.answer()
     await state.set_state(ToolsFSM.setbgm_amount)
     await state.update_data(setbgm_target=target)
     await call.message.answer(
-        f"✏️ <b>Set BGM</b> for <code>{target}</code>\nSend the exact BGM balance to "
-        "set (this OVERWRITES the current value and collapses any split). /cancel to abort.")
+        f"✏️ <b>Set BGM · <code>{target}</code></b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>Use this to repair a wallet — it <b>overwrites</b> the current balance "
+        "with the exact figure you send and collapses any split.\n\n"
+        "Send the precise BGM balance to set.</blockquote>\n"
+        "<i>⚠️ This replaces the value rather than adding to it. Send <code>/cancel</code> to step back.</i>")
 
 
 @router.message(ToolsFSM.setbgm_amount, F.text)
 async def on_setbgm_amount(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     if raw.lower() == "/cancel":
-        await state.clear(); await message.answer("❌ Cancelled."); return
+        await state.clear(); await message.answer("❌ <b>Cancelled.</b>\n<i>The balance is unchanged.</i>"); return
     data = await state.get_data()
     await state.clear()
     ok, amount = valid_amount(raw, allow_zero=True)
     if not ok:
         await message.answer(
-            f"⚠️ Enter a value from 0 to {fmt_amount(MAX_AMOUNT)} "
-            "(no <code>1e21</code> / <code>inf</code>).")
+            f"⚠️ <b>That value won't work</b>\n"
+            f"<i>Enter a figure from <code>0</code> to <code>{fmt_amount(MAX_AMOUNT)}</code> — no "
+            "<code>1e21</code> or <code>inf</code> values.</i>")
         return
     target = data.get("setbgm_target")
     new_val = await set_bgm(target, amount)
     await message.answer(
-        f"✅ BGM for <code>{target}</code> set to <b>{fmt_amount(new_val)}</b>.")
+        "✅ <b>Balance updated</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>💎 BGM for <code>{target}</code> is now <b>{fmt_amount(new_val)}</b>.\n"
+        "The wallet has been overwritten with the exact value you set.</blockquote>")
 
 
 # ── Bulk BGM grant (to ALL users) ───────────────────────────────────────────────
 @router.callback_query(F.data == "admin_bulk")
 async def cb_bulk(call: CallbackQuery, state: FSMContext) -> None:
     if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
         return
     await call.answer()
     await state.set_state(ToolsFSM.bulk_amount)
-    await call.message.answer("🎁 <b>Bulk Grant</b>\nHow much BGM to give <b>every user</b>? "
-                              "/cancel to abort.")
+    await call.message.answer(
+        "🎁 <b>Bulk Grant</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>Reward the whole community at once — every member receives the same "
+        "💎 BGM credit. Ideal for milestones, apologies or seasonal goodwill.\n\n"
+        "How much BGM should <b>every member</b> receive?</blockquote>\n"
+        "<i>You'll confirm before anything is granted. Send <code>/cancel</code> to step back.</i>")
 
 
 @router.message(ToolsFSM.bulk_amount, F.text)
 async def on_bulk_amount(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     if raw.lower() == "/cancel":
-        await state.clear(); await message.answer("❌ Cancelled."); return
+        await state.clear(); await message.answer("❌ <b>Cancelled.</b>\n<i>No one was credited.</i>"); return
     ok, amount = valid_amount(raw)
     if not ok:
-        await message.answer(f"⚠️ Enter a positive number up to {fmt_amount(MAX_AMOUNT)}."); return
+        await message.answer(
+            f"⚠️ <b>That amount won't work</b>\n"
+            f"<i>Enter a positive number up to <code>{fmt_amount(MAX_AMOUNT)}</code>.</i>"); return
     await state.clear()
     db = await MongoManager.get()
     total = await db.count_global("users")
     await message.answer(
-        f"⚠️ Grant <b>{fmt_amount(amount)} BGM</b> to all <b>{total}</b> users?",
-        reply_markup=kb([btn("✅ Confirm", f"bulk_do:{amount}", style="success")],
+        "⚠️ <b>Confirm bulk grant</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>You're about to credit <b>{fmt_amount(amount)} BGM</b> 💎 to every one "
+        f"of your <b>{total}</b> members.\n\n"
+        "This is immediate and can't be undone in one step — please confirm.</blockquote>",
+        reply_markup=kb([btn("✅ Confirm grant", f"bulk_do:{amount}", style="success")],
                         [btn("❌ Cancel", "admin_open", style="danger")]))
 
 
 @router.callback_query(F.data.startswith("bulk_do:"))
 async def cb_bulk_do(call: CallbackQuery) -> None:
     if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
         return
     ok, amount = valid_amount(call.data.split(":", 1)[1])
     if not ok:
-        await call.answer("Invalid amount.", show_alert=True)
+        await call.answer("That amount is no longer valid — please start the grant again.", show_alert=True)
         return
-    await call.answer("Granting…")
+    await call.answer("Crediting every wallet…")
     db = await MongoManager.get()
     affected = 0
     for idx in db.healthy:
         res = await db.dbs[idx]["users"].update_many({}, {"$inc": {"bookgem": amount}})
         affected += res.modified_count
     await call.message.edit_text(
-        f"✅ Granted <b>{fmt_amount(amount)} BGM</b> to <b>{affected}</b> users.")
+        "✨ <b>Bulk grant complete</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>💎 <b>{fmt_amount(amount)} BGM</b> credited to <b>{affected}</b> members.\n"
+        "Every wallet is updated and ready to spend.</blockquote>")
 
 
 # ── Maintenance mode ─────────────────────────────────────────────────────────
 @router.callback_query(F.data == "admin_maint")
 async def cb_maint(call: CallbackQuery) -> None:
     if not _is_admin(call.from_user.id):
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
         return
     await call.answer()
     db = await MongoManager.get()
     on = bool(await db.kv_get("maintenance", False))
     await call.message.edit_text(
-        f"🛠 <b>Maintenance Mode</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"Status: <b>{'🔴 ON (users blocked)' if on else '🟢 OFF'}</b>",
+        "🛠 <b>Maintenance Mode</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>Pause the bot for everyone but the team — perfect for deploys, "
+        "migrations or a quick tidy-up. Members see a friendly hold message; admins keep "
+        "full access.</blockquote>\n"
+        f"Status: <b>{'🔴 On — members are paused' if on else '🟢 Off — fully open'}</b>",
         reply_markup=kb(
             [btn("🔴 Turn ON", "maint_on", style="danger") if not on
              else btn("🟢 Turn OFF", "maint_off", style="success")],
@@ -241,9 +308,10 @@ async def cb_maint(call: CallbackQuery) -> None:
 @router.callback_query(F.data.in_({"maint_on", "maint_off"}))
 async def cb_maint_toggle(call: CallbackQuery) -> None:
     if not _is_admin(call.from_user.id):
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("Admins only — this control panel is restricted.", show_alert=True)
         return
     db = await MongoManager.get()
-    await db.kv_set("maintenance", call.data == "maint_on")
-    await call.answer("Updated")
+    on = call.data == "maint_on"
+    await db.kv_set("maintenance", on)
+    await call.answer("Maintenance paused for members." if on else "Bot is live for everyone again.")
     await cb_maint(call)

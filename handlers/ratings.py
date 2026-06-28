@@ -32,9 +32,14 @@ async def cb_rate(call: CallbackQuery) -> None:
     f = await get_file(fuid)
     name = (f or {}).get("name", "this book")
     mine = await user_rating(call.from_user.id, fuid)
-    cur = f"\nYour current rating: {'⭐' * int(mine['stars'])}" if mine else ""
+    cur = (f"\n\n<blockquote>Your current rating: <b>{'⭐' * int(mine['stars'])}</b>\n"
+           "<i>Tap a new score below to update it anytime.</i></blockquote>") if mine else ""
     await call.message.edit_text(
-        f"⭐ <b>Rate</b> <i>{escape(name[:60])}</i>{cur}\n\nHow many stars?",
+        f"⭐ <b>Rate this title</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<i>{escape(name[:60])}</i>{cur}\n\n"
+        "<blockquote>How was it? Choose a score from <b>1</b> to <b>5</b> stars — "
+        "your verdict helps fellow readers pick their next great read.</blockquote>",
         reply_markup=kb([btn(f"{n}⭐", f"bookrate_set:{fuid}:{n}", style="primary") for n in (1, 2, 3)],
                         [btn(f"{n}⭐", f"bookrate_set:{fuid}:{n}", style="primary") for n in (4, 5)],
                         [btn("📊 See Reviews", f"revw:{fuid}", style="primary")],
@@ -47,12 +52,16 @@ async def cb_rate_set(call: CallbackQuery) -> None:
     n = max(1, min(5, int(n)))
     f = await get_file(fuid)
     await set_rating(call.from_user.id, fuid, n, name=(f or {}).get("name", ""))
-    await call.answer(f"Rated {n}⭐ — thanks!")
+    await call.answer(f"Rated {n}⭐ — thank you!")
     avg, count = await summary(fuid)
     await call.message.edit_text(
-        f"✅ <b>You rated it {'⭐' * n}</b>\n\n"
-        f"📊 Average: {stars_bar(avg)} <b>{avg:g}</b> ({count} rating{'s' if count != 1 else ''})\n\n"
-        "Want to add a few words?",
+        f"✨ <b>Rating saved</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<i>You gave it {'⭐' * n} — thank you for sharing.</i>\n\n"
+        "<blockquote>📊 <b>Reader score</b>\n"
+        f"{stars_bar(avg)}  <b>{avg:g}</b> · <code>{count}</code> rating{'s' if count != 1 else ''}</blockquote>\n\n"
+        "<blockquote>Want to say a little more? A sentence or two on what stood out "
+        "helps the next reader decide — and earns your taste a place on the shelf.</blockquote>",
         reply_markup=kb([btn("✍️ Write a Review", f"rate_rev:{fuid}", style="success")],
                         [btn("📊 See Reviews", f"revw:{fuid}", style="primary"),
                          btn("🔙 Favorites", "lib_favorites", style="danger")]))
@@ -64,15 +73,25 @@ async def cb_rate_rev(call: CallbackQuery, state: FSMContext) -> None:
     fuid = call.data.split(":", 1)[1]
     await state.set_state(RateFSM.review)
     await state.update_data(fuid=fuid)
-    await call.message.edit_text("✍️ <b>Write your review</b> (a sentence or two). "
-                                 "/cancel to skip.")
+    await call.message.edit_text(
+        "✍️ <b>Write your review</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>A sentence or two is plenty.</i>\n\n"
+        "<blockquote>Tell other readers what made this one worth their time — the "
+        "writing, the pacing, the ending. Keep it kind and on-topic.\n\n"
+        "Send your review as a message, or tap <code>/cancel</code> to skip.</blockquote>")
 
 
 @router.message(RateFSM.review, F.text)
 async def on_review(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     if raw.lower() == "/cancel":
-        await state.clear(); await message.answer("❌ Cancelled."); return
+        await state.clear()
+        await message.answer(
+            "❌ <b>Review cancelled</b>\n"
+            "<i>No words saved — your star rating still counts. "
+            "You can write one anytime from 📊 Reviews.</i>")
+        return
     data = await state.get_data()
     fuid = data.get("fuid")
     await state.clear()
@@ -81,13 +100,20 @@ async def on_review(message: Message, state: FSMContext) -> None:
     from utils.moderation import check
     ok, reason = await check(raw)
     if not ok:
-        await message.answer(f"⚠️ <b>Review blocked</b> ({reason}). Please keep it on-topic and "
-                             "try again from 📊 Reviews.")
+        await message.answer(
+            f"⚠️ <b>We couldn't post that review</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>Reason: <i>{escape(reason)}</i>\n\n"
+            "Please keep reviews respectful and about the book itself, then try "
+            "again from 📊 Reviews.</blockquote>")
         return
     await set_review(message.chat.id, fuid, raw)
-    await message.answer("✅ <b>Review saved</b> — thanks for helping other readers!",
-                         reply_markup=kb([btn("📊 See Reviews", f"revw:{fuid}", style="primary")],
-                                         [btn("🔙 Favorites", "lib_favorites", style="danger")]))
+    await message.answer(
+        "✨ <b>Review published</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Thank you — your words now help fellow readers choose well.</i>",
+        reply_markup=kb([btn("📊 See Reviews", f"revw:{fuid}", style="primary")],
+                        [btn("🔙 Favorites", "lib_favorites", style="danger")]))
 
 
 async def _reviews_view(uid: int, fuid: str):
@@ -95,17 +121,22 @@ async def _reviews_view(uid: int, fuid: str):
     f = await get_file(fuid)
     name = (f or {}).get("name", "this book")
     avg, count = await summary(fuid)
-    text = (f"📊 <b>Reviews</b> — <i>{escape(name[:60])}</i>\n━━━━━━━━━━━━━━━━━━\n"
-            f"{stars_bar(avg)} <b>{avg:g}</b> from {count} rating{'s' if count != 1 else ''}\n")
+    text = (f"📊 <b>Reviews</b>\n━━━━━━━━━━━━━━━━━━\n"
+            f"<i>{escape(name[:60])}</i>\n\n"
+            f"<blockquote>{stars_bar(avg)}  <b>{avg:g}</b> · "
+            f"<code>{count}</code> rating{'s' if count != 1 else ''} from the community</blockquote>\n")
     if count:
         revs = await recent_reviews(fuid, limit=5)
         for r in revs:
             who = escape((r.get("name") or "Reader")[:20])
-            text += f"\n{'⭐' * int(r.get('stars') or 0)} <b>{who}</b>\n<i>{escape(r.get('review',''))}</i>\n"
+            text += (f"\n{'⭐' * int(r.get('stars') or 0)} <b>{who}</b>\n"
+                     f"<blockquote><i>{escape(r.get('review',''))}</i></blockquote>\n")
         if not revs:
-            text += "\n<i>No written reviews yet — be the first!</i>"
+            text += ("\n<i>No written reviews yet — be the first to share what you "
+                     "thought, and set the tone for this title.</i>")
     else:
-        text += "\n<i>No ratings yet — be the first to rate it!</i>"
+        text += ("\n<i>No ratings yet — be the first to weigh in and help this book "
+                 "find its readers.</i>")
     # reactions bar (toggle, one per user)
     rc = await react_counts(fuid)
     mine = await user_reaction(fuid, uid)
@@ -120,9 +151,9 @@ async def _reviews_view(uid: int, fuid: str):
     fin = await is_finished(uid, fuid)
     return text, kb(react_row,
                     [btn("⭐ Rate it", f"rate:{fuid}", style="success"),
-                     btn("✅ Finished" if not fin else "✅ Finished ✓", f"fin_add:{fuid}",
+                     btn("✅ Mark Finished" if not fin else "✅ Finished ✓", f"fin_add:{fuid}",
                          style="primary")],
-                    [btn("📝 Add Note", f"note_add:{fuid}", style="primary"),
+                    [btn("📝 Add a Note", f"note_add:{fuid}", style="primary"),
                      btn("🔙 Favorites", "lib_favorites", style="danger")])
 
 
@@ -146,6 +177,6 @@ async def cb_react(call: CallbackQuery) -> None:
     except (ValueError, IndexError):
         await call.answer(); return
     new = await toggle(fuid, call.from_user.id, emoji)
-    await call.answer(f"Reacted {emoji}" if new else "Reaction removed")
+    await call.answer(f"Your reaction {emoji} is in — thanks!" if new else "Reaction removed.")
     text, markup = await _reviews_view(call.from_user.id, fuid)
     await call.message.edit_text(text, reply_markup=markup)

@@ -27,8 +27,14 @@ async def on_stray_text(message: Message, state: FSMContext) -> None:
     if txt.startswith("/"):
         return  # unknown command — stay quiet, don't nag
     await message.answer(
-        "🤔 <b>Looking for a book?</b>\n\n"
-        "Tap <b>📚 Request a Book</b> and send me the title — I'll search the "
-        "archive for it.",
+        "🔭 <b>Looking for a title?</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Tell me the book — I'll search the whole archive for you.</i>\n\n"
+        "<blockquote>📚 Tap <b>Request a Book</b>, then send me a title or author. "
+        "I'll scan tens of thousands of eBooks and audiobooks and deliver a match "
+        "in an instant.\n\n"
+        "🏠 Or open the <b>Menu</b> to browse your library, play for rewards and "
+        "manage your wallet.</blockquote>\n\n"
+        "<i>💡 Tip: the more precise the title, the sharper the match.</i>",
         reply_markup=kb([btn("📚 Request a Book", "req_auto", style="success")],
-                        [btn("🏠 Menu", "menu_home", style="primary")]))
+                        [btn("🏠 Open Menu", "menu_home", style="primary")]))

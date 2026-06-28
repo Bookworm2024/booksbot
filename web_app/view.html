@@ -6,28 +6,70 @@
 <title>Books Provider — Viewer</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-  :root { color-scheme: light dark; }
+  :root {
+    color-scheme: light dark;
+    --accent: var(--tg-theme-button-color, #3390ec);
+    --accent-text: var(--tg-theme-button-text-color, #ffffff);
+    --ink: var(--tg-theme-text-color, #e8e8e8);
+    --muted: var(--tg-theme-hint-color, #8b95a3);
+    --surface: var(--tg-theme-secondary-bg-color, #1a1e26);
+  }
   * { box-sizing: border-box; }
   html, body { margin:0; min-height:100vh; background: var(--tg-theme-bg-color,#0f1115);
-    color: var(--tg-theme-text-color,#e8e8e8); font-family: system-ui, sans-serif; }
-  #bar { display:flex; align-items:center; gap:8px; padding:8px 10px; position:sticky; top:0; z-index:5;
-    background: var(--tg-theme-secondary-bg-color,#1c2027); }
-  #bar button { border:0; border-radius:10px; padding:8px 12px; font-weight:700; cursor:pointer;
-    background: var(--tg-theme-secondary-bg-color,#262b33); color: var(--tg-theme-text-color,#e8e8e8); }
-  #bar .pri { background: var(--tg-theme-button-color,#3390ec); color:#fff; }
-  #title { flex:1; font-size:.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #stage { padding:12px; display:flex; flex-direction:column; align-items:center; gap:12px; }
-  img#img { max-width:100%; border-radius:8px; transition:transform .2s; }
-  video#vid { width:100%; max-width:900px; border-radius:8px; background:#000; }
-  pre#txt { white-space:pre-wrap; word-break:break-word; width:100%; max-width:760px; line-height:1.6;
-    font-size:16px; font-family: Georgia, serif; }
+    color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased; }
+  #bar { display:flex; align-items:center; gap:8px; padding:10px 12px; position:sticky; top:0; z-index:5;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: saturate(160%) blur(12px); -webkit-backdrop-filter: saturate(160%) blur(12px);
+    border-bottom:1px solid color-mix(in srgb, var(--ink) 8%, transparent); }
+  #bar button { border:0; border-radius:11px; padding:9px 14px; font-weight:700; font-size:.9rem; cursor:pointer;
+    background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink);
+    transition: transform .12s ease, filter .15s ease, background .15s ease; }
+  #bar button:hover { filter:brightness(1.08); }
+  #bar button:active { transform: scale(.96); }
+  #bar .pri { background: var(--accent); color: var(--accent-text); }
+  #title { flex:1; font-size:.9rem; font-weight:600; letter-spacing:-.01em;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #stage { padding:14px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  img#img { max-width:100%; border-radius:14px; cursor:zoom-in; transition:transform .25s cubic-bezier(.22,.61,.36,1);
+    box-shadow:0 14px 38px -16px rgba(0,0,0,.6); }
+  video#vid { width:100%; max-width:900px; border-radius:14px; background:#000;
+    box-shadow:0 14px 38px -16px rgba(0,0,0,.6); }
+  pre#txt { white-space:pre-wrap; word-break:break-word; width:100%; max-width:720px; line-height:1.75;
+    font-size:16px; font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    letter-spacing:.005em; padding:8px 4px; margin:0; }
   .ctl { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
-  .ctl button.on { background: var(--tg-theme-button-color,#3390ec); color:#fff; }
-  #msg { padding:48px 20px; text-align:center; }
+  .ctl button { border:0; border-radius:11px; padding:9px 14px; font-weight:700; font-size:.9rem; cursor:pointer;
+    background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink);
+    transition: transform .12s ease, filter .15s ease, background .15s ease; }
+  .ctl button:hover { filter:brightness(1.08); }
+  .ctl button:active { transform: scale(.96); }
+  .ctl button.on { background: var(--accent); color: var(--accent-text); }
+  .ctl span { align-self:center; font-size:.85rem; font-weight:600; color: var(--muted);
+    font-variant-numeric: tabular-nums; }
+  #msg { padding:64px 26px; text-align:center; max-width:24rem; margin:0 auto;
+    animation: rise .5s cubic-bezier(.22,.61,.36,1) both; }
+  #msg .glyph { font-size:3rem; line-height:1; margin-bottom:.85rem; display:block; }
+  #msg .lead { font-size:1.18rem; font-weight:800; letter-spacing:-.02em; margin:0 0 .4rem; }
+  #msg .sub { font-size:.96rem; line-height:1.55; color: var(--muted); margin:0; }
+  #msg button { border:0; border-radius:12px; padding:11px 20px; font-weight:700; font-size:.95rem;
+    cursor:pointer; background: var(--accent); color: var(--accent-text); margin-top:1.4rem;
+    transition: transform .12s ease, filter .15s ease; }
+  #msg button:hover { filter:brightness(1.06); }
+  #msg button:active { transform: scale(.96); }
+  /* loading shimmer in the title bar */
+  #title.loading { position:relative; color: var(--muted); }
+  @keyframes rise { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes pulse { 0%,100% { opacity:.55; } 50% { opacity:1; } }
+  #title.loading { animation: pulse 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    #msg, #title.loading { animation:none; }
+    img#img, video#vid, #bar button, .ctl button, #msg button { transition:none; }
+  }
 </style>
 </head>
 <body>
-<div id="bar"><div id="title">Loading…</div></div>
+<div id="bar"><div id="title" class="loading">Opening your file…</div></div>
 <div id="stage"></div>
 <div id="msg" style="display:none"></div>
 
@@ -44,7 +86,7 @@ const TEXT  = ["txt","md","markdown","log","csv"];
 const COMIC = ["cbz"];
 const DOC   = ["pdf","epub"];
 
-function showMsg(t){ msg.style.display="block"; msg.innerHTML=t+`<br><br><button onclick="tg?.close()" style="padding:10px 16px;border:0;border-radius:10px;background:#3390ec;color:#fff">Close</button>`; stage.style.display="none"; }
+function showMsg(t){ msg.style.display="block"; msg.innerHTML=`<div class="lead">${t.lead||t}</div>`+(t.sub?`<div class="sub">${t.sub}</div>`:``)+`<button onclick="tg?.close()">Close reader</button>`; stage.style.display="none"; title.classList.remove("loading"); }
 function saveState(extra){ fetch("/api/reader/state",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({init_data:INIT,fuid:FUID,...extra})}); }
 async function getState(){ try{ return await (await fetch(`/api/reader/state?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`)).json(); }catch(e){ return {}; } }
 
@@ -60,24 +102,24 @@ async function fetchFile(){
 }
 
 async function boot(){
-  if(!FUID){ return showMsg("⚠️ No file specified."); }
-  title.textContent = EXT.toUpperCase()+" file";
+  if(!FUID){ return showMsg({lead:"📭 Nothing to open", sub:"No file was specified for this session. Head back and pick a title to start reading."}); }
+  title.classList.remove("loading"); title.textContent = EXT.toUpperCase()+" file";
   let r;
   try { r = await fetchFile(); }
   catch(err){
-    const m = err==="too_large" ? "📄 Too large to open in-app — receive it in chat."
-      : err==="not_in_library" ? "🔒 Add it to Favorites first."
-      : err==="stream_unavailable" ? "📄 This archive file can't be streamed — receive it in chat."
-      : "❌ Couldn't load this file.";
+    const m = err==="too_large" ? {lead:"📄 A little too big for the in-app reader", sub:"Tap “📥 Chat” from your favorites and we’ll deliver the full file straight to your chat."}
+      : err==="not_in_library" ? {lead:"🔒 Save it to your library first", sub:"Add this title to your Favorites, then reopen it here to start reading."}
+      : err==="stream_unavailable" ? {lead:"📄 This one streams best in chat", sub:"This archive file can’t be opened in-app — receive it in chat and enjoy it there."}
+      : {lead:"❌ We couldn’t open this file", sub:"Something went wrong on our side. Please try again in a moment, or receive it in chat."};
     return showMsg(m);
   }
   if (VIDEO.includes(EXT)) return renderVideo(URL.createObjectURL(await r.blob()));
   if (IMAGE.includes(EXT)) return renderImage(URL.createObjectURL(await r.blob()));
   if (TEXT.includes(EXT))  return renderText(await r.text());
   if (COMIC.includes(EXT)) return renderComic(await r.arrayBuffer());
-  if (EXT==="cbr") return showMsg("📚 CBR (RAR) isn't supported in-app yet — receive it in chat. (CBZ works here.)");
+  if (EXT==="cbr") return showMsg({lead:"📚 CBR comics aren’t supported in-app yet", sub:"CBR (RAR) archives open in chat for now — receive it there. CBZ comics read beautifully right here."});
   // unknown type
-  showMsg("📦 This format opens best in chat. Use “📥 Chat” from your favorites.");
+  showMsg({lead:"📦 This format opens best in chat", sub:"Use “📥 Chat” from your favorites and we’ll send you the file to enjoy."});
 }
 
 /* ---------- VIDEO ---------- */
@@ -108,11 +150,11 @@ function renderImage(src){
 async function renderComic(buf){
   await new Promise((res,rej)=>{ const s=document.createElement("script");
     s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
-  let zip; try { zip = await JSZip.loadAsync(buf); } catch(e){ return showMsg("❌ Couldn't open this comic archive."); }
+  let zip; try { zip = await JSZip.loadAsync(buf); } catch(e){ return showMsg({lead:"❌ We couldn’t open this comic", sub:"The archive looks damaged or isn’t a valid CBZ. Try receiving it in chat instead."}); }
   const names = Object.keys(zip.files).filter(n=>/\.(jpe?g|png|gif|webp)$/i.test(n) && !zip.files[n].dir).sort();
-  if(!names.length) return showMsg("📚 No images found in this comic.");
+  if(!names.length) return showMsg({lead:"📚 No pages inside this comic", sub:"We couldn’t find any images in this archive. Try receiving it in chat instead."});
   const st = await getState(); let i = Math.min(Math.max(0, st.page||0), names.length-1);
-  stage.innerHTML = `<img id="page" style="max-width:100%;border-radius:6px"><div class="ctl">
+  stage.innerHTML = `<img id="page" style="max-width:100%;border-radius:14px;box-shadow:0 14px 38px -16px rgba(0,0,0,.6)"><div class="ctl">
     <button id="p">‹ Prev</button><span id="pi" style="align-self:center"></span><button id="n">Next ›</button></div>`;
   const img=document.getElementById("page"), pi=document.getElementById("pi");
   async function show(k){ i=Math.min(Math.max(0,k),names.length-1);

@@ -62,24 +62,34 @@ def _board(word: str, guessed: list, wrong: int, status: str) -> tuple[str, list
     lives = _MAX_WRONG - wrong
     hearts = "❤️" * lives + "🖤" * wrong
     wrong_letters = [g for g in guessed if g not in word]
-    head = (f"🔤 <b>Literary Hangman</b>\n━━━━━━━━━━━━━━━━━━\n"
-            f"{hearts}\n\n<code>{_mask(word, guessed)}</code>\n")
+    head = (f"🎮 <b>Literary Hangman</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"<i>One hidden word from the world of books — reveal it letter by letter.</i>\n"
+            f"<blockquote>{hearts}\n<i>Guesses remaining:</i> <code>{lives}/{_MAX_WRONG}</code>\n\n"
+            f"<code>{_mask(word, guessed)}</code></blockquote>")
     if wrong_letters:
-        head += f"\n❌ Missed: {' '.join(wrong_letters)}\n"
+        head += f"\n❌ <b>Missed letters:</b> <code>{' '.join(wrong_letters)}</code>"
 
     rows = []
     if status == "active":
         remaining = [c for c in _ALPHA if c not in guessed]
         for i in range(0, len(remaining), 7):
             rows.append([btn(c, f"hm:{c}", style="primary") for c in remaining[i:i + 7]])
-        head += "\n👇 Pick a letter:"
+        head += "\n\n👇 <i>Tap a letter to make your guess.</i>"
     else:
         won = status == "won"
         rwd = _reward(wrong) if won else 0.0
-        head += (f"\n🎉 <b>Solved it!</b> The word was <b>{word}</b>.\n💎 <b>+{fmt_amount(rwd)} BGM</b>"
-                 if won else f"\n💀 <b>Out of guesses!</b> The word was <b>{word}</b>.")
+        head += (f"\n\n✨ <b>Solved it — beautifully done!</b>\n"
+                 f"<blockquote>The word was <b>{word}</b>.\n"
+                 f"🎁 <i>Reward credited:</i> 💎 <b>+{fmt_amount(rwd)} BGM</b> — straight to your wallet.</blockquote>\n"
+                 f"<i>💡 Fewer misses earn a richer reward. Care for another?</i>"
+                 if won else
+                 f"\n\n💀 <b>Out of guesses — that one held out.</b>\n"
+                 f"<blockquote>The word was <b>{word}</b>.\n"
+                 f"<i>No streak lost — every round sharpens your eye for the next.</i></blockquote>\n"
+                 f"<i>💡 Line up a fresh word and reclaim the win.</i>")
         rows.append([btn("🔁 New Word", "hm_new", style="success"),
-                     btn("🎮 Games", "menu_games", style="primary")])
+                     btn("🎮 Games Hub", "menu_games", style="primary")])
     return head, rows
 
 
@@ -93,13 +103,23 @@ async def _start(message: Message, uid: int, *, edit: bool) -> None:
     from utils.flags import is_on
     if not await is_on("games"):
         await (message.edit_text if edit else message.answer)(
-            "🎮 <b>Games are paused</b> right now — check back soon!",
-            reply_markup=kb([btn("🔙 Back", "menu_home", style="danger")]))
+            "⏳ <b>Games are taking a short break</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>Our game room is being polished right now. It'll be back shortly — "
+            "your library and rewards are untouched in the meantime.</blockquote>\n"
+            "<i>💡 Check back soon — there's BGM waiting to be won.</i>",
+            reply_markup=kb([btn("🔙 Back to Menu", "menu_home", style="danger")]))
         return
     db = await MongoManager.get()
     if await _plays_today(db, uid) >= _DAILY:
-        txt = f"🔤 <b>Hangman</b>\n\nDaily limit reached ({_DAILY}/day). Come back tomorrow!"
-        mk = kb([btn("🎮 Games", "menu_games", style="primary")])
+        txt = (f"🎮 <b>Literary Hangman</b>\n"
+               f"━━━━━━━━━━━━━━━━━━━━\n"
+               f"⏳ <b>You've played today's full set.</b>\n"
+               f"<blockquote>You've used all <code>{_DAILY}</code> rounds for today — nicely done. "
+               f"Your guessing board resets at midnight, ready for a clean run.\n\n"
+               f"<i>Meanwhile, plenty more to win across the Games Hub.</i></blockquote>\n"
+               f"<i>💡 Come back tomorrow for a fresh streak of rounds.</i>")
+        mk = kb([btn("🎮 Games Hub", "menu_games", style="primary")])
         await (message.edit_text if edit else message.answer)(txt, reply_markup=mk)
         return
     # count this play
@@ -139,10 +159,10 @@ async def cb_guess(call: CallbackQuery) -> None:
     db = await MongoManager.get()
     g = await db.find_one_global("hangman_games", {"uid": uid})
     if not g or g.get("status") != "active":
-        await call.answer("Start a new game.", show_alert=True)
+        await call.answer("This round has wrapped up. Tap New Word to start a fresh one.", show_alert=True)
         return
     if letter not in _ALPHA or letter in (g.get("guessed") or []):
-        await call.answer("Already tried that.")
+        await call.answer("You've already tried that letter — pick a new one.")
         return
 
     word = g["word"]
@@ -155,7 +175,8 @@ async def cb_guess(call: CallbackQuery) -> None:
     else:
         status = "active"
 
-    await call.answer("✅" if letter in word else "❌")
+    await call.answer("✅ Nice — that letter's in the word!" if letter in word
+                      else "❌ Not in this one — choose another.")
     if status == "active":
         await db.safe_update("hangman_games", {"uid": uid},
                              {"$set": {"guessed": guessed, "wrong": wrong, "status": "active"}},

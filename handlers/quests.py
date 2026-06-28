@@ -35,22 +35,40 @@ def _share_url(uid: int) -> str:
 
 async def _view(uid: int):
     items = await status(uid)
-    lines = ["<b>🚀 Growth Quests</b>", "━━━━━━━━━━━━━━━━━━",
-             "<i>One-time bounties — claim when complete.</i>", ""]
+    done_n = sum(1 for q in items if q["done"])
+    ready_n = sum(1 for q in items if q["claimable"])
+    lines = ["🚀 <b>Growth Quests</b>",
+             "━━━━━━━━━━━━━━━━━━━━",
+             "<i>One-time bounties for growing the library — finish each once, "
+             "then claim its 💎 BGM. They never reset, so take your time.</i>",
+             ""]
+    body = []
     rows = []
     for q in items:
         tick = "✅" if q["done"] else "⬜"
-        claimed = " · 🎁 claimed" if q["claimed"] else ""
-        lines.append(
+        if q["claimed"]:
+            state = " · <i>🎁 reward claimed</i>"
+        elif q["claimable"]:
+            state = " · <i>✨ ready to claim</i>"
+        else:
+            state = ""
+        body.append(
             f"{tick} {q['emoji']} <b>{q['title']}</b> — {q['desc']}\n"
-            f"   {_bar(q['have'], q['target'])} {q['have']}/{q['target']}"
-            f" · <b>+{fmt_amount(q['reward'])} BGM</b>{claimed}")
+            f"   {_bar(q['have'], q['target'])} <code>{q['have']}/{q['target']}</code>"
+            f" · <b>+{fmt_amount(q['reward'])} 💎 BGM</b>{state}")
         if q["claimable"]:
-            rows.append([btn(f"🎁 Claim {q['title']} (+{fmt_amount(q['reward'])} BGM)",
+            rows.append([btn(f"🎁 Claim {q['title']} · +{fmt_amount(q['reward'])} BGM",
                              f"quest_claim:{q['key']}", style="success")])
-    rows.append([url_btn("📤 Share the Bot", _share_url(uid), style="success"),
+    lines.append("<blockquote expandable>" + "\n".join(body) + "</blockquote>")
+    if ready_n:
+        lines.append(f"\n✨ <b>{ready_n} reward(s)</b> waiting — tap a "
+                     f"<b>Claim</b> button below to bank your 💎 BGM.")
+    else:
+        lines.append(f"\n📊 <i>Completed <code>{done_n}/{len(items)}</code> quests. "
+                     "Keep sharing, inviting and playing to unlock the rest.</i>")
+    rows.append([url_btn("📤 Share & Earn", _share_url(uid), style="success"),
                  btn("🎁 Loot Crates", "menu_crates", style="primary")])
-    rows.append([btn("🎁 Refer & Earn", "acc_refer", style="primary"),
+    rows.append([btn("🤝 Refer & Earn", "acc_refer", style="primary"),
                  btn("🔙 Account", "menu_account", style="danger")])
     return "\n".join(lines), kb(*rows)
 
@@ -76,8 +94,10 @@ async def cb_claim(call: CallbackQuery) -> None:
     qkey = call.data.split(":", 1)[1]
     paid = await claim_quest(call.from_user.id, qkey)
     if paid > 0:
-        await call.answer(f"🎉 +{fmt_amount(paid)} BGM!", show_alert=True)
+        await call.answer(f"✨ Quest complete! +{fmt_amount(paid)} BGM added to your wallet.",
+                          show_alert=True)
     else:
-        await call.answer("Not claimable yet.", show_alert=True)
+        await call.answer("⏳ Not ready yet — finish this quest's goal first, then claim.",
+                          show_alert=True)
     text, markup = await _view(call.from_user.id)
     await call.message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)

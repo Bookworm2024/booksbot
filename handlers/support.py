@@ -43,8 +43,14 @@ async def cb_support(call: CallbackQuery, state: FSMContext) -> None:
 async def _open(message: Message, state: FSMContext) -> None:
     await state.set_state(SupportFSM.awaiting_message)
     await message.answer(
-        "🆘 <b>Support</b>\n\nDescribe your issue in <b>one message</b> "
-        "(you can attach a screenshot). Send /cancel to abort.",
+        "🆘 <b>Support Inbox</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>A real person reads every message — we'll take it from here.</i>\n\n"
+        "<blockquote>📝 Describe what's happening in <b>one message</b>. "
+        "Add a screenshot if it helps us see the same screen you do.\n"
+        "💬 We reply right here in chat, usually within a few hours.\n"
+        "🛑 Changed your mind? Send <code>/cancel</code> anytime.</blockquote>\n"
+        "<i>💡 The more detail you share — a book title, a code, what you tapped — the faster we can fix it.</i>",
         reply_markup=kb([btn("❌ Cancel", "menu_account", style="danger")]))
 
 
@@ -52,15 +58,21 @@ async def _open(message: Message, state: FSMContext) -> None:
 async def on_support_msg(message: Message, state: FSMContext) -> None:
     if (message.text or "").strip().lower() == "/cancel":
         await state.clear()
-        await message.answer("❌ Support request cancelled.")
+        await message.answer(
+            "🆘 <b>Support Cancelled</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>No message was sent — your inbox is clear.</i>\n\n"
+            "<i>💡 Need us again? Just open <b>Support</b> or send <code>/support</code> whenever you're ready.</i>")
         return
     await state.clear()
     uid = message.chat.id
     name = message.from_user.first_name or "User"
     body = message.text or message.caption or "<i>(no text)</i>"
-    header = (f"📩 <b>Support Request</b>\n"
-              f"👤 <a href='tg://user?id={uid}'>{name}</a> (<code>{uid}</code>)\n\n"
-              f"💬 {body}")
+    header = (f"📩 <b>New Support Request</b>\n"
+              f"━━━━━━━━━━━━━━━━━━━━\n"
+              f"👤 From <a href='tg://user?id={uid}'>{name}</a> · <code>{uid}</code>\n\n"
+              f"<blockquote>💬 {body}</blockquote>\n"
+              f"<i>Tap 💬 Reply below to respond — it lands straight in their chat.</i>")
     photo = message.photo[-1].file_id if message.photo else None
     for admin in ADMIN_IDS:
         try:
@@ -71,19 +83,29 @@ async def on_support_msg(message: Message, state: FSMContext) -> None:
                 await message.bot.send_message(admin, header, reply_markup=_reply_kb(uid))
         except Exception:  # noqa: BLE001
             pass
-    await message.answer("✅ <b>Sent to our team.</b> We'll get back to you shortly.")
+    await message.answer(
+        "✅ <b>Message Received</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Your request is with our team — we'll take it from here.</i>\n\n"
+        "<blockquote>📬 Watch this chat for our reply — it usually arrives within a few hours.\n"
+        "🔔 You'll get a notification the moment we respond.</blockquote>\n"
+        "<i>💡 Thanks for the detail — it helps us sort it out faster.</i>")
 
 
 @router.callback_query(F.data.startswith("sup_reply:"))
 async def cb_reply(call: CallbackQuery, state: FSMContext) -> None:
     if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("This reply tool is for the support team only.", show_alert=True)
         return
     target = int(call.data.split(":", 1)[1])
     await call.answer()
     await state.set_state(SupportFSM.awaiting_reply)
     await state.update_data(target=target)
-    await call.message.answer(f"💬 Type your reply to <code>{target}</code>:")
+    await call.message.answer(
+        "💬 <b>Compose Reply</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Replying to <code>{target}</code> — your next message goes straight to them.</i>\n\n"
+        "<i>💡 Keep it warm and specific; it lands in their chat exactly as you type it.</i>")
 
 
 @router.message(SupportFSM.awaiting_reply, F.text)
@@ -96,8 +118,17 @@ async def on_reply(message: Message, state: FSMContext) -> None:
     try:
         await message.bot.send_message(
             target,
-            "📩 <b>Reply from Support</b>\n\n"
-            f"💬 {message.text}\n\n<i>Use /support to respond.</i>")
-        await message.answer("✅ Reply delivered.")
+            "📩 <b>Reply from Support</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>Our team got back to you — here's their note.</i>\n\n"
+            f"<blockquote>💬 {message.text}</blockquote>\n"
+            "<i>💡 Still need a hand? Send <code>/support</code> to keep the conversation going.</i>")
+        await message.answer(
+            "✅ <b>Reply Delivered</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>Your message landed in their chat.</i>")
     except Exception:  # noqa: BLE001
-        await message.answer("❌ Couldn't deliver — the user may have blocked the bot.")
+        await message.answer(
+            "❌ <b>Couldn't Deliver</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>The user may have blocked the bot or closed the chat — nothing was sent.</i>")

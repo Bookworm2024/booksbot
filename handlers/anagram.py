@@ -59,8 +59,8 @@ def _reward(tries: int) -> float:
 
 
 def _kbd():
-    return kb([btn("💡 Hint", "anag_hint", style="primary"),
-               btn("⏭ Skip", "anag_skip", style="danger")])
+    return kb([btn("💡 Reveal First Letter", "anag_hint", style="primary"),
+               btn("⏭ Skip & Reveal", "anag_skip", style="danger")])
 
 
 async def _plays_today(db, uid: int) -> int:
@@ -73,24 +73,37 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
     from utils.flags import is_on
     send = message.edit_text if edit else message.answer
     if not await is_on("games"):
-        await send("🎮 <b>Games are paused</b> — check back soon!",
-                   reply_markup=kb([btn("🔙 Back", "menu_home", style="danger")]))
+        await send("⏳ <b>Games are taking a short break</b>\n"
+                   "━━━━━━━━━━━━━━━━━━━━\n"
+                   "<blockquote>Our game room is being polished right now. It'll be back shortly — "
+                   "your library and rewards are untouched in the meantime.</blockquote>\n"
+                   "<i>💡 Check back soon — there's BGM waiting to be won.</i>",
+                   reply_markup=kb([btn("🔙 Back to Menu", "menu_home", style="danger")]))
         return
     db = await MongoManager.get()
     prev = await _plays_today(db, uid)
     if prev >= _DAILY:
-        await send(f"🔀 <b>Anagram</b>\n\nDaily limit reached ({_DAILY}/day). Back tomorrow!",
-                   reply_markup=kb([btn("🎮 Games", "menu_games", style="primary")]))
+        await send(f"🎮 <b>Word Anagram</b>\n"
+                   f"━━━━━━━━━━━━━━━━━━━━\n"
+                   f"⏳ <b>You've played today's full set.</b>\n"
+                   f"<blockquote>You've used all <code>{_DAILY}</code> rounds for today — well played. "
+                   f"Your puzzles refresh at midnight for a brand-new run.\n\n"
+                   f"<i>Plenty more rewards waiting across the Games Hub in the meantime.</i></blockquote>\n"
+                   f"<i>💡 Come back tomorrow to unscramble a fresh set.</i>",
+                   reply_markup=kb([btn("🎮 Games Hub", "menu_games", style="primary")]))
         return
     await db.safe_update("users", {"user_id": uid},
                          {"$set": {"anag_day": _today(), "anag_plays": prev + 1}})
     word = random.choice(_WORDS)
     await state.set_state(AnagramFSM.answering)
     await state.update_data(word=word, tries=0, hinted=False)
-    await send(f"🔀 <b>Word Anagram</b>\n━━━━━━━━━━━━━━━━━━\n"
-               f"Unscramble this ({len(word)} letters):\n\n"
-               f"<code>{' '.join(_scramble(word))}</code>\n\n"
-               "✍️ Type your answer below.", reply_markup=_kbd())
+    await send(f"🎮 <b>Word Anagram</b>\n"
+               f"━━━━━━━━━━━━━━━━━━━━\n"
+               f"<i>One bookish word, letters shuffled — set them back in order to win 💎 BGM.</i>\n"
+               f"<blockquote>🔀 <b>Unscramble these {len(word)} letters:</b>\n\n"
+               f"<code>{' '.join(_scramble(word))}</code></blockquote>\n"
+               f"✍️ <i>Type your answer below — you have <b>{_MAX_TRIES}</b> tries. "
+               f"Solve it fast for the biggest reward.</i>", reply_markup=_kbd())
 
 
 class AnagramFSM(StatesGroup):
@@ -119,9 +132,9 @@ async def cb_hint(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     word = data.get("word")
     if not word:
-        await call.answer("Start a new round.", show_alert=True)
+        await call.answer("This round has ended. Tap New Word to start a fresh puzzle.", show_alert=True)
         return
-    await call.answer(f"Starts with: {word[0]}", show_alert=True)
+    await call.answer(f"💡 Here's a nudge — the word begins with: {word[0]}", show_alert=True)
 
 
 @router.callback_query(F.data == "anag_skip")
@@ -131,16 +144,21 @@ async def cb_skip(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await call.answer()
     await call.message.edit_text(
-        f"⏭ <b>Skipped.</b> The word was <b>{word or '—'}</b>.",
+        f"⏭ <b>Round revealed</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>The word was <b>{word or '—'}</b>.\n"
+        f"<i>One to file away — these words love to come back around.</i></blockquote>\n"
+        f"<i>💡 Line up a fresh scramble and go for the reward.</i>",
         reply_markup=kb([btn("🔀 New Word", "anag_new", style="success"),
-                         btn("🎮 Games", "menu_games", style="primary")]))
+                         btn("🎮 Games Hub", "menu_games", style="primary")]))
 
 
 @router.message(AnagramFSM.answering, F.text)
 async def on_answer(message: Message, state: FSMContext) -> None:
     guess = (message.text or "").strip().upper()
     if guess == "/CANCEL":
-        await state.clear(); await message.answer("❌ Cancelled."); return
+        await state.clear(); await message.answer(
+            "✅ <b>Round closed.</b> <i>Your puzzle's set aside — start a new one whenever you're ready.</i>"); return
     data = await state.get_data()
     word = data.get("word", "")
     tries = int(data.get("tries") or 0)
@@ -155,19 +173,30 @@ async def on_answer(message: Message, state: FSMContext) -> None:
         from utils.missions import mark
         await mark(message.chat.id, "play_game")
         await message.answer(
-            f"🎉 <b>Correct — {word}!</b>\n💎 <b>+{fmt_amount(rwd)} BGM</b>",
+            f"✨ <b>Correct — it was {word}!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>Sharp solve. 🎁 <i>Reward credited:</i> 💎 <b>+{fmt_amount(rwd)} BGM</b> — "
+            f"already in your wallet.</blockquote>\n"
+            f"<i>💡 The fewer tries you take, the bigger the reward. Ready for another?</i>",
             reply_markup=kb([btn("🔀 Play Again", "anag_new", style="success"),
-                             btn("🎮 Games", "menu_games", style="primary")]))
+                             btn("🎮 Games Hub", "menu_games", style="primary")]))
         return
 
     tries += 1
     if tries >= _MAX_TRIES:
         await state.clear()
         await message.answer(
-            f"❌ <b>Out of tries.</b> The word was <b>{word}</b>.",
+            f"💀 <b>Out of tries — that one stayed scrambled.</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>The word was <b>{word}</b>.\n"
+            f"<i>No harm done — every puzzle trains your eye for the next.</i></blockquote>\n"
+            f"<i>💡 Fresh scramble, fresh shot at the reward.</i>",
             reply_markup=kb([btn("🔀 New Word", "anag_new", style="success"),
-                             btn("🎮 Games", "menu_games", style="primary")]))
+                             btn("🎮 Games Hub", "menu_games", style="primary")]))
         return
     await state.update_data(tries=tries)
-    await message.answer(f"❌ Not quite — try again ({tries}/{_MAX_TRIES}).\n"
-                         f"<code>{' '.join(_scramble(word))}</code>", reply_markup=_kbd())
+    left = _MAX_TRIES - tries
+    await message.answer(f"❌ <b>Not quite — keep going.</b> "
+                         f"<i>{left} {'try' if left == 1 else 'tries'} left ({tries}/{_MAX_TRIES} used).</i>\n"
+                         f"<blockquote><code>{' '.join(_scramble(word))}</code></blockquote>\n"
+                         f"✍️ <i>Type your next answer below.</i>", reply_markup=_kbd())

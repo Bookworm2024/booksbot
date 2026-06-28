@@ -40,13 +40,24 @@ async def _panel():
     cfg = await get_ai_config()
     prov = cfg["provider"]
     text = (
-        "<b>🤖 AI Settings</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"Provider: <b>{_PROV_LABEL.get(prov, prov)}</b>\n"
-        f"🔗 Free URL: <code>{cfg['free_url']}</code>\n"
-        f"🔑 Claude key: <code>{_mask(cfg['anthropic_key'])}</code>\n"
-        f"🧠 Claude model: <code>{cfg['model']}</code>\n\n"
-        "<i>Powers 🤖 Recommendations, 📝 Summaries and 🏷 genre tagging. "
-        "The Free API needs no key.</i>"
+        "🤖 <b>AI Engine</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>The intelligence behind recommendations, summaries and tagging.</i>\n\n"
+        "<blockquote>"
+        f"🔌 <b>Provider</b> · {_PROV_LABEL.get(prov, prov)}\n"
+        f"🔗 <b>Free URL</b> · <code>{cfg['free_url']}</code>\n"
+        f"🔑 <b>Claude key</b> · <code>{_mask(cfg['anthropic_key'])}</code>\n"
+        f"🧠 <b>Claude model</b> · <code>{cfg['model']}</code>"
+        "</blockquote>\n"
+        "<blockquote expandable>"
+        "This engine powers 🤖 <b>Recommendations</b>, 📝 <b>Summaries</b> and "
+        "🏷 <b>genre tagging</b> across the library.\n"
+        "🆓 <b>Free API</b> — zero-cost, no key required, great for everyday use.\n"
+        "💎 <b>Claude</b> — Anthropic's premium models for the sharpest, most "
+        "natural results (needs an API key).\n"
+        "🚫 <b>Off</b> — pauses every AI feature instantly."
+        "</blockquote>\n"
+        "<i>💡 Changes apply live — no redeploy, no downtime.</i>"
     )
     rows = [
         [btn("🆓 Use Free API", "ai_prov:free",
@@ -59,7 +70,7 @@ async def _panel():
          btn("♻️ Reset URL", "ai_reset_url", style="primary")],
         [btn("🔑 Set Claude Key", "ai_set:key", style="primary"),
          btn("🧠 Set Model", "ai_set:model", style="primary")],
-        [btn("🧪 Test AI now", "ai_test", style="success")],
+        [btn("🧪 Run Live Test", "ai_test", style="success")],
         [btn("🔙 Back", "admin_open", style="danger")],
     ]
     return text, kb(*rows)
@@ -72,7 +83,7 @@ def _guard(uid: int) -> bool:
 @router.callback_query(F.data == "admin_ai")
 async def cb_ai(call: CallbackQuery) -> None:
     if not _guard(call.from_user.id):
-        await call.answer("Super admin only", show_alert=True)
+        await call.answer("🔒 This control is reserved for the super admin.", show_alert=True)
         return
     await call.answer()
     text, markup = await _panel()
@@ -82,14 +93,14 @@ async def cb_ai(call: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("ai_prov:"))
 async def cb_prov(call: CallbackQuery) -> None:
     if not _guard(call.from_user.id):
-        await call.answer("Super admin only", show_alert=True)
+        await call.answer("🔒 This control is reserved for the super admin.", show_alert=True)
         return
     prov = call.data.split(":", 1)[1]
     if prov not in ("free", "anthropic", "off"):
-        await call.answer("Unknown", show_alert=True)
+        await call.answer("❌ That provider isn't recognised — pick one from the panel.", show_alert=True)
         return
     await set_ai_config("provider", prov)
-    await call.answer(f"Provider → {prov}")
+    await call.answer(f"✨ Provider switched to {_PROV_LABEL.get(prov, prov)} — live now.")
     text, markup = await _panel()
     await call.message.edit_text(text, reply_markup=markup)
 
@@ -97,19 +108,37 @@ async def cb_prov(call: CallbackQuery) -> None:
 @router.callback_query(F.data == "ai_reset_url")
 async def cb_reset_url(call: CallbackQuery) -> None:
     if not _guard(call.from_user.id):
-        await call.answer("Super admin only", show_alert=True)
+        await call.answer("🔒 This control is reserved for the super admin.", show_alert=True)
         return
     await set_ai_config("free_url", DEFAULT_FREE_URL)
-    await call.answer("Reset to default")
+    await call.answer("♻️ Free API URL restored to the default endpoint.")
     text, markup = await _panel()
     await call.message.edit_text(text, reply_markup=markup)
 
 
 _PROMPTS = {
-    "free_url": "🔗 Send the new <b>Free API base URL</b> (e.g. https://bots.lt/Apis/AI/gpt.php). "
-                "It will be called as <code>URL?message=...</code>. /cancel to abort.",
-    "key": "🔑 Send the <b>Claude API key</b> (sk-ant-…). /cancel to abort.",
-    "model": "🧠 Send the <b>Claude model id</b> (e.g. claude-haiku-4-5-20251001). /cancel to abort.",
+    "free_url": "🔗 <b>Set Free API Endpoint</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "<blockquote>"
+                "Send the new <b>base URL</b> for the free provider, for example:\n"
+                "<code>https://bots.lt/Apis/AI/gpt.php</code>\n\n"
+                "We'll call it as <code>URL?message=...</code> whenever AI is requested."
+                "</blockquote>\n"
+                "<i>Send <code>/cancel</code> to keep the current endpoint.</i>",
+    "key": "🔑 <b>Set Claude API Key</b>\n"
+           "━━━━━━━━━━━━━━━━━━━━\n"
+           "<blockquote>"
+           "Paste your Anthropic key (it begins with <code>sk-ant-</code>).\n\n"
+           "🛡 For your security we'll delete the message the moment it's saved."
+           "</blockquote>\n"
+           "<i>Send <code>/cancel</code> to keep the current key.</i>",
+    "model": "🧠 <b>Set Claude Model</b>\n"
+             "━━━━━━━━━━━━━━━━━━━━\n"
+             "<blockquote>"
+             "Send the <b>model id</b> you'd like to run, for example:\n"
+             "<code>claude-haiku-4-5-20251001</code>"
+             "</blockquote>\n"
+             "<i>Send <code>/cancel</code> to keep the current model.</i>",
 }
 _STATE = {"free_url": AIFSM.free_url, "key": AIFSM.key, "model": AIFSM.model}
 
@@ -117,11 +146,11 @@ _STATE = {"free_url": AIFSM.free_url, "key": AIFSM.key, "model": AIFSM.model}
 @router.callback_query(F.data.startswith("ai_set:"))
 async def cb_set(call: CallbackQuery, state: FSMContext) -> None:
     if not _guard(call.from_user.id):
-        await call.answer("Super admin only", show_alert=True)
+        await call.answer("🔒 This control is reserved for the super admin.", show_alert=True)
         return
     field = call.data.split(":", 1)[1]
     if field not in _STATE:
-        await call.answer("Unknown", show_alert=True)
+        await call.answer("❌ That setting isn't recognised — pick one from the panel.", show_alert=True)
         return
     await call.answer()
     await state.set_state(_STATE[field])
@@ -132,21 +161,24 @@ async def _save_field(message: Message, state: FSMContext, cfg_key: str, friendl
     raw = (message.text or "").strip()
     await state.clear()
     if raw.lower() == "/cancel":
-        await message.answer("❌ Cancelled.")
+        await message.answer("❌ <b>No changes made.</b>\n<i>Your current setting stays exactly as it was.</i>")
         return
     await set_ai_config(cfg_key, raw)
-    await message.answer(f"✅ {friendly} updated. Applies immediately.",
-                         reply_markup=kb([btn("🤖 AI Settings", "admin_ai", style="primary")]))
+    await message.answer(
+        f"✨ <b>{friendly} updated</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Live across every AI feature this very moment — no redeploy needed.</i>",
+        reply_markup=kb([btn("🤖 Back to AI Engine", "admin_ai", style="primary")]))
 
 
 @router.message(AIFSM.free_url, F.text)
 async def on_url(message: Message, state: FSMContext) -> None:
-    await _save_field(message, state, "free_url", "Free API URL")
+    await _save_field(message, state, "free_url", "Free API endpoint")
 
 
 @router.message(AIFSM.key, F.text)
 async def on_key(message: Message, state: FSMContext) -> None:
-    await _save_field(message, state, "anthropic_key", "Claude key")
+    await _save_field(message, state, "anthropic_key", "Claude API key")
     try:
         await message.delete()  # don't leave the key sitting in chat
     except Exception:  # noqa: BLE001
@@ -161,13 +193,28 @@ async def on_model(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data == "ai_test")
 async def cb_test(call: CallbackQuery) -> None:
     if not _guard(call.from_user.id):
-        await call.answer("Super admin only", show_alert=True)
+        await call.answer("🔒 This control is reserved for the super admin.", show_alert=True)
         return
-    await call.answer("Testing…")
+    await call.answer("🧪 Pinging your AI provider…")
     out = await ai_complete("Reply with exactly: PONG", max_tokens=20)
     if out:
-        await call.message.answer(f"✅ <b>AI is working.</b>\nReply: <code>{out[:200]}</code>",
-                                  reply_markup=kb([btn("🤖 AI Settings", "admin_ai", style="primary")]))
+        await call.message.answer(
+            "✅ <b>AI is live and responding</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>"
+            f"🔁 <b>Provider reply</b>\n<code>{out[:200]}</code>"
+            "</blockquote>\n"
+            "<i>💡 Recommendations, Summaries and tagging are all good to go.</i>",
+            reply_markup=kb([btn("🤖 Back to AI Engine", "admin_ai", style="primary")]))
     else:
-        await call.message.answer("❌ <b>No response.</b> Check the provider/URL/key and try again.",
-                                  reply_markup=kb([btn("🤖 AI Settings", "admin_ai", style="primary")]))
+        await call.message.answer(
+            "❌ <b>No response from the provider</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>"
+            "The test came back empty. A quick checklist:\n"
+            "🔌 The right provider is selected\n"
+            "🔗 The Free URL is reachable\n"
+            "🔑 The Claude key and model are valid"
+            "</blockquote>\n"
+            "<i>Adjust a setting above, then run the test again.</i>",
+            reply_markup=kb([btn("🤖 Back to AI Engine", "admin_ai", style="primary")]))

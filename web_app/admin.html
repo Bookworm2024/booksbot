@@ -3,47 +3,102 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Books Provider — Admin</title>
+<title>Books Provider — Admin Console</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-  :root { color-scheme: light dark; }
+  :root {
+    color-scheme: light dark;
+    --accent: var(--tg-theme-button-color,#3390ec);
+    --accent-text: var(--tg-theme-button-text-color,#fff);
+    --hint: var(--tg-theme-hint-color,#8a8f98);
+    --surface: var(--tg-theme-secondary-bg-color,#1c2027);
+    --bg: var(--tg-theme-bg-color,#0f1115);
+    --ink: var(--tg-theme-text-color,#e8e8e8);
+    --hairline: rgba(127,127,127,.18);
+    --shadow: 0 6px 22px rgba(0,0,0,.16);
+  }
   * { box-sizing: border-box; }
-  body { margin:0; padding:16px; font-family: system-ui, sans-serif;
-    background: var(--tg-theme-bg-color,#0f1115); color: var(--tg-theme-text-color,#e8e8e8); }
-  h1 { font-size:1.2rem; margin:.2rem 0 2px; } .sub{ color:var(--tg-theme-hint-color,#8a8f98); font-size:.8rem; margin-bottom:14px; }
-  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .card { background: var(--tg-theme-secondary-bg-color,#1c2027); border-radius:14px; padding:14px; }
-  .card .k { font-size:.72rem; color:var(--tg-theme-hint-color,#8a8f98); text-transform:uppercase; letter-spacing:.04em; }
-  .card .v { font-size:1.5rem; font-weight:800; margin-top:4px; }
-  .card .s { font-size:.75rem; color:var(--tg-theme-hint-color,#8a8f98); margin-top:2px; }
+  body {
+    margin:0; padding:18px 16px 28px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+    background:
+      radial-gradient(120% 60% at 0% -10%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%),
+      var(--bg);
+    color: var(--ink); line-height:1.45;
+  }
+  .topbar { display:flex; align-items:center; gap:9px; margin:.1rem 0 2px; }
+  .logo { width:30px; height:30px; border-radius:9px; flex:0 0 auto; display:grid; place-items:center;
+    font-size:.95rem; background: linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #7c4dff));
+    color: var(--accent-text); box-shadow: var(--shadow); }
+  h1 { font-size:1.22rem; font-weight:800; letter-spacing:-.015em; margin:0; }
+  .sub{ color:var(--hint); font-size:.8rem; line-height:1.5; margin:6px 0 16px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+  .card {
+    background: var(--surface);
+    border:1px solid var(--hairline); border-radius:16px; padding:15px;
+    box-shadow: var(--shadow);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .card:active { transform: scale(.992); }
+  .card .k { font-size:.7rem; color:var(--hint); text-transform:uppercase; letter-spacing:.06em; font-weight:700; }
+  .card .v { font-size:1.55rem; font-weight:800; letter-spacing:-.02em; margin-top:5px; line-height:1.1; }
+  .card .s { font-size:.74rem; color:var(--hint); margin-top:3px; }
   .wide { grid-column:1 / -1; }
-  .row { display:flex; justify-content:space-between; padding:4px 0; font-size:.9rem; }
-  .pill { display:inline-block; padding:3px 8px; border-radius:8px; font-size:.72rem; font-weight:700; }
-  .on { background:#7a1f1f; color:#fff; } .off { background:#1f5a2a; color:#fff; }
-  .accent { color: var(--tg-theme-button-color,#3390ec); }
-  #msg { text-align:center; padding:40px; }
-  button.refresh { width:100%; margin-top:12px; padding:12px; border:0; border-radius:12px; font-weight:700;
-    background: var(--tg-theme-button-color,#3390ec); color:#fff; cursor:pointer; }
-  .sec { margin-top:18px; }
-  .sec h2 { font-size:1rem; margin:0 0 4px; }
-  .field { margin:8px 0; }
-  .field label { display:block; font-size:.7rem; color:var(--tg-theme-hint-color,#8a8f98); text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px; }
-  .field input { width:100%; padding:11px 12px; border-radius:10px; border:1px solid rgba(127,127,127,.3);
-    background: var(--tg-theme-bg-color,#0f1115); color: var(--tg-theme-text-color,#e8e8e8); font-size:.92rem; }
-  .seg { display:flex; gap:8px; margin:8px 0; }
-  .seg button { flex:1; padding:10px 6px; border:1px solid rgba(127,127,127,.3); border-radius:10px; cursor:pointer;
-    background: var(--tg-theme-bg-color,#0f1115); color: var(--tg-theme-text-color,#e8e8e8); font-weight:700; font-size:.82rem; }
-  .seg button.sel { background: var(--tg-theme-button-color,#3390ec); color:#fff; border-color:transparent; }
-  .btn2 { flex:1; padding:11px 14px; border:0; border-radius:10px; font-weight:700; cursor:pointer; color:#fff; }
-  .btn2.save { background:#1f7a3d; } .btn2.test { background: var(--tg-theme-button-color,#3390ec); }
-  .aimsg { font-size:.82rem; margin-top:8px; min-height:1em; }
+  .wide .k { margin-bottom:6px; display:block; }
+  .row { display:flex; justify-content:space-between; align-items:center; padding:7px 0; font-size:.9rem;
+    border-top:1px solid var(--hairline); }
+  .row:first-of-type { border-top:0; }
+  .row span { color:var(--hint); }
+  .row b { font-weight:800; letter-spacing:-.01em; }
+  .pill { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px;
+    font-size:.7rem; font-weight:800; letter-spacing:.03em; }
+  .pill::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.9; }
+  .on { background:color-mix(in srgb,#e5484d 18%,transparent); color:#ff6b6f; }
+  .off { background:color-mix(in srgb,#30a46c 18%,transparent); color:#46c98a; }
+  .accent { color: var(--accent); }
+  #msg { text-align:center; padding:54px 24px; color:var(--hint); font-size:.95rem; line-height:1.6; }
+  #msg .big { font-size:1.9rem; display:block; margin-bottom:10px; }
+  button.refresh { width:100%; margin-top:14px; padding:13px; border:0; border-radius:13px; font-weight:800;
+    font-size:.92rem; letter-spacing:.01em; background: var(--accent); color: var(--accent-text); cursor:pointer;
+    box-shadow: var(--shadow); transition: transform .14s ease, filter .14s ease; }
+  button.refresh:hover { filter:brightness(1.05); }
+  button.refresh:active { transform: scale(.98); }
+  .sec { margin-top:22px; }
+  .sec h2 { font-size:1.02rem; font-weight:800; letter-spacing:-.01em; margin:0 0 5px; display:flex; align-items:center; gap:7px; }
+  .field { margin:11px 0; }
+  .field label { display:block; font-size:.68rem; color:var(--hint); text-transform:uppercase; letter-spacing:.06em; font-weight:700; margin-bottom:5px; }
+  .field input { width:100%; padding:12px 13px; border-radius:11px; border:1px solid var(--hairline);
+    background: var(--bg); color: var(--ink); font-size:.92rem; transition: border-color .15s ease, box-shadow .15s ease; }
+  .field input:focus { outline:none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .field input:disabled { opacity:.65; }
+  .seg { display:flex; gap:8px; margin:12px 0; }
+  .seg button { flex:1; padding:11px 6px; border:1px solid var(--hairline); border-radius:11px; cursor:pointer;
+    background: var(--bg); color: var(--ink); font-weight:700; font-size:.82rem; transition: all .15s ease; }
+  .seg button:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--hairline)); }
+  .seg button.sel { background: var(--accent); color: var(--accent-text); border-color:transparent; box-shadow: var(--shadow); }
+  .btn2 { flex:1; padding:12px 14px; border:0; border-radius:11px; font-weight:800; font-size:.9rem; cursor:pointer; color:#fff;
+    transition: transform .14s ease, filter .14s ease; }
+  .btn2:hover { filter:brightness(1.06); } .btn2:active { transform: scale(.98); }
+  .btn2.save { background: linear-gradient(150deg,#2bb673,#1f7a3d); } .btn2.test { background: var(--accent); color: var(--accent-text); }
+  .aimsg { font-size:.82rem; margin-top:10px; min-height:1em; color:var(--hint); }
+  .credit { margin-top:24px; text-align:center; font-size:.72rem; line-height:1.7; color:var(--hint); }
+  .credit b { color:var(--ink); font-weight:700; }
 </style>
 </head>
 <body>
-<h1>📊 Admin Dashboard</h1>
-<div class="sub" id="sub">Loading…</div>
+<div class="topbar">
+  <div class="logo">📊</div>
+  <h1>Admin Console</h1>
+</div>
+<div class="sub" id="sub">Loading your dashboard…</div>
 <div id="content"></div>
 <div id="ai"></div>
+<div class="credit">
+  <b>Books Provider</b> — owned &amp; operated by<br>
+  @bookslibraryofficial &amp; @trinityXmods and team
+</div>
 
 <script>
 const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
@@ -54,31 +109,31 @@ function n(x){ return (x||0).toLocaleString(); }
 async function load(){
   let d;
   try { d = await (await fetch(`/api/admin/overview?init_data=${encodeURIComponent(INIT)}`)).json(); }
-  catch(e){ content.innerHTML = `<div id="msg">Network error.</div>`; return; }
-  if (d.error){ content.innerHTML = `<div id="msg">🔒 ${d.error==="forbidden"?"Admins only.":"Auth failed."}</div>`; return; }
-  sub.innerHTML = `Maintenance: <span class="pill ${d.maintenance?'on':'off'}">${d.maintenance?'ON':'OFF'}</span>`;
+  catch(e){ content.innerHTML = `<div id="msg"><span class="big">📡</span>Couldn't reach the server. Check your connection and tap Refresh.</div>`; return; }
+  if (d.error){ content.innerHTML = `<div id="msg"><span class="big">🔒</span>${d.error==="forbidden"?"This console is for admins only.":"We couldn't verify your session. Reopen the Mini App and try again."}</div>`; return; }
+  sub.innerHTML = `Live overview · Maintenance <span class="pill ${d.maintenance?'on':'off'}">${d.maintenance?'ON':'OFF'}</span>`;
   const r = d.revenue, rq = d.requests;
   content.innerHTML = `
     <div class="grid">
-      <div class="card"><div class="k">Users</div><div class="v">${n(d.users)}</div><div class="s">+${n(d.new_today)} today</div></div>
-      <div class="card"><div class="k">VIP</div><div class="v">${n(d.vip)}</div><div class="s">active subs</div></div>
-      <div class="card"><div class="k">Archive</div><div class="v">${n(d.files)}</div><div class="s">files indexed</div></div>
-      <div class="card"><div class="k">Downloads</div><div class="v">${n(d.downloads)}</div><div class="s">all-time</div></div>
+      <div class="card"><div class="k">👥 Readers</div><div class="v">${n(d.users)}</div><div class="s">+${n(d.new_today)} joined today</div></div>
+      <div class="card"><div class="k">👑 VIP Members</div><div class="v">${n(d.vip)}</div><div class="s">active subscriptions</div></div>
+      <div class="card"><div class="k">📚 Archive</div><div class="v">${n(d.files)}</div><div class="s">titles indexed</div></div>
+      <div class="card"><div class="k">⬇️ Downloads</div><div class="v">${n(d.downloads)}</div><div class="s">delivered all-time</div></div>
       <div class="card wide"><div class="k">💰 Revenue</div>
-        <div class="row"><span>UPI</span><b>₹${n(r.inr)}</b></div>
-        <div class="row"><span>Crypto</span><b>$${n(r.usd)}</b></div>
-        <div class="row"><span>Today</span><b class="accent">₹${n(r.inr_today)} · $${n(r.usd_today)}</b></div>
-        <div class="row"><span>≈ Gross</span><b>₹${n(r.gross_inr)}</b></div>
+        <div class="row"><span>UPI · India</span><b>₹${n(r.inr)}</b></div>
+        <div class="row"><span>Crypto · OxaPay</span><b>$${n(r.usd)}</b></div>
+        <div class="row"><span>Earned today</span><b class="accent">₹${n(r.inr_today)} · $${n(r.usd_today)}</b></div>
+        <div class="row"><span>Gross (approx.)</span><b>₹${n(r.gross_inr)}</b></div>
       </div>
-      <div class="card wide"><div class="k">📨 Requests</div>
-        <div class="row"><span>⏳ Pending</span><b>${n(rq.pending)}</b></div>
+      <div class="card wide"><div class="k">📨 Book Requests</div>
+        <div class="row"><span>⏳ Awaiting fulfilment</span><b>${n(rq.pending)}</b></div>
         <div class="row"><span>✅ Fulfilled</span><b>${n(rq.fulfilled)}</b></div>
-        <div class="row"><span>❌ Cancelled</span><b>${n(rq.cancelled)}</b></div>
+        <div class="row"><span>❌ Cancelled / refunded</span><b>${n(rq.cancelled)}</b></div>
       </div>
-      <div class="card"><div class="k">💎 BGM</div><div class="v">${n(d.bgm)}</div><div class="s">in circulation</div></div>
-      <div class="card"><div class="k">🪙 BCN</div><div class="v">${n(d.bcn)}</div><div class="s">in circulation</div></div>
+      <div class="card"><div class="k">💎 BGM</div><div class="v">${n(d.bgm)}</div><div class="s">premium tokens live</div></div>
+      <div class="card"><div class="k">🪙 BCN</div><div class="v">${n(d.bcn)}</div><div class="s">daily coins live</div></div>
     </div>
-    <button class="refresh" onclick="load()">🔄 Refresh</button>`;
+    <button class="refresh" onclick="load()">🔄 Refresh dashboard</button>`;
 }
 
 function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -95,15 +150,15 @@ function renderAI(msg){
   const ro = !ai.can_edit;
   document.getElementById("ai").innerHTML = `
     <div class="sec"><div class="card wide">
-      <h2>🤖 AI Provider</h2>
-      <div class="s">Powers Recommendations, Summaries &amp; genre tagging. The Free API needs no key.</div>
+      <h2>🤖 AI Engine</h2>
+      <div class="s">Powers reader recommendations, AI summaries &amp; automatic genre tagging. The Free API works out of the box — no key required.</div>
       <div class="seg">${provBtn("free","🆓 Free")}${provBtn("anthropic","💎 Claude")}${provBtn("off","🚫 Off")}</div>
       <div class="field"><label>Free API URL</label><input id="ai_url" value="${esc(ai.free_url)}" ${ro?'disabled':''}></div>
-      <div class="field"><label>Claude key ${ai.has_key?'· set ('+esc(ai.anthropic_key_masked)+')':''}</label>
-        <input id="ai_key" type="password" placeholder="${ai.has_key?'leave blank to keep':'sk-ant-…'}" ${ro?'disabled':''}></div>
+      <div class="field"><label>Claude API key ${ai.has_key?'· saved ('+esc(ai.anthropic_key_masked)+')':''}</label>
+        <input id="ai_key" type="password" placeholder="${ai.has_key?'Leave blank to keep current key':'sk-ant-…'}" ${ro?'disabled':''}></div>
       <div class="field"><label>Claude model</label><input id="ai_model" value="${esc(ai.model)}" ${ro?'disabled':''}></div>
-      ${ro ? '<div class="s">🔒 Read-only — super admin can edit.</div>'
-           : '<div style="display:flex;gap:8px;margin-top:6px"><button class="btn2 save" id="ai_save">💾 Save</button><button class="btn2 test" id="ai_test">🧪 Test</button></div>'}
+      ${ro ? '<div class="s">🔒 Read-only — only the super admin can change these settings.</div>'
+           : '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn2 save" id="ai_save">💾 Save changes</button><button class="btn2 test" id="ai_test">🧪 Run test</button></div>'}
       <div class="aimsg" id="ai_msg">${esc(msg)}</div>
     </div></div>`;
   document.querySelectorAll('#ai .seg button').forEach(b => b.onclick = () => {
@@ -120,19 +175,19 @@ async function saveAI(){
     model: document.getElementById("ai_model").value };
   const key = document.getElementById("ai_key").value.trim();
   if (key) body.anthropic_key = key;
-  document.getElementById("ai_msg").textContent = "Saving…";
+  document.getElementById("ai_msg").textContent = "Saving your changes…";
   try {
     const d = await (await fetch("/api/admin/ai", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)})).json();
     if (d.error){ document.getElementById("ai_msg").textContent = "❌ " + d.error; return; }
-    ai = d; renderAI("✅ Saved — applies immediately.");
-  } catch(e){ document.getElementById("ai_msg").textContent = "❌ Network error."; }
+    ai = d; renderAI("✅ Saved — your settings are live right away.");
+  } catch(e){ document.getElementById("ai_msg").textContent = "❌ Couldn't save — check your connection and try again."; }
 }
 async function testAI(){
-  document.getElementById("ai_msg").textContent = "Testing…";
+  document.getElementById("ai_msg").textContent = "Running a quick test…";
   try {
     const d = await (await fetch("/api/admin/ai/test", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({init_data:INIT})})).json();
-    document.getElementById("ai_msg").textContent = d.ok ? ("✅ Working — reply: " + d.sample) : "❌ No response — check the URL/key.";
-  } catch(e){ document.getElementById("ai_msg").textContent = "❌ Network error."; }
+    document.getElementById("ai_msg").textContent = d.ok ? ("✅ Connection healthy — sample reply: " + d.sample) : "❌ No response — double-check the URL or API key.";
+  } catch(e){ document.getElementById("ai_msg").textContent = "❌ Couldn't run the test — check your connection and try again."; }
 }
 
 load();

@@ -56,7 +56,7 @@ def _palette_kb():
 
 def _again_kb():
     return kb([btn("🧠 Play Again", "mm_new", style="success"),
-               btn("🎮 Games", "menu_games", style="primary")])
+               btn("🎮 More Games", "menu_games", style="primary")])
 
 
 class MemoryFSM(StatesGroup):
@@ -85,13 +85,23 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool, l
     from utils.flags import is_on
     send = message.edit_text if edit else message.answer
     if not await is_on("games"):
-        await send("🎮 <b>Games are paused</b> — check back soon!",
+        await send("🎮 <b>Games are taking a short break</b>\n"
+                   "━━━━━━━━━━━━━━━━━━━━\n"
+                   "<blockquote>The arcade is paused for a little upkeep. Everything "
+                   "you've earned is safe — pop back soon and your tables will be "
+                   "right where you left them.</blockquote>",
                    reply_markup=kb([btn("🔙 Back", "menu_home", style="danger")]))
         return
     db = await MongoManager.get()
     if not await _consume_play(db, uid):
-        await send(f"🧠 <b>Memory</b>\n\nDaily limit reached ({_DAILY}/day). Back tomorrow!",
-                   reply_markup=kb([btn("🎮 Games", "menu_games", style="primary")]))
+        await send(f"🧠 <b>Memory Match</b>\n"
+                   "━━━━━━━━━━━━━━━━━━━━\n"
+                   f"<i>That's a full round of training for today.</i>\n\n"
+                   f"<blockquote>You've played all <code>{_DAILY}</code> of today's "
+                   "rounds — nicely done. Your plays refresh at midnight, so come back "
+                   "tomorrow for a fresh set and another shot at the 💎 BGM rewards. "
+                   "Plenty of other games are open in the meantime.</blockquote>",
+                   reply_markup=kb([btn("🎮 More Games", "menu_games", style="primary")]))
         return
     length = max(_START_LEN, min(_MAX_LEN, length))
     seq = [random.randrange(len(_PALETTE)) for _ in range(length)]
@@ -99,11 +109,15 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool, l
     await state.set_state(MemoryFSM.showing)
     await state.update_data(seq=seq, pos=0, length=length, mm_round=rt)
     shown = " ".join(_PALETTE[i] for i in seq)
-    await send(f"🧠 <b>Memory Match</b> · level {length - _START_LEN + 1}\n"
-               "━━━━━━━━━━━━━━━━━━\n"
-               f"Memorize this sequence ({length} tiles):\n\n<b>{shown}</b>\n\n"
-               "Tap <b>✅ Ready</b> when you've got it.",
-               reply_markup=kb([btn("✅ Ready", "mm_ready", style="success")]))
+    await send(f"🧠 <b>Memory Match</b>  ·  <i>level {length - _START_LEN + 1}</i>\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "<i>Lock the order in, then play it back from memory.</i>\n\n"
+               f"<blockquote>Study these <code>{length}</code> tiles:\n\n"
+               f"<b>{shown}</b>\n\n"
+               "Take your time — when you've got the order, tap <b>✅ Ready</b> and "
+               "we'll hide them. Replay it perfectly to earn 💎 BGM, and the further "
+               "you climb, the bigger the reward.</blockquote>",
+               reply_markup=kb([btn("✅ I'm Ready", "mm_ready", style="success")]))
 
 
 @router.message(Command("memory"))
@@ -130,8 +144,11 @@ async def cb_ready(call: CallbackQuery, state: FSMContext) -> None:
     length = int(data.get("length") or _START_LEN)
     await state.set_state(MemoryFSM.repeating)
     await call.message.edit_text(
-        f"🧠 <b>Repeat the sequence!</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"Tap the {length} tiles in order. Progress: 0/{length}",
+        f"🧠 <b>Now play it back</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>The tiles are hidden — recreate the order from memory.</i>\n\n"
+        f"<blockquote>Tap the palette below in the exact sequence you memorised, all "
+        f"<code>{length}</code> in a row.\n\n"
+        f"Progress: <code>0/{length}</code></blockquote>",
         reply_markup=kb(*_palette_kb()))
 
 
@@ -150,10 +167,14 @@ async def cb_tap(call: CallbackQuery, state: FSMContext) -> None:
 
     if pick != seq[pos]:
         await state.clear()
-        await call.answer("❌ Wrong tile!")
+        await call.answer("So close — that tile broke the chain. Give it another go!")
         shown = " ".join(_PALETTE[i] for i in seq)
         await call.message.edit_text(
-            f"❌ <b>Out of sync!</b>\nThe sequence was:\n\n<b>{shown}</b>",
+            "❌ <b>That broke the sequence</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>One tile out of place — it happens to the best of us.</i>\n\n"
+            f"<blockquote>Here's how the full sequence ran:\n\n<b>{shown}</b>\n\n"
+            "Memory is a muscle — line it up next time and the 💎 BGM is yours. "
+            "Ready for another round?</blockquote>",
             reply_markup=_again_kb())
         return
 
@@ -176,23 +197,33 @@ async def cb_tap(call: CallbackQuery, state: FSMContext) -> None:
                                  {"$inc": {"games_played": 1, "game_bgm": rwd}})
             from utils.missions import mark
             await mark(call.from_user.id, "play_game")
-        await call.answer("✅ Perfect!")
-        rows = [[btn("🎮 Games", "menu_games", style="primary")]]
+        await call.answer("✨ Flawless recall — reward credited!")
+        rows = [[btn("🎮 More Games", "menu_games", style="primary")]]
         if length < _MAX_LEN:
-            rows.insert(0, [btn(f"⬆️ Next (level {length - _START_LEN + 2})",
+            rows.insert(0, [btn(f"⬆️ Next Level ({length - _START_LEN + 2})",
                                 f"mm_next:{length + 1}", style="success")])
         else:
             rows.insert(0, [btn("🧠 Play Again", "mm_new", style="success")])
+        nxt = ("<i>Step up a tile for a bigger payout — your streak is just getting "
+               "started.</i>" if length < _MAX_LEN
+               else "<i>That's the top tier — a perfect memory. Run it again for more "
+               "💎 BGM.</i>")
         await call.message.edit_text(
-            f"🎉 <b>Correct — {length} tiles!</b>\n💎 <b>+{fmt_amount(rwd)} BGM</b>",
+            f"✨ <b>Flawless — all {length} tiles!</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>Credited to your wallet: 💎 <b>+{fmt_amount(rwd)} BGM</b>\n\n"
+            f"{nxt}</blockquote>",
             reply_markup=kb(*rows))
         return
 
     await state.update_data(pos=pos)
-    await call.answer("✅")
+    await call.answer("✅ Spot on — keep the chain going!")
     await call.message.edit_text(
-        f"🧠 <b>Keep going!</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"Tap the {length} tiles in order. Progress: {pos}/{length}",
+        f"🧠 <b>Keep going — you're on track</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Stay with the order you memorised.</i>\n\n"
+        f"<blockquote>Tap the next tile in the sequence — all <code>{length}</code> "
+        f"to claim the reward.\n\n"
+        f"Progress: <code>{pos}/{length}</code></blockquote>",
         reply_markup=kb(*_palette_kb()))
 
 
@@ -212,4 +243,4 @@ async def cb_next(call: CallbackQuery, state: FSMContext) -> None:
 # in-flow handlers above.
 @router.callback_query((F.data == "mm_ready") | F.data.startswith("mm:"))
 async def cb_mm_expired(call: CallbackQuery) -> None:
-    await call.answer("🧠 Round expired — start a new Memory game.", show_alert=True)
+    await call.answer("🧠 This round has wrapped up — start a fresh Memory Match to play on.", show_alert=True)

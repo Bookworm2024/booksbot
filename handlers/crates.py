@@ -27,12 +27,22 @@ async def _view(uid: int):
     st = await status(uid)
     odds = " · ".join(f"{t[0]}" for t in _TIERS[2:])  # show the better tiers
     text = (
-        "<b>🎁 Loot Crates</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"🔑 <b>Keys:</b> {st['keys']}\n"
-        f"📦 Next key: {_bar(st['progress'], st['need'])} {st['progress']}/{st['need']}\n"
-        f"🏆 Opened: <b>{st['opened']}</b>\n\n"
-        f"<i>Earn 1 key every {ACTIONS_PER_KEY} actions (play / download / spin / claim).\n"
-        f"Possible drops include {odds}.</i>")
+        "🎁 <b>Loot Crates</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Earn keys as you read and play — every crate pays in real tokens.</i>\n"
+        "<blockquote>"
+        f"🔑 <b>Keys ready:</b> <code>{st['keys']}</code>\n"
+        f"📦 <b>Next key:</b> {_bar(st['progress'], st['need'])} <code>{st['progress']}/{st['need']}</code>\n"
+        f"🏆 <b>Crates opened:</b> <code>{st['opened']}</code>"
+        "</blockquote>\n"
+        "<blockquote expandable>"
+        f"Every <code>{ACTIONS_PER_KEY}</code> actions — a game played, a book "
+        "downloaded, a wheel spun or a daily claimed — forges one fresh 🔑 key.\n"
+        f"Possible drops range across {odds} tiers, each paying out instantly in "
+        "💎 BGM and 🪙 BCN. The rarer the tier, the sweeter the haul.\n"
+        "💡 <i>The more you do here, the faster your keys stack — so keep "
+        "exploring your library.</i>"
+        "</blockquote>")
     rows = []
     if st["keys"] > 0:
         rows.append([btn(f"🔓 Open a Crate ({st['keys']} 🔑)", "crate_open", style="success")])
@@ -59,22 +69,27 @@ async def cmd_crates(message: Message) -> None:
 async def cb_open(call: CallbackQuery) -> None:
     reward = await open_crate(call.from_user.id)
     if not reward:
-        await call.answer("No keys yet — keep playing!", show_alert=True)
+        await call.answer("No keys just yet — play a game or grab a book to forge your next one.", show_alert=True)
         text, markup = await _view(call.from_user.id)
         await call.message.edit_text(text, reply_markup=markup)
         return
     bits = [f"💎 +{fmt_amount(reward['bgm'])} BGM"] if reward["bgm"] else []
     if reward["bcn"]:
         bits.append(f"🪙 +{fmt_amount(reward['bcn'])} BCN")
-    await call.answer("🎉 Crate opened!")
+    await call.answer("✨ Crate opened — your reward is in the wallet.")
     st = await status(call.from_user.id)
     rows = []
     if st["keys"] > 0:
         rows.append([btn(f"🔓 Open Another ({st['keys']} 🔑)", "crate_open", style="success")])
-    rows.append([btn("💼 Balance", "acc_balance", style="primary"),
+    rows.append([btn("💼 Wallet", "acc_balance", style="primary"),
                  btn("🔙 Account", "menu_account", style="danger")])
     await call.message.edit_text(
-        "🎁 <b>Crate Opened!</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"{reward['tier']} drop:\n<b>{'  '.join(bits)}</b>\n\n"
-        f"🔑 Keys left: <b>{st['keys']}</b>",
+        "✨ <b>Crate Opened</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<i>A {reward['tier']} drop — credited to your wallet on the spot.</i>\n"
+        "<blockquote>"
+        f"🎁 <b>Your reward:</b> {'  '.join(bits)}\n"
+        f"🔑 <b>Keys left:</b> <code>{st['keys']}</code>"
+        "</blockquote>\n"
+        "💡 <i>Keep the streak going — every action edges you toward the next key.</i>",
         reply_markup=kb(*rows))

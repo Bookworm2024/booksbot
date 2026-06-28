@@ -69,12 +69,24 @@ async def grant_referral(bot, uid: int) -> None:
     from utils.risk import record as risk_record
     await risk_record(ref, "referral")
     try:
-        await bot.send_message(uid, f"🎁 <b>Referral Bonus!</b> +{fmt_amount(new_bonus)} BGM added.")
+        await bot.send_message(
+            uid,
+            "🎁 <b>Welcome Gift Unlocked</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>A friend brought you in — here's a little something to start your library.</i>\n"
+            f"<blockquote>💎 <b>+{fmt_amount(new_bonus)} BGM</b> added to your wallet.</blockquote>\n"
+            "<i>💡 Tap 📚 to find your first read.</i>")
     except Exception:  # noqa: BLE001
         pass
     try:
-        await bot.send_message(ref, f"🎉 <b>New Referral!</b> You earned +{fmt_amount(ref_bonus)} BGM "
-                                    f"(total {new_count}).")
+        await bot.send_message(
+            ref,
+            "🎉 <b>New Referral Confirmed</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>Your invite just paid off — a new reader joined the library.</i>\n"
+            f"<blockquote>💎 Earned: <b>+{fmt_amount(ref_bonus)} BGM</b>\n"
+            f"📊 Verified referrals: <code>{new_count}</code></blockquote>\n"
+            "<i>💡 Keep sharing — milestones unlock bigger rewards.</i>")
     except Exception:  # noqa: BLE001
         pass
     # milestone bonus
@@ -83,6 +95,12 @@ async def grant_referral(bot, uid: int) -> None:
         await add_bgm(ref, bonus)
         try:
             await bot.send_message(
-                ref, f"🏆 <b>Milestone!</b> {new_count} referrals → <b>+{fmt_amount(bonus)} BGM</b> bonus!")
+                ref,
+                "🏆 <b>Milestone Reached</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                f"<i>That's <b>{new_count}</b> friends brought to the library — a real achievement.</i>\n"
+                f"<blockquote>🎁 Milestone bonus: <b>+{fmt_amount(bonus)} BGM</b>\n"
+                f"💼 Credited to your wallet instantly.</blockquote>\n"
+                "<i>💡 The next milestone rewards even more.</i>")
         except Exception:  # noqa: BLE001
             pass

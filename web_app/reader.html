@@ -6,66 +6,125 @@
 <title>Books Provider — Reader</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-  :root { color-scheme: light dark; --rbg: var(--tg-theme-bg-color,#0f1115); --rfg: var(--tg-theme-text-color,#e8e8e8); }
-  :root[data-theme="sepia"] { --rbg:#f4ecd8; --rfg:#5b4636; }
-  :root[data-theme="dark"]  { --rbg:#15171b; --rfg:#cfcfcf; }
-  :root[data-theme="light"] { --rbg:#ffffff; --rfg:#15171b; }
+  :root {
+    color-scheme: light dark;
+    --rbg: var(--tg-theme-bg-color,#0f1115);
+    --rfg: var(--tg-theme-text-color,#e8e8e8);
+    --accent: var(--tg-theme-button-color,#3390ec);
+    --accent-fg: var(--tg-theme-button-text-color,#fff);
+    --chrome: var(--tg-theme-secondary-bg-color,#1c2027);
+    --hint-bg: var(--tg-theme-text-color,#e8e8e8);
+    --hairline: rgba(127,127,127,.16);
+    --soft: rgba(127,127,127,.12);
+  }
+  :root[data-theme="sepia"] { --rbg:#f4ecd8; --rfg:#5b4636; --chrome:#ece0c7; --hairline:rgba(91,70,54,.16); --soft:rgba(91,70,54,.10); }
+  :root[data-theme="dark"]  { --rbg:#15171b; --rfg:#cfcfcf; --chrome:#1b1e24; --hairline:rgba(255,255,255,.10); --soft:rgba(255,255,255,.07); }
+  :root[data-theme="light"] { --rbg:#ffffff; --rfg:#15171b; --chrome:#f4f5f7; --hairline:rgba(0,0,0,.08); --soft:rgba(0,0,0,.05); }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin:0; height:100%; overflow:hidden; background: var(--rbg); color: var(--rfg);
-    font-family: system-ui, sans-serif; transition: background .2s, color .2s; }
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    transition: background .25s ease, color .25s ease; }
   body { display:flex; flex-direction:column; }
-  #bar { display:flex; align-items:center; gap:8px; padding:8px 10px; z-index:6; flex:0 0 auto;
-    background: var(--tg-theme-secondary-bg-color,#1c2027); color: var(--tg-theme-text-color,#e8e8e8); }
-  #bar button { border:0; border-radius:10px; padding:8px 12px; font-weight:700; cursor:pointer; line-height:1;
-    background: var(--tg-theme-button-color,#3390ec); color:#fff; }
-  #bar .ghost { background:transparent; color: var(--tg-theme-text-color,#e8e8e8); font-size:1.2rem; }
-  #info { flex:1; text-align:center; font-size:.85rem; font-variant-numeric:tabular-nums; }
-  #panel { display:none; gap:10px; padding:10px; flex-wrap:wrap; align-items:center; flex:0 0 auto;
-    background: var(--tg-theme-secondary-bg-color,#1c2027); z-index:5; }
-  #panel .grp { display:flex; gap:6px; align-items:center; }
-  #panel button { border:0; border-radius:8px; padding:7px 10px; cursor:pointer; font-weight:700;
-    background:#2a2f37; color:#e8e8e8; }
-  #panel button.on { background: var(--tg-theme-button-color,#3390ec); color:#fff; }
-  #bmwrap { padding:0 10px; flex:0 0 auto; max-height:64px; overflow:auto; }
-  .bm { display:inline-block; margin:4px; padding:6px 10px; border-radius:10px;
-    background: var(--tg-theme-secondary-bg-color,#1c2027); cursor:pointer; font-size:.85rem; }
+
+  #bar { display:flex; align-items:center; gap:6px; padding:10px 12px; z-index:6; flex:0 0 auto;
+    padding-top: max(10px, env(safe-area-inset-top));
+    background: var(--chrome); color: var(--rfg);
+    border-bottom:1px solid var(--hairline);
+    box-shadow:0 1px 0 var(--hairline), 0 6px 20px -16px rgba(0,0,0,.55); }
+  #bar button { border:0; border-radius:12px; padding:9px 12px; font-weight:700; cursor:pointer; line-height:1;
+    background: var(--accent); color: var(--accent-fg);
+    transition: transform .12s ease, opacity .15s ease, background .15s ease; }
+  #bar button:active { transform: scale(.92); opacity:.85; }
+  #bar .ghost { background:transparent; color: var(--rfg); font-size:1.25rem; opacity:.85; }
+  #bar .ghost:active { background: var(--soft); opacity:1; }
+  #bm { box-shadow:0 4px 12px -4px var(--accent); }
+  #info { flex:1; text-align:center; font-size:.8rem; font-weight:600; letter-spacing:.02em;
+    font-variant-numeric:tabular-nums; opacity:.78; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  #panel { display:none; gap:14px; padding:14px 12px; flex-wrap:wrap; align-items:center; flex:0 0 auto;
+    background: var(--chrome); border-bottom:1px solid var(--hairline); z-index:5;
+    animation: slideDown .22s ease; }
+  @keyframes slideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+  #panel .grp { display:flex; gap:6px; align-items:center; padding:5px 8px 5px 11px;
+    border-radius:14px; background: var(--soft); }
+  #panel .grp b { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em;
+    opacity:.6; margin-right:3px; }
+  #panel button { border:0; border-radius:10px; padding:8px 11px; cursor:pointer; font-weight:700; font-size:.92rem;
+    line-height:1; min-width:38px; background: var(--rbg); color: var(--rfg);
+    box-shadow:0 1px 2px rgba(0,0,0,.08); transition: transform .12s ease, background .15s ease, color .15s ease; }
+  #panel button:active { transform: scale(.9); }
+  #panel button.on { background: var(--accent); color: var(--accent-fg);
+    box-shadow:0 4px 12px -4px var(--accent); }
+
+  #bmwrap { padding:0 10px; flex:0 0 auto; max-height:64px; overflow:auto; -webkit-overflow-scrolling:touch; }
+  #bmwrap:not(:empty) { padding-top:8px; padding-bottom:2px; }
+  .bm { display:inline-block; margin:4px; padding:7px 12px; border-radius:11px;
+    background: var(--soft); color: var(--rfg); cursor:pointer; font-size:.82rem; font-weight:600;
+    border:1px solid var(--hairline); transition: transform .12s ease, background .15s ease; }
+  .bm:active { transform: scale(.94); background: var(--accent); color: var(--accent-fg); }
+
   /* the touch surface: pinch-zoom, pan & swipe all happen here */
   #pane { flex:1 1 auto; min-height:0; position:relative; overflow:hidden;
     touch-action:none; -webkit-user-select:none; user-select:none; }
   #pdfc { position:absolute; top:0; left:0; transform-origin:0 0; will-change:transform;
-    image-rendering:auto; box-shadow:0 2px 14px rgba(0,0,0,.4); border-radius:4px; }
+    image-rendering:auto; box-shadow:0 8px 32px -8px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.04);
+    border-radius:6px; }
   #epub { position:absolute; inset:0; width:100%; height:100%; }
+
   #msg { display:none; flex:1; align-items:center; justify-content:center; flex-direction:column;
-    padding:40px 20px; text-align:center; }
-  #hint { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:4;
-    background:rgba(0,0,0,.62); color:#fff; padding:7px 13px; border-radius:20px; font-size:.78rem;
-    pointer-events:none; opacity:0; transition:opacity .3s; white-space:nowrap; }
-  #hint.show { opacity:1; }
+    padding:40px 28px; text-align:center; gap:6px; line-height:1.55;
+    font-size:1.02rem; color: var(--rfg); }
+  #msg .ico { font-size:2.6rem; line-height:1; margin-bottom:10px; opacity:.92; }
+  #msg .ttl { font-size:1.15rem; font-weight:800; letter-spacing:-.01em; }
+  #msg .sub { font-size:.92rem; opacity:.66; max-width:300px; }
+  #msg button { margin-top:18px; padding:12px 22px; border:0; border-radius:13px; cursor:pointer;
+    font-weight:800; font-size:.95rem; background: var(--accent); color: var(--accent-fg);
+    box-shadow:0 8px 20px -8px var(--accent); transition: transform .12s ease; }
+  #msg button:active { transform: scale(.95); }
+  #msg .credit { margin-top:26px; font-size:.74rem; opacity:.42; line-height:1.5; }
+
+  /* first-paint loading veil */
+  #boot { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:16px; z-index:3; background: var(--rbg); transition: opacity .3s ease; }
+  #boot.hide { opacity:0; pointer-events:none; }
+  #boot .spin { width:34px; height:34px; border-radius:50%;
+    border:3px solid var(--soft); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+  #boot .lbl { font-size:.85rem; font-weight:600; letter-spacing:.04em; opacity:.6; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #hint { position:absolute; left:50%; bottom:18px; transform:translateX(-50%) translateY(6px); z-index:4;
+    background:rgba(20,22,28,.86); color:#fff; padding:9px 16px; border-radius:22px;
+    font-size:.78rem; font-weight:600; letter-spacing:.01em;
+    box-shadow:0 8px 24px -8px rgba(0,0,0,.6); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    pointer-events:none; opacity:0; transition:opacity .3s ease, transform .3s ease; white-space:nowrap; }
+  #hint.show { opacity:1; transform:translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
 <div id="bar">
-  <button class="ghost" id="prev" aria-label="Previous">‹</button>
-  <div id="info">Loading…</div>
-  <button class="ghost" id="next" aria-label="Next">›</button>
-  <button class="ghost" id="cog" aria-label="Settings">Aa</button>
-  <button class="ghost" id="tts" aria-label="Read aloud">🔊</button>
-  <button id="bm" aria-label="Bookmark">🔖</button>
+  <button class="ghost" id="prev" aria-label="Previous page" title="Previous page">‹</button>
+  <div id="info">Opening your book…</div>
+  <button class="ghost" id="next" aria-label="Next page" title="Next page">›</button>
+  <button class="ghost" id="cog" aria-label="Reading settings" title="Reading settings">Aa</button>
+  <button class="ghost" id="tts" aria-label="Read aloud" title="Read aloud">🔊</button>
+  <button id="bm" aria-label="Save bookmark" title="Save bookmark">🔖</button>
 </div>
 <div id="panel">
-  <div class="grp"><b style="font-size:.8rem">Theme</b>
-    <button data-theme="light">☀️</button><button data-theme="sepia">📜</button><button data-theme="dark">🌙</button></div>
-  <div class="grp" id="fontgrp"><b style="font-size:.8rem">Font</b>
-    <button id="f-">A−</button><button id="f+">A+</button></div>
-  <div class="grp" id="spacegrp"><b style="font-size:.8rem">Spacing</b>
-    <button id="s-">≣−</button><button id="s+">≣+</button></div>
-  <div class="grp" id="zoomgrp"><b style="font-size:.8rem">Zoom</b>
-    <button id="z-">−</button><button id="zfit">Fit</button><button id="z+">+</button></div>
+  <div class="grp"><b>Theme</b>
+    <button data-theme="light" title="Light" aria-label="Light theme">☀️</button><button data-theme="sepia" title="Sepia" aria-label="Sepia theme">📜</button><button data-theme="dark" title="Dark" aria-label="Dark theme">🌙</button></div>
+  <div class="grp" id="fontgrp"><b>Text size</b>
+    <button id="f-" aria-label="Smaller text">A−</button><button id="f+" aria-label="Larger text">A+</button></div>
+  <div class="grp" id="spacegrp"><b>Spacing</b>
+    <button id="s-" aria-label="Tighter spacing">≣−</button><button id="s+" aria-label="Looser spacing">≣+</button></div>
+  <div class="grp" id="zoomgrp"><b>Zoom</b>
+    <button id="z-" aria-label="Zoom out">−</button><button id="zfit" aria-label="Fit to width">Fit</button><button id="z+" aria-label="Zoom in">+</button></div>
 </div>
 <div id="bmwrap"></div>
 <div id="pane">
   <canvas id="pdfc" style="display:none"></canvas>
   <div id="epub" style="display:none"></div>
+  <div id="boot"><div class="spin"></div><div class="lbl">Preparing your book…</div></div>
   <div id="hint"></div>
 </div>
 <div id="msg"></div>
@@ -131,7 +190,8 @@ document.getElementById("zfit").onclick=()=> animateZoomTo(1, pane.clientWidth/2
 let hintTimer=null;
 function hint(t){ const h=document.getElementById("hint"); h.textContent=t; h.classList.add("show");
   clearTimeout(hintTimer); hintTimer=setTimeout(()=>h.classList.remove("show"), 1500); }
-function showMsg(t){ msg.style.display="flex"; msg.innerHTML=t; pane.style.display="none"; }
+function hideBoot(){ const b=document.getElementById("boot"); if(b){ b.classList.add("hide"); setTimeout(()=>{ b.style.display="none"; }, 320); } }
+function showMsg(t){ hideBoot(); msg.style.display="flex"; msg.innerHTML=t; pane.style.display="none"; }
 async function api(p,o){ return (await fetch(p,o)).json(); }
 async function loadState(){ try{ state = await api(`/api/reader/state?fuid=${FUID}&init_data=${encodeURIComponent(INIT)}`); }catch(e){} }
 function saveState(x){ fetch("/api/reader/state",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -146,7 +206,7 @@ function haptic(k){ try{ tg?.HapticFeedback?.impactOccurred?.(k||"light"); }catc
 
 function renderBookmarks(){ const w=document.getElementById("bmwrap"); w.innerHTML="";
   (state.bookmarks||[]).forEach(b=>{ const s=document.createElement("span"); s.className="bm";
-    s.textContent="🔖 "+(mode==="pdf"?("p."+b):"mark");
+    s.textContent="🔖 "+(mode==="pdf"?("Page "+b):"Saved spot");
     s.onclick=()=> mode==="pdf"? goPdfPage(b) : rendition?.display(b); w.appendChild(s); }); }
 
 /* ───────────────────────── PDF (canvas via pdf.js) ─────────────────────────
@@ -194,7 +254,7 @@ async function renderPdfPage(keepPan){
     pdfc.style.transition=""; pdfc.style.opacity="0"; applyTransform();
     requestAnimationFrame(()=>{ pdfc.style.transition="opacity .15s ease-out"; pdfc.style.opacity="1";
       setTimeout(()=>{ pdfc.style.transition=""; }, 170); });
-    info.textContent=`Page ${pageNum} / ${pdfDoc.numPages}`;
+    info.textContent=`Page ${pageNum} of ${pdfDoc.numPages}`;
     if(pageNum+1<=pdfDoc.numPages) pdfDoc.getPage(pageNum+1).catch(()=>{}); // warm cache
   } finally {
     rendering=false;
@@ -211,8 +271,8 @@ async function initPdf(buf){ mode="pdf";
   pdfDoc = await pdfjsLib.getDocument({data:buf}).promise;
   pageNum = Math.min(Math.max(1, state.page||1), pdfDoc.numPages);
   pdfc.style.display="block"; applyPrefs();
-  await renderPdfPage(false); renderBookmarks();
-  hint("Swipe to turn · pinch / double-tap to zoom");
+  await renderPdfPage(false); hideBoot(); renderBookmarks();
+  hint("Swipe to turn · pinch or double-tap to zoom");
   window.addEventListener("resize", debounce(()=>{ if(mode==="pdf"){ zoom=1; gScale=1; renderPdfPage(false); } }, 250));
 }
 
@@ -222,7 +282,7 @@ function goPdfPage(n){
 }
 function turnPdf(dir){
   const n = pageNum + dir;
-  if(n<1 || n>pdfDoc.numPages){ haptic(); hint(dir<0?"First page":"Last page"); return; }
+  if(n<1 || n>pdfDoc.numPages){ haptic(); hint(dir<0?"You're at the first page":"You've reached the last page"); return; }
   pageNum = n; zoom=1; gScale=1; renderPdfPage(false); saveState({page:pageNum}); haptic("light");
 }
 
@@ -314,10 +374,10 @@ async function initEpub(buf){ mode="epub";
   rendition = book.renderTo("epub", {width:"100%", height:"100%", spread:"none", flow:"paginated"});
   applyEpubTheme();
   rendition.hooks.content.register(c=>attachEpubGestures(c));
-  await rendition.display(state.loc||undefined);
-  info.textContent="EPUB";
+  await rendition.display(state.loc||undefined); hideBoot();
+  info.textContent="Reading";
   rendition.on("relocated",(loc)=>{ state.loc=loc.start.cfi; saveState({loc:state.loc});
-    info.textContent=`${Math.round((loc.start.percentage||0)*100)}%`; });
+    info.textContent=`${Math.round((loc.start.percentage||0)*100)}% read`; });
   renderBookmarks();
   hint("Swipe to turn · pinch to resize text");
 }
@@ -351,7 +411,7 @@ document.getElementById("prev").onclick=()=> mode==="pdf"? turnPdf(-1) : renditi
 document.getElementById("next").onclick=()=> mode==="pdf"? turnPdf(1)  : rendition?.next();
 document.getElementById("bm").onclick=()=>{ const mark=mode==="pdf"?pageNum:state.loc;
   if(mark && !(state.bookmarks||[]).includes(mark)){ (state.bookmarks=state.bookmarks||[]).push(mark);
-    saveState({bookmarks:state.bookmarks}); renderBookmarks(); haptic("light"); hint("Bookmarked"); } };
+    saveState({bookmarks:state.bookmarks}); renderBookmarks(); haptic("light"); hint("Bookmark saved — pick up right here"); } };
 
 /* TTS read-aloud (device voices via Web Speech API) */
 const tts = document.getElementById("tts");
@@ -372,17 +432,34 @@ window.addEventListener("pagehide", ()=>{ try{ speechSynthesis.cancel(); }catch(
 
 function debounce(fn,ms){ let h; return (...a)=>{ clearTimeout(h); h=setTimeout(()=>fn(...a),ms); }; }
 
+const CREDIT = `<div class="credit">Books Provider — curated &amp; cared for by<br>@bookslibraryofficial &amp; @trinityXmods and the team</div>`;
+function stateCard(ico, ttl, sub, btn){
+  return `<div class="ico">${ico}</div><div class="ttl">${ttl}</div><div class="sub">${sub}</div>`
+    + (btn ? `<button onclick="tg?.close()">${btn}</button>` : "") + CREDIT;
+}
 (async ()=>{
-  if(!FUID){ return showMsg("⚠️ No file specified."); }
+  if(!FUID){ return showMsg(stateCard("📚","Nothing to open yet",
+    "Pick a title from the library and we'll open it here in your reader.", "Back to library")); }
   applyPrefs(); await loadState(); let buf;
   try{ buf=await getBytes(); }
-  catch(err){ const m = err==="too_large" ? "📄 Too large to open in the reader. Receive it in chat."
-      : err==="stream_unavailable" ? "📄 This archive file can't be streamed. Receive it in chat."
-      : err==="not_in_library" ? "🔒 Add this to your Favorites first." : "❌ Couldn't load this file.";
-    return showMsg(m+`<br><br><button onclick="tg?.close()" style="margin-top:12px;padding:10px 16px;border:0;border-radius:10px;background:#3390ec;color:#fff">Close</button>`); }
+  catch(err){
+    const card = err==="too_large"
+        ? stateCard("📦","This one's a big read",
+            "It's too large to open inside the reader. Tap below and we'll send the full file straight to your chat.", "Send it to my chat")
+      : err==="stream_unavailable"
+        ? stateCard("📨","Best enjoyed in chat",
+            "This archived edition can't be streamed in the reader. Receive the complete file in your chat and enjoy it there.", "Send it to my chat")
+      : err==="not_in_library"
+        ? stateCard("🔒","Add it to Favorites first",
+            "Save this title to your Favorites and it'll be ready to open in your reader anytime.", "Got it")
+      : stateCard("😕","We couldn't open this one",
+            "Something interrupted the loading. Please try again in a moment — your place is saved.", "Close");
+    return showMsg(card); }
   try{ if(EXT==="pdf") await initPdf(buf); else if(EXT==="epub") await initEpub(buf);
-    else showMsg("📄 Unsupported format for in-app reading."); }
-  catch(e){ showMsg("❌ Failed to render: "+e); }
+    else showMsg(stateCard("📄","Not readable in-app — yet",
+      "This format isn't supported by the in-app reader. We'll deliver it to your chat so you never miss a page.", "Send it to my chat")); }
+  catch(e){ showMsg(stateCard("😕","Couldn't render this book",
+      "We hit a snag while preparing the pages. Please try opening it again — we'll have it ready.", "Close")); }
 })();
 </script>
 </body>

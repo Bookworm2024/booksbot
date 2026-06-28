@@ -72,19 +72,30 @@ async def cb_req_manual(call: CallbackQuery, state: FSMContext) -> None:
     bgm, bcn = await get_balances(call.from_user.id)
     if bgm + bcn < cost:
         await call.message.edit_text(
-            f"🚫 <b>Insufficient balance.</b>\nManual requests cost <b>{fmt_amount(cost)} tokens</b>.\n"
-            f"You have {bgm + bcn:.2f}.",
-            reply_markup=kb([btn("💎 Buy BGM", "acc_buy", style="success")],
-                            [btn("🔙 Back", "menu_request", style="danger")]))
+            "🔒 <b>A little more in your wallet first</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>A concierge request is hand-fulfilled by our team and "
+            f"costs <code>{fmt_amount(cost)}</code> tokens — settled from 🪙 BCN first, "
+            "then 💎 BGM.\n"
+            f"Your wallet currently holds <code>{bgm + bcn:.2f}</code>.</blockquote>\n"
+            "<i>💡 Top up with 💎 BGM and we'll have the order desk standing by.</i>",
+            reply_markup=kb([btn("💎 Top up BGM", "acc_buy", style="success")],
+                            [btn("🔙 Back to Requests", "menu_request", style="danger")]))
         return
     await state.set_data({})
     await call.message.edit_text(
-        "<b>👤 Admin Request</b>\n\nWhat are you requesting?\n"
-        f"💰 Cost: <b>{fmt_amount(cost)} BCN/BGM</b> (deducted on confirm).",
+        "👤 <b>Concierge Request</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Can't find a title in the archive? Hand it to our team — we'll source it for you.</i>\n"
+        "<blockquote>Tell us what you're after and we'll track it down, then deliver it "
+        "straight to your chat. eBook or audiobook — your choice.\n"
+        f"💰 <b>Fulfilment fee:</b> <code>{fmt_amount(cost)}</code> 🪙 BCN / 💎 BGM, "
+        "charged only when you confirm.</blockquote>\n"
+        "<i>👇 What shall we find for you?</i>",
         reply_markup=kb(
-            [btn("📘 Ebook", "mreq_ebook", style="primary"),
+            [btn("📘 eBook", "mreq_ebook", style="primary"),
              btn("🎧 Audiobook", "mreq_audio", style="success")],
-            [btn("🔙 Back", "menu_request", style="danger")]))
+            [btn("🔙 Back to Requests", "menu_request", style="danger")]))
 
 
 @router.callback_query(F.data.in_({"mreq_ebook", "mreq_audio"}))
@@ -93,10 +104,13 @@ async def cb_pick_category(call: CallbackQuery, state: FSMContext) -> None:
     category = "ebook" if call.data == "mreq_ebook" else "audiobook"
     await state.update_data(category=category)
     await state.set_state(ManualFSM.title)
-    label = "📘 Ebook" if category == "ebook" else "🎧 Audiobook"
+    label = "📘 eBook" if category == "ebook" else "🎧 Audiobook"
     await call.message.edit_text(
-        f"<b>{label} Request — Step 1</b>\n\n✍️ Send the <b>title</b>.\n"
-        "<i>Send /cancel anytime to abort.</i>")
+        f"{label} <b>Request · Step 1 of 4</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>✍️ Send us the <b>title</b> of the book you'd like — exactly as "
+        "it appears on the cover works best, so we match the right edition.</blockquote>\n"
+        "<i>💡 Changed your mind? Send /cancel anytime — nothing is charged until you confirm.</i>")
 
 
 @router.message(ManualFSM.title, F.text)
@@ -105,7 +119,11 @@ async def on_title(message: Message, state: FSMContext) -> None:
         return await _maybe_cancel(message, state)
     await state.update_data(title=message.text.strip())
     await state.set_state(ManualFSM.author)
-    await message.answer("<b>Step 2</b>\n\n✍️ Send the <b>author's name</b>.")
+    await message.answer(
+        "✍️ <b>Request · Step 2 of 4</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>Now the <b>author's name</b>. This helps us pick the right "
+        "book when several share a title.</blockquote>")
 
 
 @router.message(ManualFSM.author, F.text)
@@ -116,14 +134,24 @@ async def on_author(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     if data.get("category") == "ebook":
         await message.answer(
-            "<b>Step 3</b>\n\n📂 Choose the <b>format</b>:",
+            "📂 <b>Request · Step 3 of 4</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>Pick your preferred <b>format</b> and we'll source that "
+            "edition where we can.\n"
+            "📑 <b>PDF</b> — pixel-perfect, ideal for textbooks &amp; comics.\n"
+            "📘 <b>EPUB</b> — reflows beautifully, best for novels.\n"
+            "📙 <b>MOBI</b> — for Kindle libraries.</blockquote>",
             reply_markup=kb([btn("📑 PDF", "mfmt_PDF", style="primary"),
                              btn("📘 EPUB", "mfmt_EPUB", style="primary"),
                              btn("📙 MOBI", "mfmt_MOBI", style="primary")]))
     else:
         await state.set_state(ManualFSM.cover)
-        await message.answer("<b>Step 3</b>\n\n🖼 Send the <b>cover image</b> "
-                             "(photo or file). Grab one from Google Images.")
+        await message.answer(
+            "🖼 <b>Request · Step 3 of 4</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>Send a <b>cover image</b> (a photo or an image file) so we "
+            "can confirm we've matched the exact title.\n"
+            "💡 A quick grab from Google Images is perfect.</blockquote>")
 
 
 @router.callback_query(F.data.startswith("mfmt_"))
@@ -131,8 +159,12 @@ async def cb_format(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
     await state.update_data(format=call.data.split("_", 1)[1])
     await state.set_state(ManualFSM.cover)
-    await call.message.edit_text("<b>Step 4</b>\n\n🖼 Send the <b>cover image</b> "
-                                 "(photo or file).")
+    await call.message.edit_text(
+        "🖼 <b>Request · Step 4 of 4</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>Almost there — send a <b>cover image</b> (a photo or an image "
+        "file) so we lock onto the exact edition.\n"
+        "💡 A quick grab from Google Images works perfectly.</blockquote>")
 
 
 @router.message(ManualFSM.cover, F.photo | F.document)
@@ -142,36 +174,52 @@ async def on_cover(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     from utils.settings import get_float
     cost = await get_float("request_cost")
-    fmt = f"\n📂 <b>Format:</b> {data.get('format')}" if data.get("category") == "ebook" else ""
+    fmt = f"📂 <b>Format:</b> {data.get('format')}\n" if data.get("category") == "ebook" else ""
     await message.answer_photo(
         cover_id,
-        caption=("<b>⚡ Confirm Request</b>\n"
+        caption=("📋 <b>Review &amp; Confirm</b>\n"
+                 "━━━━━━━━━━━━━━━━━━━━\n"
+                 "<i>One last look before we send this to the order desk.</i>\n"
+                 "<blockquote>"
                  f"📖 <b>Title:</b> {data.get('title')}\n"
                  f"✍️ <b>Author:</b> {data.get('author')}\n"
-                 f"📂 <b>Type:</b> {data.get('category').title()}{fmt}\n"
-                 f"💰 <b>Cost:</b> {fmt_amount(cost)} BCN/BGM"),
-        reply_markup=kb([btn("✅ Approve & Submit", "mreq_confirm", style="success")],
+                 f"📦 <b>Type:</b> {data.get('category').title()}\n"
+                 f"{fmt}"
+                 f"💰 <b>Fee:</b> <code>{fmt_amount(cost)}</code> 🪙 BCN / 💎 BGM</blockquote>\n"
+                 "<i>💡 Tap Confirm and we'll take it from here — the fee is charged "
+                 "now and fully refunded if we can't source it.</i>"),
+        reply_markup=kb([btn("✅ Confirm & Submit", "mreq_confirm", style="success")],
                         [btn("❌ Cancel", "mreq_cancel", style="danger")]))
 
 
 @router.message(ManualFSM.cover)
 async def on_cover_invalid(message: Message) -> None:
-    await message.answer("⚠️ Please send a <b>photo</b> or <b>image file</b> as the cover.")
+    await message.answer(
+        "⚠️ <b>That wasn't quite an image</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>Send the cover as a <b>photo</b> or an <b>image file</b> and "
+        "we'll lock onto the right edition. A screenshot from Google Images is "
+        "perfect.</blockquote>")
 
 
 @router.callback_query(F.data == "mreq_cancel")
 async def cb_cancel(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    await call.answer("Cancelled")
-    await call.message.answer("🛑 <b>Request cancelled.</b> No tokens deducted.",
-                              reply_markup=kb([btn("🔙 Menu", "menu_home", style="danger")]))
+    await call.answer("Request cancelled — nothing was charged.")
+    await call.message.answer(
+        "🛑 <b>Request cancelled</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>No worries — not a single token was touched. Your wallet is "
+        "exactly as it was, and the order desk never saw this one.</blockquote>\n"
+        "<i>💡 Ready when you are — start a fresh request anytime.</i>",
+        reply_markup=kb([btn("🔙 Back to Menu", "menu_home", style="danger")]))
 
 
 @router.callback_query(F.data == "mreq_confirm")
 async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     if not data.get("title"):
-        await call.answer("Session expired — start again.", show_alert=True)
+        await call.answer("This request session has expired — please start a fresh one.", show_alert=True)
         await state.clear()
         return
     uid = call.from_user.id
@@ -179,10 +227,10 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
     cost = await get_float("request_cost")
     currency = await spend(uid, cost)
     if not currency:
-        await call.answer("Insufficient balance.", show_alert=True)
+        await call.answer("Not quite enough in your wallet — top up with BGM and try again.", show_alert=True)
         await state.clear()
         return
-    await call.answer()
+    await call.answer("Confirmed — your request is on its way to our team.")
     rid = _rid()
     req = {
         "request_id": rid, "user_id": uid,
@@ -201,16 +249,22 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
 
     await call.message.answer(
-        "✅ <b>Request Registered!</b>\n\n"
+        "✨ <b>Request received — we're on it</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Your order is in the queue and our team will take it from here.</i>\n"
+        "<blockquote>"
         f"🆔 <b>Tracking ID:</b> <code>{rid}</code>\n"
-        f"📖 {req['title']} — {req['author']}\n\n"
-        "<i>You'll be notified once it's processed. Track it via 🚨 Track Request.</i>")
+        f"📖 <b>{req['title']}</b> — {req['author']}</blockquote>\n"
+        "<i>🔔 We'll ping you the moment it's ready. Follow its progress anytime "
+        "via 🚨 Track Request — and if we can't source it, your fee comes straight back.</i>")
 
     # notify admins
     summary = (f"🚀 <b>New Manual {req['category'].title()} Request</b>\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "<blockquote>"
                f"🆔 <code>{rid}</code>\n👤 <a href='tg://user?id={uid}'>{req['first_name']}</a> "
                f"(<code>{uid}</code>)\n📖 {req['title']}\n✍️ {req['author']}\n"
-               f"📂 {req['format'] or req['category']}\n💰 {currency}")
+               f"📂 {req['format'] or req['category']}\n💰 Paid in {currency}</blockquote>")
     for admin in ADMIN_IDS:
         try:
             if req["cover_id"]:
@@ -225,7 +279,11 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
 async def _maybe_cancel(message: Message, state: FSMContext) -> None:
     if message.text.strip().lower() == "/cancel":
         await state.clear()
-        await message.answer("🛑 Cancelled.")
+        await message.answer(
+            "🛑 <b>Request cancelled</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>All clear — nothing was charged and the order desk never "
+            "saw it. Start a fresh request whenever you're ready.</blockquote>")
 
 
 # ── admin queue ────────────────────────────────────────────────────────────────
@@ -240,13 +298,27 @@ async def _render_queue(bot, admin_id: int) -> None:
     pending = await db.find_global("requests", {"status": "pending", "type": "manual"},
                                    sort=[("created_at", 1)], limit=10)
     if not pending:
-        await bot.send_message(admin_id, "📭 <b>No pending manual requests.</b>")
+        await bot.send_message(
+            admin_id,
+            "📭 <b>The queue is clear</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>No manual requests are waiting right now. Every reader is "
+            "sorted — beautiful work. 🛡</blockquote>")
         return
-    await bot.send_message(admin_id, f"📬 <b>{len(pending)} pending request(s):</b>")
+    await bot.send_message(
+        admin_id,
+        "📬 <b>Manual Request Queue</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>🛡 <b>{len(pending)}</b> request(s) awaiting fulfilment, oldest "
+        "first. Each card below has its own actions — send the file, mark it done, "
+        "or cancel with a refund.</blockquote>")
     for r in pending:
-        cap = (f"🆔 <code>{r['request_id']}</code>\n👤 <code>{r['user_id']}</code>\n"
+        cap = ("🛡 <b>Pending Request</b>\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "<blockquote>"
+               f"🆔 <code>{r['request_id']}</code>\n👤 <code>{r['user_id']}</code>\n"
                f"📖 {r.get('title')}\n✍️ {r.get('author')}\n"
-               f"📂 {r.get('format') or r.get('category')}")
+               f"📂 {r.get('format') or r.get('category')}</blockquote>")
         try:
             if r.get("cover_id"):
                 await bot.send_photo(admin_id, r["cover_id"], caption=cap,
@@ -261,7 +333,7 @@ async def _render_queue(bot, admin_id: int) -> None:
 @router.callback_query(F.data == "admin_requests")
 async def cb_admin_requests(call: CallbackQuery) -> None:
     if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("This is an admin-only action.", show_alert=True)
         return
     await call.answer()
     await _render_queue(call.bot, call.from_user.id)
@@ -270,7 +342,11 @@ async def cb_admin_requests(call: CallbackQuery) -> None:
 @router.message(Command("requests"))
 async def cmd_requests(message: Message) -> None:
     if message.chat.id not in ADMIN_IDS:
-        await message.answer("🚫 Access denied.")
+        await message.answer(
+            "🔒 <b>Admins only</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>The request queue is part of the admin desk and isn't "
+            "available on this account.</blockquote>")
         return
     await _render_queue(message.bot, message.chat.id)
 
@@ -284,18 +360,23 @@ async def _get_req(rid: str):
 @router.callback_query(F.data.startswith("areq_send:"))
 async def cb_send_init(call: CallbackQuery, state: FSMContext) -> None:
     if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("This is an admin-only action.", show_alert=True)
         return
     rid = call.data.split(":", 1)[1]
     req = await _get_req(rid)
     if not req or req.get("status") != "pending":
-        await call.answer("Request not pending.", show_alert=True)
+        await call.answer("This request is no longer pending — it's already been handled.", show_alert=True)
         return
     await call.answer()
     await state.set_state(AdminReqFSM.awaiting_file)
     await state.update_data(rid=rid, target=req["user_id"])
-    await call.message.answer(f"📁 Send the file for <code>{rid}</code> now "
-                              "(document / audio / video).")
+    await call.message.answer(
+        "📤 <b>Deliver the File</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>Upload the file for request <code>{rid}</code> now — "
+        "a <b>document</b>, <b>audio</b>, or <b>video</b>.\n"
+        "🛡 It's indexed into the searchable archive and delivered straight to the "
+        "reader with a one-tap Add-to-Favorites button.</blockquote>")
 
 
 @router.message(AdminReqFSM.awaiting_file, F.document | F.audio | F.video)
@@ -305,7 +386,11 @@ async def on_admin_file(message: Message, state: FSMContext) -> None:
     await state.clear()
     req = await _get_req(rid)
     if not req:
-        await message.answer("❌ Request vanished.")
+        await message.answer(
+            "❌ <b>Request not found</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>This ticket is no longer in the system — it may have been "
+            "cancelled or already fulfilled. Nothing was sent.</blockquote>")
         return
 
     obj = message.document or message.audio or message.video
@@ -322,42 +407,61 @@ async def on_admin_file(message: Message, state: FSMContext) -> None:
         "msg_id": None, "file_id": file_id,
     })
 
-    caption = (f"📚 <b>Your requested file is ready!</b>\n\n"
-               f"📖 {req.get('title')}\n✍️ {req.get('author')}\n\n"
+    caption = ("🎁 <b>Your book has arrived</b>\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "<i>Sourced and delivered, just as you asked — enjoy.</i>\n"
+               "<blockquote>"
+               f"📖 <b>{req.get('title')}</b>\n✍️ {req.get('author')}</blockquote>\n"
+               "<i>🔖 Tap below to save it to your library so it's always one tap away.</i>\n\n"
                f"{CREDIT}")
-    fav = kb([btn("⭐ Add to Favorites", f"fav_add:{fuid}", style="success")])
+    fav = kb([btn("⭐ Save to Favorites", f"fav_add:{fuid}", style="success")])
     try:
         await message.bot.send_document(target, file_id, caption=caption, reply_markup=fav) \
             if message.document else \
             await message.bot.copy_message(target, message.chat.id, message.message_id)
     except Exception as exc:  # noqa: BLE001
-        await message.answer(f"❌ Could not deliver to user: {exc}")
+        await message.answer(
+            "❌ <b>Delivery didn't go through</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>We couldn't hand this file to the reader.\n🛡 <b>Details:</b> "
+            f"{exc}</blockquote>\n"
+            "<i>💡 The ticket is still open — try sending the file again.</i>")
         return
-    await message.answer("✅ File delivered. Tap below to close the ticket.",
-                         reply_markup=kb([btn("✅ Mark Completed", f"areq_done:{rid}",
-                                              style="primary")]))
+    await message.answer(
+        "✨ <b>File delivered</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>The reader has their book and it's now indexed in the searchable "
+        "archive. 🛡 Tap below to close out the ticket.</blockquote>",
+        reply_markup=kb([btn("✅ Mark Completed", f"areq_done:{rid}",
+                             style="primary")]))
 
 
 # ── mark completed ───────────────────────────────────────────────────────────
 @router.callback_query(F.data.startswith("areq_done:"))
 async def cb_done(call: CallbackQuery) -> None:
     if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("This is an admin-only action.", show_alert=True)
         return
     rid = call.data.split(":", 1)[1]
     db = await MongoManager.get()
     req = await _get_req(rid)
     if not req or req.get("status") != "pending":
-        await call.answer("Already processed.", show_alert=True)
+        await call.answer("This one's already been handled — no action needed.", show_alert=True)
         return
     await db.safe_update("requests", {"request_id": rid},
                          {"$set": {"status": "fulfilled", "fulfilled_at": _now(),
                                    "fulfilled_by": call.from_user.id}})
-    await call.answer("Marked completed ✅")
+    await call.answer("Marked completed — the reader has been notified.")
     try:
-        await call.bot.send_message(req["user_id"],
-                                    f"✅ <b>Request fulfilled</b>\n🆔 <code>{rid}</code>\n"
-                                    f"📖 {req.get('title')}")
+        await call.bot.send_message(
+            req["user_id"],
+            "✅ <b>Request fulfilled</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>All done — your book has been delivered.</i>\n"
+            "<blockquote>"
+            f"🆔 <b>Tracking ID:</b> <code>{rid}</code>\n"
+            f"📖 <b>{req.get('title')}</b></blockquote>\n"
+            "<i>🔖 Find it anytime in your library. Happy reading!</i>")
     except Exception:  # noqa: BLE001
         pass
 
@@ -366,18 +470,23 @@ async def cb_done(call: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("areq_cancel:"))
 async def cb_cancel_init(call: CallbackQuery, state: FSMContext) -> None:
     if call.from_user.id not in ADMIN_IDS:
-        await call.answer("Access denied", show_alert=True)
+        await call.answer("This is an admin-only action.", show_alert=True)
         return
     rid = call.data.split(":", 1)[1]
     req = await _get_req(rid)
     if not req or req.get("status") != "pending":
-        await call.answer("Already processed.", show_alert=True)
+        await call.answer("This one's already been handled — no action needed.", show_alert=True)
         return
     await call.answer()
     await state.set_state(AdminReqFSM.awaiting_reason)
     await state.update_data(rid=rid)
-    await call.message.answer(f"📝 Type the <b>cancellation reason</b> for <code>{rid}</code> "
-                              "(sent to the user):")
+    await call.message.answer(
+        "📝 <b>Cancel &amp; Refund</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>Type a short <b>reason</b> for cancelling <code>{rid}</code>. "
+        "The reader sees this exact note, so keep it kind and clear.\n"
+        "💰 Their fee is refunded automatically in 💎 BGM the moment you "
+        "send it.</blockquote>")
 
 
 @router.message(AdminReqFSM.awaiting_reason, F.text)
@@ -389,7 +498,11 @@ async def on_reason(message: Message, state: FSMContext) -> None:
     db = await MongoManager.get()
     req = await _get_req(rid)
     if not req or req.get("status") != "pending":
-        await message.answer("❌ Already processed.")
+        await message.answer(
+            "❌ <b>Already handled</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>This request has already been fulfilled or cancelled, so "
+            "nothing further was changed.</blockquote>")
         return
 
     # refund — always in BGM: BCN→25%, BGM→75% of cost
@@ -399,11 +512,25 @@ async def on_reason(message: Message, state: FSMContext) -> None:
     await db.safe_update("requests", {"request_id": rid},
                          {"$set": {"status": "cancelled", "cancel_reason": reason,
                                    "refunded": refund_amt, "cancelled_at": _now()}})
-    await message.answer(f"✅ Cancelled <code>{rid}</code> · refunded {fmt_amount(refund_amt)} BGM.")
+    await message.answer(
+        "✅ <b>Request cancelled &amp; refunded</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>"
+        f"🆔 <code>{rid}</code>\n"
+        f"💰 Refunded <code>{fmt_amount(refund_amt)}</code> 💎 BGM to the reader.</blockquote>\n"
+        "<i>🛡 They've been notified with your reason.</i>")
     try:
         await message.bot.send_message(
             req["user_id"],
-            f"❌ <b>Request Cancelled</b>\n🆔 <code>{rid}</code>\n📖 {req.get('title')}\n\n"
-            f"📭 <b>Reason:</b> {reason}\n💰 <b>Refund:</b> {fmt_amount(refund_amt)} BGM")
+            "🔔 <b>An update on your request</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>We weren't able to fulfil this one — but we've made it right.</i>\n"
+            "<blockquote>"
+            f"🆔 <b>Tracking ID:</b> <code>{rid}</code>\n"
+            f"📖 <b>{req.get('title')}</b>\n"
+            f"📝 <b>Note from our team:</b> {reason}\n"
+            f"💰 <b>Refunded:</b> <code>{fmt_amount(refund_amt)}</code> 💎 BGM, back in "
+            "your wallet now.</blockquote>\n"
+            "<i>💡 Sorry we missed this one — try another title and we'll do our best to track it down.</i>")
     except Exception:  # noqa: BLE001
         pass

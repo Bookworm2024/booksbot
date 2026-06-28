@@ -61,11 +61,15 @@ async def _claim(message: Message, uid: int) -> None:
                                        {"login_streak": 1, "streak_freezes": 1}) or {}
         frz = int(doc.get("streak_freezes") or 0)
         await message.answer(
-            "🎁 <b>Already claimed today!</b>\n"
-            f"🔥 Current streak: <b>{int(doc.get('login_streak') or 0)} day(s)</b>"
-            + (f" · 🛡 {frz} freeze(s)" if frz else "") + "\n"
-            "Come back tomorrow to keep it going.",
-            reply_markup=kb([btn("💼 Balance", "acc_balance", style="primary")]))
+            "🎁 <b>Today's Reward — Already Claimed</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>You're all set for today. Your streak is safe and "
+            "counting — return tomorrow to claim the next, larger reward.\n"
+            f"🔥 <b>Current streak:</b> <code>{int(doc.get('login_streak') or 0)}</code> day(s)"
+            + (f"\n🛡 <b>Streak insurance:</b> <code>{frz}</code> freeze(s) banked" if frz else "")
+            + "</blockquote>\n"
+            "<i>💡 Rewards climb every day and peak on day 7 — keep the streak alive.</i>",
+            reply_markup=kb([btn("💼 My Wallet", "acc_balance", style="primary")]))
         return
 
     prev_streak = int(before.get("login_streak") or 0)
@@ -94,7 +98,7 @@ async def _claim(message: Message, uid: int) -> None:
     # ── comeback bonus (returning after a long lapse) ─────────────────────────
     comeback = 1.0 if _gap_days(prev_daily) >= 7 else 0.0
     if comeback:
-        extras.append(f"👋 Welcome back! <b>+{fmt_amount(comeback)} BGM</b> comeback bonus")
+        extras.append(f"👋 <b>Welcome back!</b> A <code>+{fmt_amount(comeback)}</code> 💎 BGM comeback bonus is on us")
 
     # ── anniversary gift (yearly, on the join month-day) ──────────────────────
     anniv = 0.0
@@ -109,7 +113,7 @@ async def _claim(message: Message, uid: int) -> None:
                 and now.year > joined.year and int(before.get("anniv_year") or 0) != now.year):
             anniv = 2.0
             set_fields["anniv_year"] = now.year
-            extras.append(f"🎂 Happy bot-anniversary! <b>+{fmt_amount(anniv)} BGM</b> gift")
+            extras.append(f"🎂 <b>Happy anniversary with us!</b> Enjoy a <code>+{fmt_amount(anniv)}</code> 💎 BGM gift")
 
     reward = _REWARDS[min(streak, 7) - 1]
     # sanitize keeps this credit inside the same [0, MAX_AMOUNT] guard the rest of
@@ -122,19 +126,20 @@ async def _claim(message: Message, uid: int) -> None:
                          {"$set": set_fields, "$inc": {"bookgem": total}})
 
     if insured:
-        extras.insert(0, "🛡 <b>Streak Insurance</b> saved your streak!")
+        extras.insert(0, "🛡 <b>Streak insurance</b> stepped in and rescued your streak")
     if earned_freeze:
-        extras.append("🛡 Earned a <b>streak freeze</b> (saves a missed day later)")
+        extras.append("🛡 You've earned a <b>streak freeze</b> — it quietly covers one missed day down the road")
 
     dots = "".join("🟢" if i < min(streak, 7) else "⚪" for i in range(7))
-    extra_block = ("\n" + "\n".join(extras) + "\n") if extras else ""
+    extra_block = ("\n<blockquote>" + "\n".join(extras) + "</blockquote>\n") if extras else ""
     await message.answer(
-        "🎁 <b>Daily Reward Claimed!</b>\n━━━━━━━━━━━━━━━━━━\n"
-        f"🔥 <b>Day {streak}</b> streak\n{dots}\n"
+        "🎁 <b>Daily Reward — Claimed</b>\n━━━━━━━━━━━━━━━━━━\n"
+        f"🔥 <b>Day {streak}</b> of your reading streak\n{dots}\n"
         f"{extra_block}\n"
-        f"💎 <b>+{fmt_amount(total)} BGM</b>\n<i>Keep the streak — day 7 pays the most!</i>",
-        reply_markup=kb([btn("💼 Balance", "acc_balance", style="primary"),
-                         btn("🎡 Daily Spin", "daily_spin", style="success")]))
+        f"💎 <b>+{fmt_amount(total)} BGM</b> added to your wallet\n"
+        "<i>💡 Each day pays a little more — day 7 is the richest claim of all. See you tomorrow.</i>",
+        reply_markup=kb([btn("💼 My Wallet", "acc_balance", style="primary"),
+                         btn("🎡 Spin the Wheel", "daily_spin", style="success")]))
 
     # surface any freshly-earned achievements (e.g. streak milestones)
     from utils.achievements import check_unlocks

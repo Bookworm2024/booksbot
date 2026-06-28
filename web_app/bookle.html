@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-<title>Bookle</title>
+<title>Books Provider — Bookle</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,7 +20,8 @@
   html,body{ margin:0; min-height:100%; }
   body{
     font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--ink);
-    display:flex; flex-direction:column; align-items:center; gap:12px; padding:14px 12px 28px; overflow-x:hidden;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; letter-spacing:-.005em;
+    display:flex; flex-direction:column; align-items:center; gap:13px; padding:16px 12px 30px; overflow-x:hidden;
     background:
       radial-gradient(900px 480px at 50% -10%, rgba(67,224,138,.18), transparent 60%),
       radial-gradient(700px 380px at 110% 6%, rgba(75,201,255,.14), transparent 55%),
@@ -28,59 +29,66 @@
     background-attachment:fixed;
   }
   .head{ text-align:center; }
-  .head h1{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:1.6rem; margin:4px 0 2px; letter-spacing:.04em;
+  .head h1{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:1.66rem; margin:4px 0 3px; letter-spacing:.05em;
     background:linear-gradient(120deg,var(--acc),var(--acc2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
-  .head .sub{ color:var(--mut); font-size:.84rem; }
-  #grid{ display:grid; grid-template-rows:repeat(6,1fr); gap:8px; margin-top:4px; }
+  .head .sub{ color:var(--mut); font-size:.85rem; line-height:1.5; }
+  #grid{ display:grid; grid-template-rows:repeat(6,1fr); gap:8px; margin-top:6px; }
   .row{ display:grid; grid-template-columns:repeat(5,56px); gap:8px; }
   .cell{ width:56px; height:56px; display:grid; place-items:center; font-family:"Orbitron",sans-serif; font-weight:700;
-    font-size:1.5rem; border:2px solid var(--line); border-radius:12px; text-transform:uppercase; background:var(--card);
-    transition:transform .15s, border-color .15s, background .25s; }
-  .cell.fill{ border-color:var(--acc); animation:pop .15s ease; }
+    font-size:1.5rem; border:2px solid var(--line); border-radius:13px; text-transform:uppercase; background:var(--card);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    transition:transform .15s, border-color .15s, background .25s, box-shadow .25s; }
+  .cell.fill{ border-color:var(--acc); animation:pop .15s ease; box-shadow:0 0 0 1px var(--acc) inset; }
   @keyframes pop{ 50%{ transform:scale(1.08) } }
   .cell.rev{ animation:flip .5s ease both; }
   @keyframes flip{ 0%{transform:rotateX(0)} 50%{transform:rotateX(90deg)} 100%{transform:rotateX(0)} }
   .cell.c{ background:linear-gradient(160deg,#43e08a,#2bbf72); border-color:transparent; color:#06231a; box-shadow:0 6px 18px var(--glow); }
-  .cell.p{ background:linear-gradient(160deg,#ffc24b,#e0a52b); border-color:transparent; color:#2a1c00; }
-  .cell.a{ background:var(--a); border-color:transparent; color:#9aa3ad; }
-  #msg{ min-height:1.3em; font-weight:700; text-align:center; font-size:.95rem; }
-  #kb{ display:flex; flex-direction:column; gap:7px; width:100%; max-width:420px; margin-top:2px; }
+  .cell.p{ background:linear-gradient(160deg,#ffc24b,#e0a52b); border-color:transparent; color:#2a1c00; box-shadow:0 6px 18px rgba(255,194,75,.3); }
+  .cell.a{ background:var(--a); border-color:transparent; color:#9aa3ad; box-shadow:none; }
+  #msg{ min-height:1.3em; font-weight:700; text-align:center; font-size:.95rem; letter-spacing:.01em; transition:color .2s; }
+  #kb{ display:flex; flex-direction:column; gap:7px; width:100%; max-width:420px; margin-top:4px; }
   .krow{ display:flex; gap:5px; justify-content:center; }
-  .key{ flex:1; min-width:0; height:50px; border:0; border-radius:9px; font-weight:800; font-size:1rem; font-family:inherit;
-    background:var(--card2); color:var(--ink); cursor:pointer; transition:transform .08s, background .25s; }
+  .key{ flex:1; min-width:0; height:52px; border:0; border-radius:10px; font-weight:800; font-size:1rem; font-family:inherit;
+    background:var(--card2); color:var(--ink); cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.05);
+    transition:transform .08s, background .25s, box-shadow .25s; }
   .key:active{ transform:translateY(1px) scale(.96); }
-  .key.wide{ flex:1.6; font-size:.78rem; letter-spacing:.04em; }
-  .key.c{ background:linear-gradient(160deg,#43e08a,#2bbf72); color:#06231a; }
-  .key.p{ background:linear-gradient(160deg,#ffc24b,#e0a52b); color:#2a1c00; }
-  .key.a{ background:#10211a; color:#5d6b62; }
+  .key.wide{ flex:1.6; font-size:.74rem; letter-spacing:.06em; }
+  .key.c{ background:linear-gradient(160deg,#43e08a,#2bbf72); color:#06231a; box-shadow:0 4px 12px var(--glow); }
+  .key.p{ background:linear-gradient(160deg,#ffc24b,#e0a52b); color:#2a1c00; box-shadow:0 4px 12px rgba(255,194,75,.28); }
+  .key.a{ background:#10211a; color:#5d6b62; box-shadow:none; }
   /* result card */
   .result{ width:100%; max-width:420px; background:linear-gradient(165deg,var(--card2),var(--card)); border:1px solid var(--line);
-    border-radius:18px; padding:18px; text-align:center; box-shadow:0 16px 40px rgba(0,0,0,.45); animation:up .4s ease both; display:none; }
+    border-radius:20px; padding:20px 18px; text-align:center; box-shadow:0 18px 44px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.05); animation:up .4s ease both; display:none; }
   @keyframes up{ from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
-  .result .emoji{ font-size:3rem; }
-  .result .tag{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:1.4rem; margin:6px 0 2px; }
-  .result .word b{ color:var(--acc); letter-spacing:.1em; }
-  .result .reward{ display:inline-block; margin-top:10px; background:linear-gradient(160deg,rgba(67,224,138,.18),rgba(67,224,138,.04));
-    border:1px solid rgba(67,224,138,.35); border-radius:14px; padding:10px 18px; }
+  .result .emoji{ font-size:3.1rem; filter:drop-shadow(0 6px 18px var(--glow)); }
+  .result .tag{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:1.42rem; margin:8px 0 2px; }
+  .result .word{ font-size:.96rem; margin-top:4px; }
+  .result .word b{ color:var(--acc); letter-spacing:.1em; text-transform:uppercase; }
+  .result .reward{ display:inline-block; margin-top:12px; background:linear-gradient(160deg,rgba(67,224,138,.18),rgba(67,224,138,.04));
+    border:1px solid rgba(67,224,138,.35); border-radius:15px; padding:11px 20px; box-shadow:0 8px 22px rgba(67,224,138,.18), inset 0 1px 0 rgba(255,255,255,.06); }
   .result .reward .n{ font-family:"Orbitron",sans-serif; font-weight:800; font-size:1.5rem; color:var(--acc); }
-  .result .reward .l{ font-size:.64rem; letter-spacing:.12em; text-transform:uppercase; color:var(--mut); }
-  .btn{ border:0; border-radius:13px; padding:13px 18px; font-size:.98rem; font-weight:800; cursor:pointer; color:#06231a; font-family:inherit;
-    background:linear-gradient(135deg,var(--acc),var(--acc2)); box-shadow:0 10px 26px var(--glow); margin-top:14px; }
-  .btn.ghost{ background:rgba(255,255,255,.06); color:var(--ink); box-shadow:none; border:1px solid var(--line); }
-  .btn:active{ transform:translateY(1px) scale(.99); }
+  .result .reward .l{ font-size:.62rem; letter-spacing:.14em; text-transform:uppercase; color:var(--mut); font-weight:600; margin-top:2px; }
+  .btn{ border:0; border-radius:14px; padding:13px 18px; font-size:.98rem; font-weight:800; letter-spacing:.01em; cursor:pointer; color:#06231a; font-family:inherit;
+    background:linear-gradient(135deg,var(--acc),var(--acc2)); box-shadow:0 12px 28px var(--glow), inset 0 1px 0 rgba(255,255,255,.25); transition:transform .12s, filter .2s; margin-top:16px; }
+  .btn.ghost{ background:rgba(255,255,255,.06); color:var(--ink); box-shadow:inset 0 1px 0 rgba(255,255,255,.04); border:1px solid var(--line); }
+  .btn:active{ transform:translateY(1px) scale(.99); filter:brightness(1.05); }
   .btnrow{ display:flex; gap:10px; justify-content:center; }
+  /* owner credit */
+  .credit{ text-align:center; color:var(--mut); font-size:.72rem; line-height:1.55; margin:18px auto 2px; max-width:340px; opacity:.78; }
+  .credit b{ color:var(--ink); font-weight:600; }
   #confetti{ position:fixed; inset:0; pointer-events:none; z-index:50; }
 </style>
 </head>
 <body>
 <div class="head">
   <h1>🟩 BOOKLE</h1>
-  <div class="sub">Crack the daily book word in 6 tries · 1 game/day</div>
+  <div class="sub">Crack today's book-world word in 6 tries · one fresh puzzle daily</div>
 </div>
 <div id="grid"></div>
 <div id="msg"></div>
 <div id="kb"></div>
 <div class="result" id="result"></div>
+<div class="credit">Books Provider — curated &amp; operated by<br><b>@bookslibraryofficial</b> &amp; <b>@trinityXmods</b></div>
 <canvas id="confetti"></canvas>
 
 <script>
@@ -126,12 +134,12 @@ async function api(path, body){
   const r = await fetch(path,{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ init_data:INIT, ...body }) });
   return r.json();
 }
-async function load(){ try{ apply(await api("/api/bookle/new",{}), false); }catch(e){ msg.textContent="Network error."; } }
+async function load(){ try{ apply(await api("/api/bookle/new",{}), false); }catch(e){ msg.textContent="Couldn't load today's puzzle — please try again."; } }
 async function submitGuess(){
   if(status!=="active") return;
-  if(cur.length!==LEN){ msg.textContent="Need 5 letters"; hapN("error"); return; }
+  if(cur.length!==LEN){ msg.textContent=`A few more letters — fill all ${LEN}`; hapN("error"); return; }
   msg.textContent="";
-  let r; try{ r=await api("/api/bookle/guess",{ guess:cur }); }catch(e){ msg.textContent="Network error."; return; }
+  let r; try{ r=await api("/api/bookle/guess",{ guess:cur }); }catch(e){ msg.textContent="Connection hiccup — try that guess again."; return; }
   if(r.error){ msg.textContent=r.error; hapN("error"); return; }
   cur=""; apply(r, true);
 }
@@ -145,14 +153,14 @@ function apply(r, animateLast){
   const revealRow = (animateLast && guesses.length>prevLen) ? guesses.length-1 : -1;
   paint(revealRow);
   if(status==="active"){
-    if(guesses.length===0) msg.textContent="Type your first guess 👇";
-    else msg.textContent=`${MAX-guesses.length} ${MAX-guesses.length===1?"try":"tries"} left`;
+    if(guesses.length===0) msg.textContent="Type any 5-letter word to begin 👇";
+    else msg.textContent=`${MAX-guesses.length} ${MAX-guesses.length===1?"guess":"guesses"} left`;
   } else {
     setTimeout(showResult, revealRow>=0 ? 700 : 0);
   }
 }
 
-const GRADES_WIN=[ [2,"🏆","Legendary!","#ffd24b"], [4,"🌟","Great solve!","#43e08a"], [6,"😅","Phew — got it!","#4bc9ff"] ];
+const GRADES_WIN=[ [2,"🏆","Legendary!","#ffd24b"], [4,"🌟","Brilliant solve!","#43e08a"], [6,"😅","Phew — nailed it!","#4bc9ff"] ];
 function showResult(){
   const won = status==="won";
   let emoji="📚", tag="So close!", col="#ff5d73";
@@ -162,19 +170,19 @@ function showResult(){
   resultEl.innerHTML = `
     <div class="emoji">${emoji}</div>
     <div class="tag" style="color:${col}">${tag}</div>
-    ${won ? `<div class="sub" style="color:var(--mut)">Solved in <b style="color:var(--ink)">${guesses.length}/${MAX}</b></div>`
-          : `<div class="word">The word was <b>${word}</b></div>`}
-    ${won ? `<div class="reward"><div class="n">+${Number(reward||0).toLocaleString('en-US',{maximumFractionDigits:3})} BGM</div><div class="l">Reward earned</div></div>` : ``}
-    <div style="font-family:monospace;line-height:1.25;margin-top:14px;font-size:1.1rem">${share}</div>
+    ${won ? `<div class="sub" style="color:var(--mut)">Solved in <b style="color:var(--ink)">${guesses.length} of ${MAX}</b></div>`
+          : `<div class="word">Today's word was <b>${word}</b> — come back tomorrow for a fresh one.</div>`}
+    ${won ? `<div class="reward"><div class="n">+${Number(reward||0).toLocaleString('en-US',{maximumFractionDigits:3})} BGM</div><div class="l">💎 Reward earned</div></div>` : ``}
+    <div style="font-family:monospace;line-height:1.25;margin-top:16px;font-size:1.1rem">${share}</div>
     <div class="btnrow">
-      <button class="btn ghost" id="copy">📋 Share</button>
+      <button class="btn ghost" id="copy">📋 Share result</button>
       <button class="btn" id="close">Done</button>
     </div>`;
   document.getElementById("close").onclick=()=>tg?.close();
   document.getElementById("copy").onclick=()=>{
     const txt=`🟩 Bookle ${won?guesses.length:"X"}/${MAX}\n${share}`;
     try{ navigator.clipboard?.writeText(txt); }catch(e){}
-    msg.textContent="Copied to clipboard!";
+    msg.textContent="Copied — share your grid with friends!";
   };
   hapN(won ? "success" : "warning");
   if(won && guesses.length<=4) burst(col);

@@ -28,16 +28,16 @@ async def cb_add(call: CallbackQuery) -> None:
     fuid = call.data.split(":", 1)[1]
     f = await get_file(fuid)
     if not f:
-        await call.answer("File not found.", show_alert=True)
+        await call.answer("We couldn't find that title anymore — it may have moved. Try a fresh search.", show_alert=True)
         return
     db = await MongoManager.get()
     if await db.find_one_global("tbr", {"user_id": uid, "file_unique_id": fuid}):
-        await call.answer("Already on your Reading List 📌", show_alert=True)
+        await call.answer("🔖 Already saved — it's waiting on your Reading List whenever you are.", show_alert=True)
         return
     await db.safe_insert("tbr", {
         "user_id": uid, "file_unique_id": fuid, "name": f.get("name"),
         "ext": f.get("ext"), "added_at": datetime.now(timezone.utc)})
-    await call.answer("📌 Saved to your Reading List!")
+    await call.answer("🔖 Saved to your Reading List — we'll keep it ready for you.")
 
 
 @router.message(Command("tbr"))
@@ -56,8 +56,13 @@ async def _render(message: Message, uid: int, *, edit: bool) -> None:
     items = await db.find_global("tbr", {"user_id": uid}, sort=[("added_at", -1)], limit=200)
     send = message.edit_text if edit else message.answer
     if not items:
-        await send("📌 <b>Reading List is empty</b>\n\nTap 📌 on any search result to "
-                   "save a book to read later.",
+        await send("🔖 <b>Your Reading List</b>\n"
+                   "━━━━━━━━━━━━━━━━━━━━\n"
+                   "<i>The shelf for everything you mean to read next.</i>\n\n"
+                   "<blockquote>It's empty for now — and that's the fun part. "
+                   "Find a book you love the look of, tap <b>🔖 Save for later</b> on "
+                   "the result, and it lands right here, ready the moment you are.</blockquote>\n"
+                   "<i>💡 Save freely — your list keeps as many titles as you like.</i>",
                    reply_markup=kb([btn("🔍 Find Books", "req_auto", style="success")],
                                    [btn("🔙 Library", "menu_library", style="danger")]))
         return
@@ -69,9 +74,12 @@ async def _render(message: Message, uid: int, *, edit: bool) -> None:
                          style="success"),
                      btn("🗑", f"tbr_del:{fuid}", style="danger")])
     rows.append([btn("🔙 Library", "menu_library", style="danger")])
-    more = f" (showing first {_PER})" if len(items) > _PER else ""
-    await send(f"📌 <b>Reading List</b> — {len(items)} book(s){more}\n"
-               "Tap a title to download it (it leaves the list once you do).",
+    more = f"  ·  <i>showing the first {_PER}</i>" if len(items) > _PER else ""
+    await send(f"🔖 <b>Your Reading List</b>  ·  <code>{len(items)}</code> saved{more}\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "<blockquote>Tap any title to bring it to you instantly — it slips off the "
+               "list the moment it's delivered, so what's left is always still ahead of you. "
+               "Use 🗑 to clear one you've changed your mind about.</blockquote>",
                reply_markup=kb(*rows))
 
 
@@ -82,5 +90,5 @@ async def cb_del(call: CallbackQuery) -> None:
     db = await MongoManager.get()
     for idx in db.healthy:
         await db.dbs[idx]["tbr"].delete_one({"user_id": uid, "file_unique_id": fuid})
-    await call.answer("🗑 Removed")
+    await call.answer("🗑 Removed from your Reading List.")
     await _render(call.message, uid, edit=True)

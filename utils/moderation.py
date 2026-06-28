@@ -70,12 +70,12 @@ async def remove_banned(word: str) -> bool:
 def _heuristic_reason(text: str) -> str | None:
     t = text or ""
     if len(_URL_RE.findall(t)) >= 3:
-        return "too many links"
+        return "a little too many links"
     letters = [c for c in t if c.isalpha()]
     if len(letters) >= 12 and sum(1 for c in letters if c.isupper()) / len(letters) > 0.75:
-        return "excessive shouting"
+        return "too much shouting — try lower-case"
     if _REPEAT_RE.search(t):
-        return "spammy character repetition"
+        return "repeated characters that read as spam"
     return None
 
 
@@ -88,7 +88,7 @@ def _banned_hit(text: str, words: list[str]) -> str | None:
         # word-boundary match for single tokens; plain substring for phrases
         pat = r"\b" + re.escape(w) + r"\b" if " " not in w else re.escape(w)
         if re.search(pat, low):
-            return "blocked term"
+            return "a term we don't allow"
     return None
 
 
@@ -96,7 +96,7 @@ async def check(text: str) -> tuple[bool, str]:
     """Return (ok, reason). ok=True means allowed. Reason is a short user-facing
     label when blocked. A no-op (always ok) when moderation is disabled."""
     if not (text or "").strip():
-        return False, "empty message"
+        return False, "an empty message"
     if not await is_enabled():
         return True, ""
     reason = _heuristic_reason(text)
