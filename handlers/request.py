@@ -19,7 +19,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import BOT_PUBLIC_URL, LOG_CHANNEL_ID
+from config import BOT_PUBLIC_URL
+from utils.logs import log_book_found
 from database.connection import MongoManager
 from utils.brand import CREDIT
 from utils.channel import get_file_channel
@@ -434,14 +435,8 @@ async def cb_download(call: CallbackQuery) -> None:
                                      f"dl:{nxt['file_unique_id']}", style="success")]))
     except Exception:  # noqa: BLE001 — a nudge must never break delivery
         pass
-    if LOG_CHANNEL_ID:
-        try:
-            await call.bot.send_message(
-                LOG_CHANNEL_ID,
-                f"📦 <b>File Sent</b>\n👤 <code>{uid}</code>\n"
-                f"📚 {escape(f.get('name') or '')}\n💰 {currency}")
-        except Exception:  # noqa: BLE001
-            pass
+    # found-a-book → admin (full detail) + public (privacy-safe) activity log
+    await log_book_found(call.bot, uid, f.get("name") or "", f.get("ext") or "", currency)
 
 
 # NOTE: req_manual and req_history are handled by requests_manual.py and track.py.

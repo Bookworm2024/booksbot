@@ -114,7 +114,7 @@ async def cb_balance(call: CallbackQuery) -> None:
 
 
 # ── /claim ───────────────────────────────────────────────────────────────────
-async def _do_claim(uid: int) -> tuple[str, object]:
+async def _do_claim(uid: int, bot) -> tuple[str, object]:
     left = await seconds_until_claim(uid)
     if left > 0:
         return ("⏳ <b>Daily Bonus Resting</b>\n"
@@ -133,6 +133,8 @@ async def _do_claim(uid: int) -> tuple[str, object]:
     await set_daily_bcn(uid, bonus)
     from utils.missions import mark
     await mark(uid, "claim")
+    from utils.logs import log_bcn_claim
+    await log_bcn_claim(bot, uid, bonus)
     return ("✨ <b>Daily Bonus Collected</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "<blockquote>"
@@ -146,14 +148,14 @@ async def _do_claim(uid: int) -> tuple[str, object]:
 
 @router.message(Command("claim"))
 async def cmd_claim(message: Message) -> None:
-    text, markup = await _do_claim(message.chat.id)
+    text, markup = await _do_claim(message.chat.id, message.bot)
     await message.answer(text, reply_markup=markup)
 
 
 @router.callback_query(F.data == "do_claim")
 async def cb_claim(call: CallbackQuery) -> None:
     await call.answer()
-    text, markup = await _do_claim(call.from_user.id)
+    text, markup = await _do_claim(call.from_user.id, call.bot)
     await call.message.edit_text(text, reply_markup=markup)
 
 

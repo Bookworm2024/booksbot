@@ -12,7 +12,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from config import LOG_CHANNEL_ID
+from config import PUBLIC_LOG_CHANNEL_ID as LOG_CHANNEL_ID
 from database.connection import MongoManager
 from utils.keyboards import btn, kb
 

@@ -48,7 +48,13 @@ async def backfill_first_purchase_flag() -> None:
 
 
 async def ensure_user(user_id: int, first_name: str = "", username: str = "") -> Dict[str, Any]:
-    """Fetch the user; create the record on first sight. Returns the doc."""
+    """Fetch the user; create the record on first sight. Returns the doc.
+
+    `is_new` on the returned doc is a TRANSIENT, per-call flag — True only on the
+    very first sight of this user, False for every later visit. It is deliberately
+    NOT persisted: an earlier version stored is_new=True on the record and never
+    cleared it, so every returning user was mis-reported as "new" on each /start.
+    """
     db = await MongoManager.get()
     doc = await db.find_one_global("users", {"user_id": user_id})
     if doc:
@@ -59,6 +65,7 @@ async def ensure_user(user_id: int, first_name: str = "", username: str = "") ->
                       "username": username or doc.get("username", ""),
                       "last_active": _now()}},
         )
+        doc["is_new"] = False   # a returning user is never "new" (overrides any legacy stored flag)
         return doc
 
     new = {
@@ -72,9 +79,11 @@ async def ensure_user(user_id: int, first_name: str = "", username: str = "") ->
         "bookcoin": 0.0,
         "bcn_claimed_at": None,
         "referrer": None,
-        "is_new": True,
     }
-    await db.safe_insert("users", new)
+    # Only the call that actually INSERTS the record sees is_new=True, so a rare
+    # double /start race still announces the new user exactly once.
+    inserted = await db.safe_insert("users", new)
+    new["is_new"] = bool(inserted)
     return new
 
 

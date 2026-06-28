@@ -353,6 +353,9 @@ async def _confirm_payment(doc: dict, bot, *, email_txn_id: str = "",
     cpn = await _redeem_coupon(flipped.get("coupon", ""), flipped["user_id"], base)
     total = base + bonus + fp + cpn
     await add_bgm(flipped["user_id"], total)
+    from utils.logs import log_purchase
+    await log_purchase(bot, flipped["user_id"], total,
+                       f"₹{fmt_amount(flipped.get('total_due_inr') or 0)}", "upi")
     await db.safe_update("users", {"user_id": flipped["user_id"]},
                          {"$unset": {"cart_opened_at": ""}}, upsert=False)  # cart completed
     bonus_line = f" <i>(includes +{fmt_amount(bonus)} bonus)</i>" if bonus else ""
@@ -514,11 +517,14 @@ async def oxapay_webhook(request: web.Request) -> web.Response:
     cpn = await _redeem_coupon(order.get("coupon", ""), order["user_id"], base)
     total = base + float(order.get("bonus") or 0) + fp + cpn
     await add_bgm(order["user_id"], total)
+    bot = request.app["bot"]
+    from utils.logs import log_purchase
+    await log_purchase(bot, order["user_id"], total,
+                       f"${fmt_amount(order.get('amount_usd') or 0)}", "crypto")
     await db.safe_update("users", {"user_id": order["user_id"]},
                          {"$unset": {"cart_opened_at": ""}}, upsert=False)  # cart completed
     fp_line = f"\n🥳 First-purchase welcome: <b>+{fmt_amount(fp)} BGM</b>" if fp else ""
     cpn_line = f"\n🎟 Coupon bonus: <b>+{fmt_amount(cpn)} BGM</b>" if cpn else ""
-    bot = request.app["bot"]
     try:
         await bot.send_message(order["user_id"],
                                "✨ <b>Crypto Payment Confirmed</b>\n"

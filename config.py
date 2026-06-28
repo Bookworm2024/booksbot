@@ -106,8 +106,16 @@ REQUIRED_CHANNELS: list[str] = _csv_strs(
 )
 # Private channel holding the ~30k files to be indexed (numeric -100... id).
 FILE_CHANNEL_ID: int = _int("FILE_CHANNEL_ID", 0)
-# Where the bot posts new-user / activity logs.
-LOG_CHANNEL_ID: int  = _int("LOG_CHANNEL_ID", 0)
+# Two log channels (see utils/logs.py):
+#   • ADMIN  — private, staff-only. Every meaningful user activity, full detail
+#     (ids, usernames, amounts, references). Users are NEVER given a link to it.
+#   • PUBLIC — community feed. Curated, privacy-safe highlights; this is the
+#     channel users receive a one-time join link to (handlers/invite.py).
+# Defaults are the operator's channels; override per-deploy via env if needed.
+ADMIN_LOG_CHANNEL_ID: int  = _int("ADMIN_LOG_CHANNEL_ID", 0) or _int("LOG_CHANNEL_ID", -1002597047059)
+PUBLIC_LOG_CHANNEL_ID: int = _int("PUBLIC_LOG_CHANNEL_ID", -1002669659742)
+# Back-compat alias: the old single activity-log channel is now the admin log.
+LOG_CHANNEL_ID: int = ADMIN_LOG_CHANNEL_ID
 
 
 # ── Telethon backfill (tools/backfill.py only) ───────────────────────────────

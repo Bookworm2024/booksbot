@@ -24,9 +24,10 @@ from aiogram.filters import CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS, LOG_CHANNEL_ID, REQUIRED_CHANNELS
+from config import ADMIN_IDS, REQUIRED_CHANNELS
 from utils.brand import DASHBOARD_FOOTER, about_text
 from utils.keyboards import btn, kb, url_btn
+from utils.logs import log_new_user
 from utils.referral import grant_referral, remember_referrer
 from utils.users import ensure_user, is_banned
 
@@ -120,16 +121,11 @@ async def cmd_start(message: Message, command: CommandObject, state: FSMContext)
     if arg:
         await remember_referrer(uid, arg)
 
-    # new-user log
-    if doc.get("is_new") and LOG_CHANNEL_ID:
-        try:
-            await message.bot.send_message(
-                LOG_CHANNEL_ID,
-                f"🆕 <b>New User</b>\n👤 {escape(message.from_user.first_name or '')}\n"
-                f"🆔 <code>{uid}</code>",
-            )
-        except Exception:  # noqa: BLE001
-            pass
+    # first-ever /start → log to admin (full detail) + public (warm welcome).
+    # is_new is now a true first-sight flag, so returning users are never re-logged.
+    if doc.get("is_new"):
+        await log_new_user(message.bot, uid, message.from_user.first_name or "",
+                           message.from_user.username or "")
 
     await _render_gate_or_dashboard(message)
 

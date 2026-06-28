@@ -30,9 +30,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS, LOG_CHANNEL_ID
+from config import ADMIN_IDS
 from database.connection import MongoManager
 from utils.brand import CREDIT
+from utils.logs import log_request_created, log_request_fulfilled
 from utils.files import clean_title, index_file, kind_for_ext
 from utils.format import fmt_amount
 from utils.keyboards import btn, kb
@@ -276,6 +277,10 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
         except Exception:  # noqa: BLE001
             pass
 
+    # channels: admin (full detail) + public (curated, privacy-safe)
+    await log_request_created(call.bot, uid, req["first_name"], req["title"],
+                              req.get("author", ""), req["category"], req.get("cover_id"))
+
 
 async def _maybe_cancel(message: Message, state: FSMContext) -> None:
     if message.text.strip().lower() == "/cancel":
@@ -449,6 +454,9 @@ async def cb_done(call: CallbackQuery) -> None:
     await db.safe_update("requests", {"request_id": rid},
                          {"$set": {"status": "fulfilled", "fulfilled_at": _now(),
                                    "fulfilled_by": call.from_user.id}})
+    # channels: admin (full detail) + public (curated, with the cover photo)
+    await log_request_fulfilled(call.bot, req["user_id"], req.get("title") or "",
+                                req.get("author") or "", rid, req.get("cover_id"))
     await call.answer("Marked completed — the reader has been notified.")
     try:
         await call.bot.send_message(
