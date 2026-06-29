@@ -100,6 +100,22 @@ async def _plays_today(db, uid: int) -> int:
     return int(u.get("hm_plays") or 0) if u.get("hm_day") == _today() else 0
 
 
+async def _consume_play(db, uid: int, lim: int) -> bool:
+    """Atomically count one play under the daily cap (race-safe, like memory.py)."""
+    if lim == 0:
+        return False
+    today = _today()
+    reset = await db.find_one_and_update_global(
+        "users", {"user_id": uid, "hm_day": {"$ne": today}},
+        {"$set": {"hm_day": today, "hm_plays": 1}})
+    if reset is not None:
+        return True
+    inc = await db.find_one_and_update_global(
+        "users", {"user_id": uid, "hm_day": today, "hm_plays": {"$lt": lim}},
+        {"$inc": {"hm_plays": 1}})
+    return inc is not None
+
+
 async def _start(message: Message, uid: int, *, edit: bool) -> None:
     from utils.flags import is_on
     if not await is_on("games"):
@@ -113,7 +129,7 @@ async def _start(message: Message, uid: int, *, edit: bool) -> None:
         return
     db = await MongoManager.get()
     lim = await daily_limit(uid)
-    if await _plays_today(db, uid) >= lim:
+    if not await _consume_play(db, uid, lim):
         free = not await is_premium(uid)
         txt = (f"🎮 <b>Literary Hangman</b>\n"
                f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -129,11 +145,6 @@ async def _start(message: Message, uid: int, *, edit: bool) -> None:
         rows.append([btn("🎮 Games Hub", "menu_games", style="primary")])
         await (message.edit_text if edit else message.answer)(txt, reply_markup=kb(*rows))
         return
-    # count this play
-    today = _today()
-    prev = await _plays_today(db, uid)
-    await db.safe_update("users", {"user_id": uid},
-                         {"$set": {"hm_day": today, "hm_plays": prev + 1}})
     word = random.choice(_WORDS)
     await db.safe_update("hangman_games", {"uid": uid},
                          {"$set": {"uid": uid, "word": word, "guessed": [], "wrong": 0,

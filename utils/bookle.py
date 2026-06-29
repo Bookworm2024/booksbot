@@ -101,7 +101,14 @@ async def guess(uid: int, raw: str) -> dict:
     elif len(guesses) >= MAX_TRIES:
         update["status"] = "lost"
 
-    await db.safe_update("bookle_sessions", {"uid": uid, "day": day}, {"$set": update}, upsert=False)
+    # Apply the move atomically, conditioned on the session still being active, so
+    # two concurrent winning guesses can't both credit the reward (double-credit).
+    # Only the caller that actually flips active→won/lost proceeds to pay out.
+    applied = await db.find_one_and_update_global(
+        "bookle_sessions", {"uid": uid, "day": day, "status": "active"},
+        {"$set": update})
+    if not applied:
+        return _public(await db.find_one_global("bookle_sessions", {"uid": uid, "day": day}) or sess)
 
     if reward > 0:
         await add_bgm(uid, reward)

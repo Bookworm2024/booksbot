@@ -6,6 +6,7 @@ handlers/support.py — user ↔ admin support.
   message, and it's delivered back to the user. No third-party services.
 """
 import logging
+from html import escape
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -67,8 +68,9 @@ async def on_support_msg(message: Message, state: FSMContext) -> None:
         return
     await state.clear()
     uid = message.chat.id
-    name = message.from_user.first_name or "User"
-    body = message.text or message.caption or "<i>(no text)</i>"
+    name = escape(message.from_user.first_name or "User")
+    raw_body = message.text or message.caption
+    body = escape(raw_body) if raw_body else "<i>(no text)</i>"
     header = (f"📩 <b>New Support Request</b>\n"
               f"━━━━━━━━━━━━━━━━━━━━\n"
               f"👤 From <a href='tg://user?id={uid}'>{name}</a> · <code>{uid}</code>\n\n"
@@ -122,7 +124,7 @@ async def on_reply(message: Message, state: FSMContext) -> None:
             "📩 <b>Reply from Support</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "<i>Our team got back to you — here's their note.</i>\n\n"
-            f"<blockquote>💬 {message.text}</blockquote>\n"
+            f"<blockquote>💬 {escape(message.text)}</blockquote>\n"
             "<i>💡 Still need a hand? Open <b>Support</b> to keep the conversation going.</i>")
         await message.answer(
             "✅ <b>Reply Delivered</b>\n"

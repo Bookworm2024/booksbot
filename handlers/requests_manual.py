@@ -227,8 +227,8 @@ async def on_cover(message: Message, state: FSMContext) -> None:
                  "━━━━━━━━━━━━━━━━━━━━\n"
                  "<i>One last look before we send this to the order desk.</i>\n"
                  "<blockquote>"
-                 f"📖 <b>Title:</b> {data.get('title')}\n"
-                 f"✍️ <b>Author:</b> {data.get('author')}\n"
+                 f"📖 <b>Title:</b> {escape(data.get('title') or '')}\n"
+                 f"✍️ <b>Author:</b> {escape(data.get('author') or '')}\n"
                  f"📦 <b>Type:</b> {data.get('category').title()}\n"
                  f"{fmt}"
                  "🎁 <b>Cost:</b> Free — counts toward today's request allowance.</blockquote>\n"
@@ -327,7 +327,7 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
         "<i>Your order is in the queue and our team will take it from here.</i>\n"
         "<blockquote>"
         f"🆔 <b>Tracking ID:</b> <code>{rid}</code>\n"
-        f"📖 <b>{req['title']}</b> — {req['author']}\n"
+        f"📖 <b>{escape(req['title'])}</b> — {escape(req['author'])}\n"
         f"🕒 <b>Requested:</b> {fmt_dt(req['created_at'])}</blockquote>\n"
         "<i>🔔 We'll ping you the moment it's ready. Follow its progress anytime "
         "via 🚨 Track Request.</i>")
@@ -336,9 +336,9 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
     summary = (f"🚀 <b>New Manual {req['category'].title()} Request</b>\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
                "<blockquote>"
-               f"🆔 <code>{rid}</code>\n👤 <a href='tg://user?id={uid}'>{req['first_name']}</a> "
-               f"(<code>{uid}</code>)\n📖 {req['title']}\n✍️ {req['author']}\n"
-               f"📂 {req['format'] or req['category']}\n"
+               f"🆔 <code>{rid}</code>\n👤 <a href='tg://user?id={uid}'>{escape(req['first_name'])}</a> "
+               f"(<code>{uid}</code>)\n📖 {escape(req['title'])}\n✍️ {escape(req['author'])}\n"
+               f"📂 {escape(req['format'] or req['category'])}\n"
                f"🕒 {fmt_dt(req['created_at'])}</blockquote>")
     for admin in ADMIN_IDS:
         try:
@@ -396,8 +396,8 @@ async def _render_queue(bot, admin_id: int) -> None:
                "━━━━━━━━━━━━━━━━━━━━\n"
                "<blockquote>"
                f"🆔 <code>{r['request_id']}</code>\n👤 <code>{r['user_id']}</code>\n"
-               f"📖 {r.get('title')}\n✍️ {r.get('author')}\n"
-               f"📂 {r.get('format') or r.get('category')}\n"
+               f"📖 {escape(str(r.get('title') or ''))}\n✍️ {escape(str(r.get('author') or ''))}\n"
+               f"📂 {escape(str(r.get('format') or r.get('category') or ''))}\n"
                f"🕒 {fmt_dt(r.get('created_at'))}</blockquote>")
         try:
             if r.get("cover_id"):
@@ -515,7 +515,7 @@ async def on_admin_file(message: Message, state: FSMContext) -> None:
                "━━━━━━━━━━━━━━━━━━━━\n"
                "<i>Sourced and delivered, just as you asked — enjoy.</i>\n"
                "<blockquote>"
-               f"📖 <b>{req.get('title')}</b>\n✍️ {req.get('author')}</blockquote>\n"
+               f"📖 <b>{escape(str(req.get('title') or ''))}</b>\n✍️ {escape(str(req.get('author') or ''))}</blockquote>\n"
                "<i>🔖 Tap below to save it to your library so it's always one tap away.</i>\n\n"
                f"{CREDIT}")
     fav = kb([btn("⭐ Save to Favorites", f"fav_add:{fuid}", style="success")])
@@ -582,7 +582,7 @@ async def cb_done(call: CallbackQuery) -> None:
             "<i>All done — your book has been delivered.</i>\n"
             "<blockquote>"
             f"🆔 <b>Tracking ID:</b> <code>{rid}</code>\n"
-            f"📖 <b>{req.get('title')}</b>\n"
+            f"📖 <b>{escape(str(req.get('title') or ''))}</b>\n"
             f"🕒 <b>Fulfilled:</b> {fmt_dt(_now())}</blockquote>\n"
             "<i>🔖 Find it anytime in your library. Happy reading!</i>")
     except Exception:  # noqa: BLE001
@@ -645,9 +645,9 @@ async def on_reason(message: Message, state: FSMContext) -> None:
             "<i>We weren't able to fulfil this one this time.</i>\n"
             "<blockquote>"
             f"🆔 <b>Tracking ID:</b> <code>{rid}</code>\n"
-            f"📖 <b>{req.get('title')}</b>\n"
+            f"📖 <b>{escape(str(req.get('title') or ''))}</b>\n"
             f"🕒 <b>Cancelled:</b> {fmt_dt(_now())}\n"
-            f"📝 <b>Note from our team:</b> {reason}</blockquote>\n"
+            f"📝 <b>Note from our team:</b> {escape(reason)}</blockquote>\n"
             "<i>💡 Sorry we missed this one — try another title and we'll do our best to track it down.</i>")
     except Exception:  # noqa: BLE001
         pass

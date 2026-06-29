@@ -45,7 +45,8 @@ async def _build() -> str:
         ts = d.get("paid_at") or d.get("created_at")
         return isinstance(ts, datetime) and ts >= sod
 
-    inr_today = sum(float(d.get("total_due_inr") or 0) for d in upi if _is_today(d))
+    inr_today = sum(float(d.get("total_due_inr") or d.get("email_amount_inr") or 0)
+                    for d in upi if _is_today(d))
     usd_today = sum(float(d.get("amount_usd") or 0) for d in crypto if _is_today(d))
     orders_today = sum(1 for d in upi + crypto if _is_today(d))
 

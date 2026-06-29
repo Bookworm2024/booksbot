@@ -70,6 +70,22 @@ async def _plays_today(db, uid: int) -> int:
     return int(u.get("anag_plays") or 0) if u.get("anag_day") == _today() else 0
 
 
+async def _consume_play(db, uid: int, lim: int) -> bool:
+    """Atomically count one play under the daily cap (race-safe, like memory.py)."""
+    if lim == 0:
+        return False
+    today = _today()
+    reset = await db.find_one_and_update_global(
+        "users", {"user_id": uid, "anag_day": {"$ne": today}},
+        {"$set": {"anag_day": today, "anag_plays": 1}})
+    if reset is not None:
+        return True
+    inc = await db.find_one_and_update_global(
+        "users", {"user_id": uid, "anag_day": today, "anag_plays": {"$lt": lim}},
+        {"$inc": {"anag_plays": 1}})
+    return inc is not None
+
+
 async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -> None:
     from utils.flags import is_on
     send = message.edit_text if edit else message.answer
@@ -83,8 +99,7 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
         return
     db = await MongoManager.get()
     lim = await daily_limit(uid)
-    prev = await _plays_today(db, uid)
-    if prev >= lim:
+    if not await _consume_play(db, uid, lim):
         free = not await is_premium(uid)
         txt = (f"🎮 <b>Word Anagram</b>\n"
                f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -100,8 +115,6 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
         rows.append([btn("🎮 Games Hub", "menu_games", style="primary")])
         await send(txt, reply_markup=kb(*rows))
         return
-    await db.safe_update("users", {"user_id": uid},
-                         {"$set": {"anag_day": _today(), "anag_plays": prev + 1}})
     word = random.choice(_WORDS)
     await state.set_state(AnagramFSM.answering)
     await state.update_data(word=word, tries=0, hinted=False)

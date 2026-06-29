@@ -6,6 +6,7 @@ handlers/rate.py — user feedback / rating.
 """
 import logging
 from datetime import datetime, timezone
+from html import escape
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -41,7 +42,7 @@ async def cb_rate(call: CallbackQuery) -> None:
 async def _open(message: Message, uid: int) -> None:
     db = await MongoManager.get()
     since = datetime.now(timezone.utc).timestamp() - 86400
-    recent = await db.count_global("ratings",
+    recent = await db.count_global("feedback",
                                    {"user_id": uid, "ts": {"$gte": since}})
     if recent >= _DAILY_LIMIT:
         await message.answer(
@@ -114,15 +115,15 @@ async def on_comment(message: Message, state: FSMContext) -> None:
 
 async def _submit(bot, user, rating: int, comment: str) -> None:
     db = await MongoManager.get()
-    await db.safe_insert("ratings", {
+    await db.safe_insert("feedback", {
         "user_id": user.id, "rating": rating, "comment": comment,
         "ts": datetime.now(timezone.utc).timestamp(),
         "at": datetime.now(timezone.utc),
     })
     emoji = "🔴" if rating < 5 else "🟢" if rating > 7 else "🟡"
     log = (f"{emoji} <b>New Feedback</b> — {rating}/10\n"
-           f"👤 <a href='tg://user?id={user.id}'>{user.first_name}</a> (<code>{user.id}</code>)\n"
-           f"💬 {comment or '—'}")
+           f"👤 <a href='tg://user?id={user.id}'>{escape(user.first_name or '')}</a> (<code>{user.id}</code>)\n"
+           f"💬 {escape(comment) if comment else '—'}")
     targets = set(ADMIN_IDS)
     if LOG_CHANNEL_ID:
         targets.add(LOG_CHANNEL_ID)

@@ -194,6 +194,9 @@ async def _run_ab(bot, aid: str) -> None:
 
 @router.callback_query(F.data.startswith("ab_refresh:"))
 async def cb_refresh(call: CallbackQuery) -> None:
+    if not await _gate(call.from_user.id):
+        await call.answer("🔒 You don't have access to broadcast tools.", show_alert=True)
+        return
     await call.answer()
     aid = call.data.split(":", 1)[1]
     await call.message.edit_text(

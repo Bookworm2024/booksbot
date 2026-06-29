@@ -32,7 +32,7 @@ async def cb_rate(call: CallbackQuery) -> None:
     f = await get_file(fuid)
     name = (f or {}).get("name", "this book")
     mine = await user_rating(call.from_user.id, fuid)
-    cur = (f"\n\n<blockquote>Your current rating: <b>{'⭐' * int(mine['stars'])}</b>\n"
+    cur = (f"\n\n<blockquote>Your current rating: <b>{'⭐' * int(mine.get('stars') or 0)}</b>\n"
            "<i>Tap a new score below to update it anytime.</i></blockquote>") if mine else ""
     await call.message.edit_text(
         f"⭐ <b>Rate this title</b>\n"

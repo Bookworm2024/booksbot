@@ -110,7 +110,7 @@ async function load(){
   let d;
   try { d = await (await fetch(`/api/admin/overview?init_data=${encodeURIComponent(INIT)}`)).json(); }
   catch(e){ content.innerHTML = `<div id="msg"><span class="big">📡</span>Couldn't reach the server. Check your connection and tap Refresh.</div>`; return; }
-  if (d.error){ content.innerHTML = `<div id="msg"><span class="big">🔒</span>${d.error==="forbidden"?"This console is for admins only.":"We couldn't verify your session. Reopen the Mini App and try again."}</div>`; return; }
+  if (d.error){ content.innerHTML = `<div id="msg"><span class="big">🔒</span>${(d.error==="forbidden"||d.error==="super_admin_only")?"This console is for the super admin only.":"We couldn't verify your session. Reopen the Mini App and try again."}</div>`; return; }
   sub.innerHTML = `Live overview · Maintenance <span class="pill ${d.maintenance?'on':'off'}">${d.maintenance?'ON':'OFF'}</span>`;
   const r = d.revenue, rq = d.requests;
   content.innerHTML = `

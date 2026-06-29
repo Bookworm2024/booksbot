@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 _KEYS = list(DEFAULTS.keys())
-_CATS = ["Pricing", "Rewards", "Economy", "Safety"]
+# Must list every category present in DEFAULTS, or those levers become
+# unreachable in the editor. The freemium migration added "Premium" and "Quotas".
+_CATS = ["Pricing", "Premium", "Quotas", "Rewards", "Economy", "Safety"]
 
 
 class PriceFSM(StatesGroup):
@@ -46,7 +48,12 @@ async def _panel():
         body = [f"<blockquote><b>{cat}</b>"]
         for k in cat_keys:
             label = DEFAULTS[k][1]
-            body.append(f"• {label}: <code>{fmt_amount(vals[k], 3)}</code>")
+            try:
+                unlimited = k.startswith("q_") and float(vals[k]) == -1.0
+            except (TypeError, ValueError):
+                unlimited = False
+            shown = "∞ (unlimited)" if unlimited else fmt_amount(vals[k], 3)
+            body.append(f"• {label}: <code>{shown}</code>")
             rows.append([btn(f"✏️ {label}", f"price_edit:{k}", style="primary")])
         body.append("</blockquote>")
         lines.append("\n".join(body))
@@ -97,24 +104,31 @@ async def on_value(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     key = data.get("key")
     await state.clear()
-    # valid_amount rejects inf/nan/negative/absurd — the old `value < 0` guard let
-    # float("inf")/float("nan") through, which then exploded purchase-bonus math.
-    ok, value = valid_amount(raw, allow_zero=True)
-    if not ok:
-        await message.answer(
-            "⚠️ <b>That value won't work</b>\n"
-            "<blockquote>"
-            "Please send a plain, non-negative number — no <code>inf</code> and no shorthand like "
-            "<code>1e21</code>.\n"
-            "💡 <i>For example:</i> <code>5</code><i>,</i> <code>0.5</code> <i>or</i> <code>250</code>"
-            "</blockquote>")
-        return
+    # Quota levers (q_*) accept -1 = "unlimited"; everything else must be a plain
+    # non-negative number. valid_amount rejects inf/nan/negative/absurd (the old
+    # `value < 0` guard let inf/nan through and exploded the bonus math).
+    is_quota = bool(key and key.startswith("q_"))
+    if is_quota and raw.lstrip("+") in ("-1", "-1.0"):
+        value = -1.0
+    else:
+        ok, value = valid_amount(raw, allow_zero=True)
+        if not ok:
+            hint = " (or <code>-1</code> for unlimited)" if is_quota else ""
+            await message.answer(
+                "⚠️ <b>That value won't work</b>\n"
+                "<blockquote>"
+                f"Please send a plain, non-negative number{hint} — no <code>inf</code> and no "
+                "shorthand like <code>1e21</code>.\n"
+                "💡 <i>For example:</i> <code>5</code><i>,</i> <code>0.5</code> <i>or</i> <code>250</code>"
+                "</blockquote>")
+            return
     await set_setting(key, value)
+    shown = "∞ (unlimited)" if value == -1.0 else fmt_amount(value, 3)
     await message.answer(
         f"✨ <b>{DEFAULTS[key][1]} updated</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
         "<blockquote>"
-        f"📊 <b>New value:</b> <code>{fmt_amount(value, 3)}</code>\n"
+        f"📊 <b>New value:</b> <code>{shown}</code>\n"
         "⚡ <i>Live now — it takes effect on the very next action, no redeploy needed.</i>"
         "</blockquote>")
 

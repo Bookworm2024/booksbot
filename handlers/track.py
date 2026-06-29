@@ -6,6 +6,7 @@ handlers/track.py — request tracking & history.
   /track_request — admin: look up ANY request id
 """
 import logging
+from html import escape
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -91,15 +92,20 @@ def _render_req(req: dict) -> str:
     timeline = "\n".join(times)
     extra = ""
     if req.get("status") == "cancelled":
-        extra = (f"\n\n<blockquote>📭 <b>Reason:</b> {req.get('cancel_reason', '—')}"
-                 f"\n💎 <b>Refunded:</b> <code>{fmt_amount(req.get('refunded', 0))}</code> BGM "
-                 f"— credited back to your wallet, no action needed.</blockquote>")
+        # Freemium requests are free, so cancellations carry no refund; only legacy
+        # cancellations that actually refunded BGM show the refund line.
+        refunded = float(req.get("refunded") or 0)
+        refund_line = (f"\n💎 <b>Refunded:</b> <code>{fmt_amount(refunded)}</code> BGM "
+                       "— credited back to your wallet, no action needed."
+                       if refunded > 0 else "")
+        extra = (f"\n\n<blockquote>📭 <b>Reason:</b> {escape(str(req.get('cancel_reason') or '—'))}"
+                 f"{refund_line}</blockquote>")
     return ("📦 <b>Request Status</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            f"🆔 <b>Order ID:</b> <code>{req.get('request_id')}</code>\n"
-            f"<blockquote>📖 <b>Title:</b> {req.get('title')}\n"
-            f"✍️ <b>Author:</b> {req.get('author')}\n"
-            f"📂 <b>Format:</b> {req.get('format') or req.get('category')}\n"
+            f"🆔 <b>Order ID:</b> <code>{escape(str(req.get('request_id') or ''))}</code>\n"
+            f"<blockquote>📖 <b>Title:</b> {escape(str(req.get('title') or ''))}\n"
+            f"✍️ <b>Author:</b> {escape(str(req.get('author') or ''))}\n"
+            f"📂 <b>Format:</b> {escape(str(req.get('format') or req.get('category') or ''))}\n"
             f"📊 <b>Status:</b> {status}\n"
             f"{timeline}</blockquote>"
             f"{extra}")
@@ -140,8 +146,8 @@ async def _render_history(call: CallbackQuery, page: int) -> None:
              "<i>Every title you've asked us to find — newest first.</i>",
              "<blockquote>"]
     for r in chunk:
-        lines.append(f"{_STATUS.get(r.get('status'),'❓')} <code>{r['request_id']}</code> — "
-                     f"{r.get('title','?')[:28]}")
+        lines.append(f"{_STATUS.get(r.get('status'),'❓')} <code>{escape(str(r.get('request_id') or ''))}</code> — "
+                     f"{escape(str(r.get('title') or '?')[:28])}")
         lines.append(f"   🕒 {fmt_dt(r.get('created_at'))}")
     lines.append("</blockquote>")
     rows = []

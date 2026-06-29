@@ -157,8 +157,10 @@ async function renderComic(buf){
   stage.innerHTML = `<img id="page" style="max-width:100%;border-radius:14px;box-shadow:0 14px 38px -16px rgba(0,0,0,.6)"><div class="ctl">
     <button id="p">‹ Prev</button><span id="pi" style="align-self:center"></span><button id="n">Next ›</button></div>`;
   const img=document.getElementById("page"), pi=document.getElementById("pi");
+  const mimeFor=n=>{ const e=(n.split(".").pop()||"").toLowerCase();
+    return e==="png"?"image/png":e==="gif"?"image/gif":e==="webp"?"image/webp":"image/jpeg"; };
   async function show(k){ i=Math.min(Math.max(0,k),names.length-1);
-    const b64=await zip.files[names[i]].async("base64"); img.src="data:image/*;base64,"+b64;
+    const b64=await zip.files[names[i]].async("base64"); img.src="data:"+mimeFor(names[i])+";base64,"+b64;
     pi.textContent=`${i+1}/${names.length}`; title.textContent=`Comic · ${i+1}/${names.length}`; saveState({page:i}); }
   document.getElementById("p").onclick=()=>show(i-1);
   document.getElementById("n").onclick=()=>show(i+1);

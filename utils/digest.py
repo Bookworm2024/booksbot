@@ -9,6 +9,7 @@ last_digest stamp, so it scales. Rate-limited; respects the notif toggle.
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from html import escape
 
 from database.connection import MongoManager
 from utils.keyboards import btn, kb
@@ -61,7 +62,7 @@ async def run_weekly_digest(bot) -> None:
                                  "this week — first in line is yours.")
                 if botd_name:
                     lines.append(f"📖 Today's <b>Book of the Day</b>: "
-                                 f"<i>{botd_name[:50]}</i>")
+                                 f"<i>{escape(botd_name[:50])}</i>")
                 lines.append(f"🔥 Your reading streak: <b>{int(u.get('login_streak') or 0)} "
                              "day(s)</b> — claim today and keep the run alive.")
                 lines.append("\n🎁 <b>Waiting for you:</b> your free daily reward "

@@ -212,7 +212,15 @@ class MongoManager:
             results.extend([d async for d in cur])
         if sort:
             key, direction = sort[0]
-            results.sort(key=lambda d: d.get(key) or 0, reverse=(direction == DESCENDING))
+            # Type-safe merge sort across clusters: docs MISSING the sort field must
+            # not be compared against present (datetime/str) values — that raises
+            # TypeError ("'<' not supported between datetime and int"). The first
+            # tuple element segregates missing vs present so Python never compares a
+            # present value against the int fallback; present-vs-present compares the
+            # real (same-typed) values.
+            results.sort(
+                key=lambda d: (d.get(key) is None, d.get(key) if d.get(key) is not None else 0),
+                reverse=(direction == DESCENDING))
         return results[:limit] if limit else results
 
     async def sample_global(self, coll: str, match: Dict[str, Any], size: int) -> List[Dict[str, Any]]:

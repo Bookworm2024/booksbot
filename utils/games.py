@@ -383,9 +383,15 @@ async def submit(uid: int, session_id: str, client_answers: list) -> dict:
     elapsed = (_now() - sess["started_at"]).total_seconds()
     timed_out = elapsed > cfg["time_limit"] + 5  # small grace for the round-trip
 
-    # mark done immediately (single-use → no replay)
-    await db.safe_update("game_sessions", {"session_id": session_id},
-                         {"$set": {"status": "done", "finished_at": _now()}}, upsert=False)
+    # Atomically flip active→done so EXACTLY ONE submit scores (single-use → no
+    # replay). A plain status read + unconditional update has a TOCTOU window:
+    # two concurrent submits both pass the check above and both credit BGM. The
+    # conditional find_one_and_update claims the session for one caller only.
+    claimed = await db.find_one_and_update_global(
+        "game_sessions", {"session_id": session_id, "status": "active"},
+        {"$set": {"status": "done", "finished_at": _now()}})
+    if not claimed:
+        return {"error": "This round has already been scored and your rewards are safely banked. Start a new game whenever you're ready for the next one."}
 
     n = len(qs)
     answers = (client_answers or [])[:n]
@@ -430,11 +436,13 @@ async def submit(uid: int, session_id: str, client_answers: list) -> dict:
     if (game == "quiz" and not timed_out and skipped == 0 and wrong == 0
             and correct == n and n > 0 and elapsed <= cfg["speed_secs"]):
         today = _now().strftime("%Y-%m-%d")
-        u = await db.find_one_global("users", {"user_id": uid}, {"speed_bonus_day": 1}) or {}
-        if u.get("speed_bonus_day") != today:
+        # Atomically claim the once-per-day speed bonus: only the call that flips
+        # speed_bonus_day to today gets it (no double-credit on a concurrent clear).
+        claimed = await db.find_one_and_update_global(
+            "users", {"user_id": uid, "speed_bonus_day": {"$ne": today}},
+            {"$set": {"speed_bonus_day": today}})
+        if claimed is not None:
             bonus = cfg["speed_bonus"]
-            await db.safe_update("users", {"user_id": uid},
-                                 {"$set": {"speed_bonus_day": today}})
 
     total_delta = round(net + bonus, 5)
     if total_delta >= 0:

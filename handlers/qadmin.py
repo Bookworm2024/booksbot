@@ -58,6 +58,9 @@ async def cb_qbank(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "qa_counts")
 async def cb_counts(call: CallbackQuery) -> None:
+    if not await has(call.from_user.id, "content"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
+        return
     await call.answer()
     db = await MongoManager.get()
     lines = ["📊 <b>Bank Overview</b>",
@@ -99,6 +102,9 @@ async def cb_addquiz(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("qa_lvl:"))
 async def cb_level(call: CallbackQuery, state: FSMContext) -> None:
+    if not await has(call.from_user.id, "content"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
+        return
     await call.answer()
     await state.update_data(level=call.data.split(":", 1)[1])
     await state.set_state(QAdminFSM.quiz_q)
@@ -171,6 +177,9 @@ async def q_d(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("qa_correct:"))
 async def cb_correct(call: CallbackQuery, state: FSMContext) -> None:
+    if not await has(call.from_user.id, "content"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
+        return
     ans = call.data.split(":", 1)[1]
     data = await state.get_data()
     await state.clear()
@@ -227,6 +236,9 @@ async def tf_question(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("qa_tf:"))
 async def cb_tf_answer(call: CallbackQuery, state: FSMContext) -> None:
+    if not await has(call.from_user.id, "content"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
+        return
     val = call.data.split(":", 1)[1] == "1"
     data = await state.get_data()
     await state.clear()

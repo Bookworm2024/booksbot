@@ -398,6 +398,7 @@ async function poll(){
     if(!r.ok){ if(r.status===401||r.status===403||r.status===404){ terminalEnd('Link Expired','We couldn\'t load this order. Please reopen the payment from the bot.'); return; } schedule(4000); return; }
     const d=await r.json();
     if(d.status==='paid'){ terminalSuccess(); return; }
+    if(d.status==='amount_mismatch'){ terminalEnd('Amount Mismatch','The amount we received didn\'t match this order. Nothing was credited — please message support inside the bot with your UTR.'); return; }
     if(['cancelled','expired','failed'].includes(d.status)){ terminalEnd('Order Closed','This order is no longer active. No BookGems were charged.'); return; }
 
     if(!built){

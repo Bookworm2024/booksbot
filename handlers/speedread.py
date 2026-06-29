@@ -117,6 +117,22 @@ async def _plays_today(db, uid: int) -> int:
     return int(u.get("sr_plays") or 0) if u.get("sr_day") == _today() else 0
 
 
+async def _consume_play(db, uid: int, lim: int) -> bool:
+    """Atomically count one play under the daily cap (race-safe, like memory.py)."""
+    if lim == 0:
+        return False
+    today = _today()
+    reset = await db.find_one_and_update_global(
+        "users", {"user_id": uid, "sr_day": {"$ne": today}},
+        {"$set": {"sr_day": today, "sr_plays": 1}})
+    if reset is not None:
+        return True
+    inc = await db.find_one_and_update_global(
+        "users", {"user_id": uid, "sr_day": today, "sr_plays": {"$lt": lim}},
+        {"$inc": {"sr_plays": 1}})
+    return inc is not None
+
+
 async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -> None:
     from utils.flags import is_on
     send = message.edit_text if edit else message.answer
@@ -132,8 +148,7 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
         return
     db = await MongoManager.get()
     lim = await daily_limit(uid)
-    prev = await _plays_today(db, uid)
-    if prev >= lim:
+    if not await _consume_play(db, uid, lim):
         free = not await is_premium(uid)
         txt = (
             "⚡ <b>Speed Read — Come Back Tomorrow</b>\n"
@@ -150,8 +165,6 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
         rows.append([btn("🎮 Games Lounge", "menu_games", style="primary")])
         await send(txt, reply_markup=kb(*rows))
         return
-    await db.safe_update("users", {"user_id": uid},
-                         {"$set": {"sr_day": _today(), "sr_plays": prev + 1}})
     idx = random.randrange(len(_PASSAGES))
     passage, question, options, answer = _PASSAGES[idx]
     words = len(passage.split())

@@ -173,12 +173,12 @@ async def log_bcn_claim(bot, uid: int, amount: float) -> None:
         bot,
         f"🎁 <b>Daily Claim</b>\n{DIV}\n"
         "<blockquote>"
-        f"🪙 <b>+{fmt_amount(amount)} BCN</b>\n"
+        f"💎 <b>+{fmt_amount(amount)} BGM</b>\n"
         f"👤 <code>{uid}</code>\n"
         f"🕒 {at}</blockquote>")
     await public_log(
         bot,
         "🎁 <b>Daily reward claimed</b>\n" + DIV + "\n"
-        f"<blockquote>🪙 A reader grabbed <b>{fmt_amount(amount)} free BCN</b>\n"
+        f"<blockquote>💎 A reader grabbed <b>{fmt_amount(amount)} free BGM</b>\n"
         f"🕒 {at}</blockquote>\n"
-        "⚡ Your free coins are waiting too — tap /claim every day.")
+        "⚡ Your free reward is waiting too — tap /claim every day.")

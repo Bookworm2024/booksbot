@@ -83,9 +83,9 @@ async def cb_setlang(call: CallbackQuery) -> None:
 
 
 # ── currency ──────────────────────────────────────────────────────────────────
-@router.callback_query(F.data == "loc_cur")
-async def cb_cur(call: CallbackQuery) -> None:
-    await call.answer()
+async def _render_cur(call: CallbackQuery) -> None:
+    """Render the currency picker into the current message. Does NOT answer the
+    callback — the caller owns that (so we never double-answer one query)."""
     from utils.premium import price_usd
     cur = await get_currency(call.from_user.id)
     prem_usd = await price_usd()
@@ -110,6 +110,12 @@ async def cb_cur(call: CallbackQuery) -> None:
         reply_markup=kb(*rows))
 
 
+@router.callback_query(F.data == "loc_cur")
+async def cb_cur(call: CallbackQuery) -> None:
+    await call.answer()
+    await _render_cur(call)
+
+
 @router.callback_query(F.data.startswith("loc_setcur:"))
 async def cb_setcur(call: CallbackQuery) -> None:
     code = call.data.split(":", 1)[1]
@@ -117,4 +123,4 @@ async def cb_setcur(call: CallbackQuery) -> None:
         await call.answer(); return
     await set_currency(call.from_user.id, code)
     await call.answer(f"Prices now shown in {code} ✅")
-    await cb_cur(call)
+    await _render_cur(call)

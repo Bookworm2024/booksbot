@@ -489,7 +489,7 @@ async def cb_botd(call: CallbackQuery) -> None:
         "📅 <b>Book of the Day</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>One handpicked read, refreshed every morning — just for today.</i>\n"
-        f"<blockquote>{icon_for(f.get('ext',''))} <b>{f.get('name','Untitled')}</b>\n\n"
+        f"<blockquote>{icon_for(f.get('ext',''))} <b>{escape(f.get('name','Untitled'))}</b>\n\n"
         "📥 Tap below and it's in your library — free with your daily quota.</blockquote>",
         reply_markup=kb([btn("📥 Claim Today's Pick", f"dl:{f['file_unique_id']}", style="success")],
                         [btn("🔙 Discover", "lib_discover", style="danger")]))

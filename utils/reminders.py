@@ -22,11 +22,17 @@ _SLEEP = 0.05             # ~20 msgs/sec
 _TEXT = ("📖 <b>Your library missed you</b>\n"
          "<i>A few rewards have been saved up while you were away.</i>\n"
          "<blockquote>"
-         "🎁 <b>Daily bonus</b> — claim your free 🪙 BCN, refreshed and ready.\n"
-         "🎡 <b>Free spin</b> — one turn for a shot at bonus tokens and perks.\n"
+         "🎁 <b>Daily bonus</b> — claim your free 💎 BGM, refreshed and ready.\n"
+         "🎡 <b>Free spin</b> — one turn for a shot at bonus rewards and perks.\n"
          "📚 <b>Continue reading</b> — your shelf is right where you left it."
          "</blockquote>"
          "<i>💡 Tap below to claim your reward — it only takes a moment.</i>")
+
+
+def _kb():
+    from utils.keyboards import btn, kb
+    return kb([btn("🎁 Claim Daily Reward", "daily_reward", style="success")],
+              [btn("🏠 Open Menu", "menu_home", style="primary")])
 
 
 def _today() -> str:
@@ -50,7 +56,7 @@ async def run_reminder_loop(bot) -> None:
             for u in targets:
                 uid = u["user_id"]
                 try:
-                    await bot.send_message(uid, _TEXT)
+                    await bot.send_message(uid, _TEXT, reply_markup=_kb())
                     sent += 1
                 except Exception:  # noqa: BLE001 — blocked/deactivated
                     pass

@@ -16,7 +16,7 @@ MISSIONS = {
     "play_game": ("🎮 Play a game in the arcade", 0.2),
     "download":  ("📚 Add a book to your library", 0.2),
     "spin":      ("🎡 Take a spin on the wheel", 0.1),
-    "claim":     ("🪙 Collect your daily BCN", 0.1),
+    "claim":     ("🪙 Collect your daily reward", 0.1),
 }
 
 
@@ -82,11 +82,20 @@ async def status(uid: int) -> dict:
 
 async def claim(uid: int) -> float:
     db = await MongoManager.get()
-    st = await status(uid)
-    if st["claimable"] <= 0:
-        return 0.0
-    await add_bgm(uid, st["claimable"])
-    # mark every completed mission as claimed
-    await db.safe_update("users", {"user_id": uid},
-                         {"$set": {"missions_claimed": list(st["done"])}})
-    return st["claimable"]
+    today = _today()
+    # Atomic per-key: each mission is banked exactly once. The $ne-guarded
+    # $addToSet means a double-tap (two concurrent claims) can't pay any mission
+    # twice — only the call that actually adds the key counts its reward.
+    paid = 0.0
+    for key, (_label, reward) in MISSIONS.items():
+        updated = await db.find_one_and_update_global(
+            "users",
+            {"user_id": uid, "missions_day": today,
+             "missions_done": key, "missions_claimed": {"$ne": key}},
+            {"$addToSet": {"missions_claimed": key}})
+        if updated:
+            paid += reward
+    paid = round(paid, 3)
+    if paid > 0:
+        await add_bgm(uid, paid)
+    return paid

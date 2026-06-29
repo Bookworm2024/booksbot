@@ -32,6 +32,7 @@ switches every feature at once.
 import json
 import logging
 import re
+from html import escape
 
 import aiohttp
 
@@ -270,8 +271,13 @@ async def classify_genre(title: str) -> str | None:
     text = await ai_complete(prompt, max_tokens=20)
     if not text:
         return None
-    low = text.lower()
+    low = text.lower().strip()
+    # Exact match first (most reliable). Then substring, but LONGEST genre name
+    # first so "Non-Fiction" isn't swallowed by the "fiction" substring of "Fiction".
     for g in GENRES:
+        if g.lower() == low:
+            return g
+    for g in sorted(GENRES, key=len, reverse=True):
         if g.lower() in low:
             return g
     return "Other"
@@ -300,6 +306,10 @@ async def summarize_book(title: str) -> str | None:
         line = line.strip()
         if not line:
             continue
+        # Escape the raw AI text first (it can contain &, <, > — e.g. "Crime &
+        # Punishment") so it doesn't break Telegram's HTML parser; the labels
+        # have no special chars, so we can still bold them after escaping.
+        line = escape(line)
         for lbl in ("Overview:", "Themes:", "Best for:", "Takeaways:"):
             if line.startswith(lbl):
                 line = line.replace(lbl, f"<b>{lbl}</b>", 1)

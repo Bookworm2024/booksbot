@@ -269,7 +269,11 @@ async def cmd_create(message: Message, command: CommandObject) -> None:
         await message.answer("🔒 <b>Owner only</b>\n<i>Minting redeem codes is reserved for the super admin.</i>")
         return
     parts = (command.args or "").split()
-    if len(parts) != 2 or not all(p.replace(".", "").isdigit() for p in parts):
+    try:
+        if len(parts) != 2:
+            raise ValueError
+        max_claims, total = int(parts[0]), float(parts[1])
+    except ValueError:
         await message.answer(
             "🛡 <b>Mint a Redeem Code</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
@@ -279,7 +283,6 @@ async def cmd_create(message: Message, command: CommandObject) -> None:
             "</blockquote>\n"
             "💡 <i>The total is split evenly across every claim.</i>")
         return
-    max_claims, total = int(parts[0]), float(parts[1])
     if max_claims <= 0 or total <= 0:
         await message.answer("⚠️ <b>Values Out of Range</b>\n<i>Both the claim count and total BGM must be greater than zero.</i>")
         return

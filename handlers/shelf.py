@@ -221,8 +221,17 @@ async def _notes_screen(uid: int, fuid: str):
              "<i>Your highlights and reflections for this title.</i>",
              "━━━━━━━━━━━━━━━━━━", "<blockquote>"]
     rows = []
+    # Bound the body so 10 long (up to MAX_NOTE_LEN) notes can't blow past
+    # Telegram's 4096-char message limit (which would make edit_text raise).
+    budget = 3500
+    shown = 0
     for n in notes[:10]:
-        lines.append(f"• {escape(n.get('text',''))}")
+        line = f"• {escape(n.get('text',''))}"
+        if shown and shown + len(line) > budget:
+            lines.append("…")
+            break
+        lines.append(line)
+        shown += len(line) + 1
         rows.append([btn(f"🗑 Delete: {n.get('text','')[:18]}", f"note_del:{n['note_id']}",
                          style="danger")])
     lines.append("</blockquote>")

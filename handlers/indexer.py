@@ -20,6 +20,7 @@ earlier "not found" search, that user is DM'd that their book has arrived.
 """
 import logging
 import re
+from html import escape
 
 from aiogram import Router
 from aiogram.types import Message
@@ -82,7 +83,7 @@ async def _service_watchlist(bot, new_title: str) -> None:
                 await bot.send_message(
                     w["user_id"],
                     "✨ <b>Watchlist Match!</b>\n\n"
-                    f"The book you wanted — <code>{w.get('query')}</code> — is now "
+                    f"The book you wanted — <code>{escape(w.get('query') or '')}</code> — is now "
                     "in our archive!",
                     reply_markup=kb([btn("🔍 Search & Download", "menu_request",
                                          style="success")]),

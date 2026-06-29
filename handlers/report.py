@@ -8,6 +8,7 @@ import logging
 import random
 import string
 from datetime import datetime, timezone
+from html import escape
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -84,6 +85,6 @@ async def on_report(message: Message, state: FSMContext) -> None:
         try:
             await message.bot.send_message(
                 LOG_CHANNEL_ID,
-                f"🚩 <b>New Report {rid}</b>\n👤 <code>{message.chat.id}</code>\n{raw[:500]}")
+                f"🚩 <b>New Report {rid}</b>\n👤 <code>{message.chat.id}</code>\n{escape(raw[:500])}")
         except Exception:  # noqa: BLE001
             pass

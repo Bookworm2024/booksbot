@@ -168,7 +168,7 @@ def _build_dispatcher() -> Dispatcher:
 # handlers in lock-step instead of relying on a manual BotFather setup.
 _COMMAND_MENU = [
     ("start", "Start/restart the bot"),
-    ("claim", "Claim free BCN between 3 and 5"),
+    ("claim", "Claim your free daily BGM"),
     ("balance", "Check your current balance"),
     ("buy", "Purchase BGMs"),
     ("request", "Request Books or Audiobooks"),

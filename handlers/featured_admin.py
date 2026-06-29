@@ -6,6 +6,7 @@ feature it for 7 days (sell the slot). Current featured list shown with remove
 buttons.
 """
 import logging
+from html import escape
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -39,7 +40,7 @@ async def _panel():
     if items:
         lines.append(f"\n<blockquote><b>Now in the spotlight ({len(items)})</b>")
         for f in items:
-            lines.append(f"⭐ {f.get('name','Untitled')[:40]}")
+            lines.append(f"⭐ {escape(f.get('name','Untitled')[:40])}")
         lines.append("Tap a 🗑 button below to clear a slot the moment a sponsorship ends.</blockquote>")
     else:
         lines.append(

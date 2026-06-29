@@ -50,7 +50,15 @@ async def grant_referral(bot, uid: int) -> None:
     ref = int(doc["referrer"])
     ref_bonus = await get_float("referrer_bonus")
     new_bonus = await get_float("referee_bonus")
-    await db.safe_update("users", {"user_id": uid}, {"$set": {"referral_rewarded": True}})
+    # Atomic one-shot gate: only the single caller that flips referral_rewarded
+    # from non-True to True pays out. A plain safe_update has a read-then-write
+    # window (the check above → here) that lets two concurrent dashboard renders
+    # both credit the referral. Claim the flag first; bail if we lost the race.
+    claimed = await db.find_one_and_update_global(
+        "users", {"user_id": uid, "referral_rewarded": {"$ne": True}},
+        {"$set": {"referral_rewarded": True}})
+    if not claimed:
+        return
     await add_bgm(uid, new_bonus)
     await add_bgm(ref, ref_bonus)
     # global XP for the referrer (the referred user earns XP through their own

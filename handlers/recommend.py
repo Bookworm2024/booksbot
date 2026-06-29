@@ -348,10 +348,10 @@ async def _send_batch(message: Message, uid: int) -> None:
 async def cb_rget(call: CallbackQuery, state: FSMContext) -> None:
     """Tapped a recommended title → search the archive and fetch it (or offer a
     manual admin request when it isn't stocked)."""
-    await call.answer()
     try:
         i = int(call.data.split(":", 1)[1])
     except ValueError:
+        await call.answer()
         return
     db = await MongoManager.get()
     u = await db.find_one_global("users", {"user_id": call.from_user.id},
@@ -360,6 +360,7 @@ async def cb_rget(call: CallbackQuery, state: FSMContext) -> None:
     if i < 0 or i >= len(titles):
         await call.answer("That pick has rolled off your list — start a fresh recommendation.", show_alert=True)
         return
+    await call.answer()
     from handlers.request import find_in_library
     await find_in_library(call.message, state, titles[i], edit=False)
 
@@ -499,7 +500,6 @@ async def on_summary_title(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data == "sum_find")
 async def cb_sum_find(call: CallbackQuery, state: FSMContext) -> None:
     """Fetch the just-summarised title straight from the archive."""
-    await call.answer()
     db = await MongoManager.get()
     u = await db.find_one_global("users", {"user_id": call.from_user.id},
                                  {"sum_title": 1}) or {}
@@ -507,5 +507,6 @@ async def cb_sum_find(call: CallbackQuery, state: FSMContext) -> None:
     if not title:
         await call.answer("Run a summary first, then I can pull that title for you.", show_alert=True)
         return
+    await call.answer()
     from handlers.request import find_in_library
     await find_in_library(call.message, state, title, edit=False)

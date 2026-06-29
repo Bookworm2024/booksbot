@@ -37,7 +37,7 @@ def _badges(d: dict, favs: int, vip: str) -> list[str]:
     if ls >= 30: out.append("🔥 Devoted")
     elif ls >= 7: out.append("🔥 Regular")
     if favs >= 10: out.append("⭐ Curator")
-    if vip: out.append("👑 " + vip)
+    if vip: out.append(vip)
     return out or ["🌱 Newcomer"]
 
 
