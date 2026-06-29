@@ -25,7 +25,8 @@ from utils.logs import log_book_found
 from database.connection import MongoManager
 from utils.brand import CREDIT
 from utils.channel import get_file_channel
-from utils.files import archive_count, fuzzy_search, get_file, icon_for, search
+from utils.files import (_MAX_SCAN, archive_count, fuzzy_search, get_file,
+                         icon_for, search)
 from utils.format import fmt_amount
 from utils.keyboards import btn, kb, webapp_btn
 
@@ -326,7 +327,10 @@ async def _render_results(message: Message, state: FSMContext, query: str,
     nav = []
     if page > 0:
         nav.append(btn("⬅️ Prev", "sr_prev", style="primary"))
-    if (page + 1) * _PER_PAGE < total:
+    # Only the first _MAX_SCAN matches are materialised, so never offer a Next that
+    # would page into an empty void (rows[skip:] is empty once skip ≥ _MAX_SCAN).
+    reachable = min(total, _MAX_SCAN)
+    if (page + 1) * _PER_PAGE < reachable:
         nav.append(btn("Next ➡️", "sr_next", style="primary"))
     if nav:
         rows.append(nav)

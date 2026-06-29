@@ -17,6 +17,7 @@ Two super-admin tools (Admin panel → 🗂 File Channel):
      (For the bulk ~30k history, tools/backfill.py uses a Telethon userbot.)
 """
 import logging
+from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -116,16 +117,16 @@ async def cb_diag(call: CallbackQuery) -> None:
     if live:
         try:
             chat = await call.bot.get_chat(live)
-            title = getattr(chat, "title", None) or live
+            title = escape(str(getattr(chat, "title", None) or live))
             try:
                 me = await call.bot.get_chat_member(live, (await call.bot.get_me()).id)
-                role = getattr(me, "status", "member")
+                role = escape(str(getattr(me, "status", "member")))
                 access = f"✅ <b>{title}</b> — bot is <i>{role}</i>"
             except Exception:  # noqa: BLE001
                 access = f"✅ Reachable — <b>{title}</b>"
         except Exception as exc:  # noqa: BLE001
             access = ("❌ Out of reach — add the bot as an <b>admin</b> in the channel\n"
-                      f"<i>{str(exc)[:80]}</i>")
+                      f"<i>{escape(str(exc)[:80])}</i>")
 
     health = "🟢 Healthy &amp; serving" if (live and total > 0) else "🔴 Setup needed"
     tips = []
@@ -211,7 +212,7 @@ async def on_channel_id(message: Message, state: FSMContext) -> None:
     note = ""
     try:
         chat = await message.bot.get_chat(new_id)
-        title = getattr(chat, "title", None) or new_id
+        title = escape(str(getattr(chat, "title", None) or new_id))
         note = (f"\n\n<blockquote>🔗 <b>Linked to</b> · {title}\n"
                 "✅ The bot can reach it — new uploads will index automatically.</blockquote>")
     except Exception:  # noqa: BLE001
@@ -339,12 +340,12 @@ async def on_import(message: Message, state: FSMContext) -> None:
     if created:
         imported += 1
         await state.update_data(imported=imported)
-        await message.answer(f"📚 <b>Indexed</b> · {item['name'][:60]}\n"
+        await message.answer(f"📚 <b>Indexed</b> · {escape(item['name'][:60])}\n"
                              f"<i>On the shelf — total this session: <code>{imported}</code>.</i>",
                              reply_markup=_import_kb())
     else:
         skipped += 1
         await state.update_data(skipped=skipped)
-        await message.answer(f"⏭ <b>Already in your library</b> · {item['name'][:60]}\n"
+        await message.answer(f"⏭ <b>Already in your library</b> · {escape(item['name'][:60])}\n"
                              f"<i>Skipped to avoid a duplicate — skipped so far: <code>{skipped}</code>.</i>",
                              reply_markup=_import_kb())

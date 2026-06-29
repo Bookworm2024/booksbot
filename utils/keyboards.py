@@ -32,10 +32,15 @@ _SUCCESS_HINTS = ("request", "play", "buy", "confirm", "approve", "proceed", "cl
 
 def _auto_style(label: str) -> str:
     low = label.lower()
-    if any(h in low for h in _DANGER_HINTS):
-        return "danger"
+    # Success is checked BEFORE danger so an explicitly-listed success word is
+    # never shadowed by a danger hint that happens to be a substring of it —
+    # e.g. "send" (success) contains "end" (danger); without this order every
+    # "Send …" button would auto-style red. No current label matches both tables,
+    # so this reorder changes no existing button's colour.
     if any(h in low for h in _SUCCESS_HINTS):
         return "success"
+    if any(h in low for h in _DANGER_HINTS):
+        return "danger"
     return "primary"
 
 

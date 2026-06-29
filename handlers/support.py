@@ -70,6 +70,12 @@ async def on_support_msg(message: Message, state: FSMContext) -> None:
     uid = message.chat.id
     name = escape(message.from_user.first_name or "User")
     raw_body = message.text or message.caption
+    # Cap the raw text BEFORE escaping (never split an HTML entity) so the
+    # assembled caption can't blow past Telegram's 1024-char photo-caption limit
+    # — otherwise send_photo raises, the except swallows it, and the user is told
+    # "received" while admins get nothing.
+    if raw_body and len(raw_body) > 800:
+        raw_body = raw_body[:800] + " […]"
     body = escape(raw_body) if raw_body else "<i>(no text)</i>"
     header = (f"📩 <b>New Support Request</b>\n"
               f"━━━━━━━━━━━━━━━━━━━━\n"

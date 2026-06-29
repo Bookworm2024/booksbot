@@ -37,7 +37,7 @@ from utils.oxapay import (
     MIN_USD_AMOUNT, PAID_STATUSES, POPULAR_COINS, create_invoice, make_order_id,
     verify_webhook,
 )
-from utils.format import fmt_amount
+from utils.format import fmt_amount, valid_amount
 from utils.keyboards import btn, cancel_row, kb, url_btn, webapp_btn
 from utils.wallet import add_money
 
@@ -158,13 +158,13 @@ async def on_amount(message: Message, state: FSMContext) -> None:
         await state.clear()
         await message.answer("❌ No problem — top-up cancelled. Your wallet is unchanged.")
         return
-    try:
-        inr = round(float(raw), 2)
-    except ValueError:
+    ok, parsed = valid_amount(raw)
+    if not ok:
         await message.answer(
             f"⚠️ <b>Please send a number.</b>\n<i>Enter how many ₹ to add — at least "
             f"<code>₹{_MIN_TOPUP_INR}</code>.</i>")
         return
+    inr = round(parsed, 2)
     if inr < _MIN_TOPUP_INR:
         await message.answer(
             f"⚠️ <b>A little higher, please.</b>\n<i>The minimum top-up is "
@@ -254,15 +254,20 @@ async def on_utr(message: Message, state: FSMContext) -> None:
                          {"$set": {"submitted_utr": utr, "status": "utr_submitted"}})
     await state.clear()
 
-    # ledger pre-match: the credit email may have already arrived & be parked
+    # ledger pre-match: the credit email may have already arrived & be parked.
+    # Atomically CLAIM the row (status: unclaimed → claimed) so two concurrent
+    # submits of the same UTR can't both credit off one credit email.
     total = float(order.get("total_due_inr") or 0)
     led = await db.find_one_global("fampay_ledger", {"utr": utr, "status": "unclaimed"})
     if led and abs(float(led.get("amount") or 0) - total) <= _AMOUNT_TOLERANCE_INR:
-        order["submitted_utr"] = utr
-        await _confirm_payment(order, message.bot, email_txn_id=utr,
-                               email_amount_inr=float(led.get("amount") or total))
-        await db.safe_update("fampay_ledger", {"utr": utr}, {"$set": {"status": "claimed"}})
-        return
+        claimed = await db.find_one_and_update_global(
+            "fampay_ledger", {"utr": utr, "status": "unclaimed"},
+            {"$set": {"status": "claimed"}})
+        if claimed:
+            order["submitted_utr"] = utr
+            await _confirm_payment(order, message.bot, email_txn_id=utr,
+                                   email_amount_inr=float(claimed.get("amount") or total))
+            return
 
     await message.answer(
         "✅ <b>Reference Received</b>\n"
@@ -406,6 +411,11 @@ async def oxapay_webhook(request: web.Request) -> web.Response:
         data = await request.json()
     except Exception:  # noqa: BLE001
         return web.Response(status=400, text="bad json")
+    # OxaPay v1 may wrap the callback fields under a `data` object; accept either
+    # shape (mirrors create_invoice's response unwrap) so a wrapped payload still
+    # credits instead of silently no-op'ing.
+    if isinstance(data, dict) and isinstance(data.get("data"), dict):
+        data = data["data"]
 
     order_id = str(data.get("order_id") or "")
     status = str(data.get("status") or "").lower()

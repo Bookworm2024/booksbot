@@ -29,8 +29,12 @@ def _bar(have: int, target: int, width: int = 10) -> str:
 def _share_url(uid: int) -> str:
     msg = (f"📚 Free books, audiobooks & games on @{BOT_USERNAME}! "
            "Read, play and earn rewards. Join me:")
-    return (f"https://t.me/share/url?url=https://t.me/{BOT_USERNAME}?start={uid}"
-            f"&text={quote(msg)}")
+    # The invite URL carries a ?start={uid} referral payload, so it MUST be
+    # url-encoded before going into share/url's own `url=` param — otherwise the
+    # raw `?start={uid}` is parsed as a separate query arg of share/url and the
+    # referral payload is dropped (friend joins unattributed).
+    invite = quote(f"https://t.me/{BOT_USERNAME}?start={uid}", safe="")
+    return f"https://t.me/share/url?url={invite}&text={quote(msg)}"
 
 
 async def _view(uid: int):

@@ -273,8 +273,13 @@ async def cb_bulk_do(call: CallbackQuery) -> None:
     if not ok:
         await call.answer("That amount is no longer valid — please start the grant again.", show_alert=True)
         return
-    await call.answer("Crediting every wallet…")
     db = await MongoManager.get()
+    # One-shot guard: a double-tap of the SAME confirm card must not credit everyone
+    # twice (this is a mass money mutation). kv_claim wins for exactly one caller.
+    if not await db.kv_claim(f"bulk_grant:{call.message.message_id}"):
+        await call.answer("This grant was already applied.", show_alert=True)
+        return
+    await call.answer("Crediting every wallet…")
     affected = 0
     for idx in db.healthy:
         res = await db.dbs[idx]["users"].update_many({}, {"$inc": {"bookgem": amount}})

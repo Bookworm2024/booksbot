@@ -101,7 +101,8 @@ async def _plays_today(db, uid: int) -> int:
 
 
 async def _consume_play(db, uid: int, lim: int) -> bool:
-    """Atomically count one play under the daily cap (race-safe, like memory.py)."""
+    """Atomically count one play under the daily cap (race-safe, like memory.py).
+    Mirrors utils/quota.py's sentinels: lim <= 0 is closed, lim < 0 is unlimited."""
     if lim == 0:
         return False
     today = _today()
@@ -109,6 +110,10 @@ async def _consume_play(db, uid: int, lim: int) -> bool:
         "users", {"user_id": uid, "hm_day": {"$ne": today}},
         {"$set": {"hm_day": today, "hm_plays": 1}})
     if reset is not None:
+        return True
+    if lim < 0:  # unlimited: bump the counter for stats and always allow
+        await db.find_one_and_update_global(
+            "users", {"user_id": uid, "hm_day": today}, {"$inc": {"hm_plays": 1}})
         return True
     inc = await db.find_one_and_update_global(
         "users", {"user_id": uid, "hm_day": today, "hm_plays": {"$lt": lim}},

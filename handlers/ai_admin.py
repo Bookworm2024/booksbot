@@ -8,6 +8,7 @@ config, so changes take effect immediately for Recommendations, Summaries and
 genre tagging.
 """
 import logging
+from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -41,7 +42,7 @@ async def _panel():
     cfg = await get_ai_config()
     prov = cfg["provider"]
     wh_on = cfg["webhook_enabled"]
-    wh_url = cfg["webhook_url"] or "—"
+    wh_url = escape(cfg["webhook_url"] or "—")
     active = ("🪝 Custom Webhook" if (wh_on and cfg["webhook_url"])
               else _PROV_LABEL.get(prov, prov))
     text = (
@@ -51,9 +52,9 @@ async def _panel():
         "<blockquote>"
         f"⚡ <b>Active</b> · {active}\n"
         f"🔌 <b>Provider</b> · {_PROV_LABEL.get(prov, prov)}\n"
-        f"🔗 <b>Free URL</b> · <code>{cfg['free_url']}</code>\n"
+        f"🔗 <b>Free URL</b> · <code>{escape(cfg['free_url'])}</code>\n"
         f"🔑 <b>Claude key</b> · <code>{_mask(cfg['anthropic_key'])}</code>\n"
-        f"🧠 <b>Claude model</b> · <code>{cfg['model']}</code>\n"
+        f"🧠 <b>Claude model</b> · <code>{escape(cfg['model'])}</code>\n"
         f"🪝 <b>Webhook</b> · {'🟢 ON' if wh_on else '⚪ OFF'}\n"
         f"🌐 <b>Webhook URL</b> · <code>{wh_url}</code>"
         "</blockquote>\n"
@@ -249,7 +250,7 @@ async def cb_test(call: CallbackQuery) -> None:
             "✅ <b>AI is live and responding</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "<blockquote>"
-            f"🔁 <b>Provider reply</b>\n<code>{out[:200]}</code>"
+            f"🔁 <b>Provider reply</b>\n<code>{escape(out[:200])}</code>"
             "</blockquote>\n"
             "<i>💡 Recommendations, Summaries and tagging are all good to go.</i>",
             reply_markup=kb([btn("🤖 Back to AI Engine", "admin_ai", style="primary")]))

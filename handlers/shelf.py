@@ -87,7 +87,7 @@ async def cb_finished(call: CallbackQuery) -> None:
     rows = []
     for f in items:
         ext = (f.get("ext") or "").lower()
-        rows.append([btn(f"✅ {icon_for(ext)} {f.get('name','Untitled')[:32]}",
+        rows.append([btn(f"✅ {icon_for(ext)} {(f.get('name') or 'Untitled')[:32]}",
                          f"fin_get:{f['file_unique_id']}", style="primary")])
     rows.append([btn("🔙 Back to Shelf", "menu_shelf", style="danger")])
     await call.message.edit_text(

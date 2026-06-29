@@ -35,25 +35,31 @@ async def mark(uid: int, key: str) -> None:
         await award(uid, key)
         db = await MongoManager.get()
         today = _today()
-        doc = await db.find_one_global("users", {"user_id": uid}, {"missions_day": 1})
-        if not doc or doc.get("missions_day") != today:
-            await db.safe_update("users", {"user_id": uid},
-                                 {"$set": {"missions_day": today, "missions_done": [key],
-                                           "missions_claimed": []}})
-        else:
+        # Atomic, self-guarding day reset: only the FIRST action of a new day
+        # matches {missions_day != today} and resets — seeding missions_done with
+        # THIS key in the same op so its tick isn't lost. A concurrent second
+        # action no longer matches and falls through to a plain $addToSet, so a
+        # day-rollover race can never clobber a completed mission (cf.
+        # challenges.bump / battlepass.bump).
+        did_reset = await db.find_one_and_update_global(
+            "users", {"user_id": uid, "missions_day": {"$ne": today}},
+            {"$set": {"missions_day": today, "missions_done": [key],
+                      "missions_claimed": []}})
+        if not did_reset:
             await db.safe_update("users", {"user_id": uid},
                                  {"$addToSet": {"missions_done": key}})
         if key == "play_game":
             # daily game-play streak bonus (the "daily challenge"), once/day
             from utils.game_streak import on_game_played
             await on_game_played(uid)
-            # weekly tournament: games played this ISO week (resets each week)
+            # weekly tournament: games played this ISO week (resets each week).
+            # Atomic week reset (same pattern as the day reset above) so a
+            # week-rollover race can't clobber the tournament counter.
             wk = datetime.now(timezone.utc).strftime("%G-W%V")
-            tdoc = await db.find_one_global("users", {"user_id": uid}, {"tour_week": 1})
-            if not tdoc or tdoc.get("tour_week") != wk:
-                await db.safe_update("users", {"user_id": uid},
-                                     {"$set": {"tour_week": wk, "tour_games": 1}})
-            else:
+            did_wreset = await db.find_one_and_update_global(
+                "users", {"user_id": uid, "tour_week": {"$ne": wk}},
+                {"$set": {"tour_week": wk, "tour_games": 1}})
+            if not did_wreset:
                 await db.safe_update("users", {"user_id": uid}, {"$inc": {"tour_games": 1}})
         # monthly reading-challenge counters (reset on month change)
         from utils.challenges import bump

@@ -10,6 +10,7 @@ answer lives in the FSM and is never sent to the client.
 """
 import logging
 import random
+import uuid
 from datetime import datetime, timezone
 
 from aiogram import F, Router
@@ -118,7 +119,8 @@ async def _plays_today(db, uid: int) -> int:
 
 
 async def _consume_play(db, uid: int, lim: int) -> bool:
-    """Atomically count one play under the daily cap (race-safe, like memory.py)."""
+    """Atomically count one play under the daily cap (race-safe, like memory.py).
+    Mirrors utils/quota.py's sentinels: lim <= 0 is closed, lim < 0 is unlimited."""
     if lim == 0:
         return False
     today = _today()
@@ -126,6 +128,10 @@ async def _consume_play(db, uid: int, lim: int) -> bool:
         "users", {"user_id": uid, "sr_day": {"$ne": today}},
         {"$set": {"sr_day": today, "sr_plays": 1}})
     if reset is not None:
+        return True
+    if lim < 0:  # unlimited: bump the counter for stats and always allow
+        await db.find_one_and_update_global(
+            "users", {"user_id": uid, "sr_day": today}, {"$inc": {"sr_plays": 1}})
         return True
     inc = await db.find_one_and_update_global(
         "users", {"user_id": uid, "sr_day": today, "sr_plays": {"$lt": lim}},
@@ -169,8 +175,11 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
     passage, question, options, answer = _PASSAGES[idx]
     words = len(passage.split())
     await state.set_state(SpeedFSM.reading)
+    # per-round token → atomic single-winner reward claim (FSM isolation is off,
+    # so state.clear() alone can't dedup a fast double-tap of the answer button).
     await state.update_data(words=words, question=question, options=options,
-                            answer=answer, started=_now().timestamp())
+                            answer=answer, started=_now().timestamp(),
+                            sr_round=uuid.uuid4().hex)
     await send(
         "⚡ <b>Speed Read</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
@@ -234,7 +243,7 @@ async def cb_answer(call: CallbackQuery, state: FSMContext) -> None:
     answer = int(data.get("answer") or 0)
     wpm = int(data.get("wpm") or 0)
     options = data.get("options") or []
-    await state.clear()   # clear BEFORE crediting → no double-credit
+    await state.clear()
     correct = pick == answer
     cheated = wpm > _CHEAT_WPM
     rwd = 0.0 if cheated else _reward(wpm, correct)
@@ -242,12 +251,21 @@ async def cb_answer(call: CallbackQuery, state: FSMContext) -> None:
         "✅ Correct — reward on its way!" if correct
         else "❌ Not quite — see the answer below.")
     if rwd > 0:
-        await add_bgm(call.from_user.id, rwd)
+        # Gate the reward on an atomic per-round-token claim: only the task that
+        # flips sr_solved_token to this round's token pays out, so a fast
+        # double-tap of the answer button can't credit BGM twice (FSM isolation
+        # is off → state.clear() is not a reliable dedup guard).
         db = await MongoManager.get()
-        await db.safe_update("users", {"user_id": call.from_user.id},
-                             {"$inc": {"games_played": 1, "game_bgm": rwd}})
-        from utils.missions import mark
-        await mark(call.from_user.id, "play_game")
+        rt = data.get("sr_round") or uuid.uuid4().hex
+        won = await db.find_one_and_update_global(
+            "users", {"user_id": call.from_user.id, "sr_solved_token": {"$ne": rt}},
+            {"$set": {"sr_solved_token": rt}})
+        if won is not None:
+            await add_bgm(call.from_user.id, rwd)
+            await db.safe_update("users", {"user_id": call.from_user.id},
+                                 {"$inc": {"games_played": 1, "game_bgm": rwd}})
+            from utils.missions import mark
+            await mark(call.from_user.id, "play_game")
     right = options[answer] if 0 <= answer < len(options) else "—"
     if cheated:
         verdict = (

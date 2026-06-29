@@ -433,8 +433,9 @@ async function poll(){
         if(!payUrl) document.getElementById('crypto-open').disabled=true;
       }
       if(d.expires_at) startTimer(d.expires_at);
-    } else if (d.method==='crypto' && payUrl!== (d.pay_url||'')) {
-      payUrl=d.pay_url||payUrl;
+    } else if (d.method==='crypto' && d.pay_url && payUrl!==d.pay_url) {
+      payUrl=d.pay_url;
+      const co=document.getElementById('crypto-open'); if(co) co.disabled=false;
     }
 
     if(d.status!==prevStatus){ pollMs=2500; prevStatus=d.status; } else { pollMs=Math.min(pollMs*1.15,6000); }

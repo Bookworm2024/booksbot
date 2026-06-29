@@ -215,7 +215,7 @@ async def cb_reports(call: CallbackQuery) -> None:
     btns = []
     for r in rows:
         lines.append(f"<code>{r.get('rid')}</code> · 👤 <code>{r.get('user_id')}</code>\n"
-                     f"{(r.get('text') or '')[:180]}")
+                     f"{escape((r.get('text') or '')[:180])}")
         btns.append([btn(f"✅ Resolve {r.get('rid')}", f"rpt_done:{r.get('rid')}", style="success")])
     btns.append([btn("🔄 Refresh", "admin_reports", style="primary"),
                  btn("🔙 Back", "admin_more", style="primary")])
@@ -468,7 +468,7 @@ async def on_cpn_days(message: Message, state: FSMContext) -> None:
     code = await create_coupon(data["cpn_kind"], data["cpn_value"], data["cpn_uses"],
                                int(raw), message.chat.id)
     await log_action(message.chat.id, "coupon_create",
-                     f"{code} {data['cpn_kind']}={data['cpn_value']:g}")
+                     f"{code} {data['cpn_kind']}={fmt_amount(data['cpn_value'])}")
     val = (f"{fmt_amount(data['cpn_value'])}%" if data["cpn_kind"] == "pct"
            else f"{fmt_amount(data['cpn_value'])} BGM")
     await message.answer(

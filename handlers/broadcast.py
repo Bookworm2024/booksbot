@@ -266,6 +266,22 @@ async def cb_when(call: CallbackQuery, state: FSMContext) -> None:
 
 
 async def _run(bot, bid: str) -> None:
+    # Fire-and-forget task: if any pre-loop DB call throws, the campaign would be
+    # stranded in 'running' forever. Wrap so a crash marks it failed + logs.
+    try:
+        await _run_impl(bot, bid)
+    except Exception:  # noqa: BLE001
+        logger.exception("broadcast %s crashed; marking failed", bid)
+        try:
+            db = await MongoManager.get()
+            await db.safe_update("broadcasts", {"bid": bid},
+                                 {"$set": {"status": "failed", "finished_at": _now()}},
+                                 upsert=False)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+async def _run_impl(bot, bid: str) -> None:
     db = await MongoManager.get()
     b = await db.find_one_global("broadcasts", {"bid": bid})
     if not b:

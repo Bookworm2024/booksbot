@@ -8,6 +8,7 @@ the reward is credited once (state is cleared before crediting).
 """
 import logging
 import random
+import uuid
 from datetime import datetime, timezone
 
 from aiogram import F, Router
@@ -71,7 +72,8 @@ async def _plays_today(db, uid: int) -> int:
 
 
 async def _consume_play(db, uid: int, lim: int) -> bool:
-    """Atomically count one play under the daily cap (race-safe, like memory.py)."""
+    """Atomically count one play under the daily cap (race-safe, like memory.py).
+    Mirrors utils/quota.py's sentinels: lim <= 0 is closed, lim < 0 is unlimited."""
     if lim == 0:
         return False
     today = _today()
@@ -79,6 +81,10 @@ async def _consume_play(db, uid: int, lim: int) -> bool:
         "users", {"user_id": uid, "anag_day": {"$ne": today}},
         {"$set": {"anag_day": today, "anag_plays": 1}})
     if reset is not None:
+        return True
+    if lim < 0:  # unlimited: bump the counter for stats and always allow
+        await db.find_one_and_update_global(
+            "users", {"user_id": uid, "anag_day": today}, {"$inc": {"anag_plays": 1}})
         return True
     inc = await db.find_one_and_update_global(
         "users", {"user_id": uid, "anag_day": today, "anag_plays": {"$lt": lim}},
@@ -117,7 +123,9 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
         return
     word = random.choice(_WORDS)
     await state.set_state(AnagramFSM.answering)
-    await state.update_data(word=word, tries=0, hinted=False)
+    # per-round token → atomic single-winner reward claim (FSM isolation is off,
+    # so state.clear() alone can't dedup a fast double-send of the right answer).
+    await state.update_data(word=word, tries=0, hinted=False, anag_round=uuid.uuid4().hex)
     await send(f"🎮 <b>Word Anagram</b>\n"
                f"━━━━━━━━━━━━━━━━━━━━\n"
                f"<i>One bookish word, letters shuffled — set them back in order to win 💎 BGM.</i>\n"
@@ -185,14 +193,23 @@ async def on_answer(message: Message, state: FSMContext) -> None:
     tries = int(data.get("tries") or 0)
 
     if guess == word:
-        await state.clear()   # clear BEFORE crediting → no double-credit
+        await state.clear()
+        # Gate the reward on an atomic per-round-token claim: only the task that
+        # flips anag_solved_token to this round's token pays out, so a fast
+        # double-send of the right answer can't credit BGM twice (FSM isolation
+        # is off → state.clear() is not a reliable dedup guard).
         rwd = _reward(tries)
-        await add_bgm(message.chat.id, rwd)
         db = await MongoManager.get()
-        await db.safe_update("users", {"user_id": message.chat.id},
-                             {"$inc": {"games_played": 1, "game_bgm": rwd}})
-        from utils.missions import mark
-        await mark(message.chat.id, "play_game")
+        rt = data.get("anag_round") or uuid.uuid4().hex
+        won = await db.find_one_and_update_global(
+            "users", {"user_id": message.chat.id, "anag_solved_token": {"$ne": rt}},
+            {"$set": {"anag_solved_token": rt}})
+        if won is not None:
+            await add_bgm(message.chat.id, rwd)
+            await db.safe_update("users", {"user_id": message.chat.id},
+                                 {"$inc": {"games_played": 1, "game_bgm": rwd}})
+            from utils.missions import mark
+            await mark(message.chat.id, "play_game")
         await message.answer(
             f"✨ <b>Correct — it was {word}!</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"

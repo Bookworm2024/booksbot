@@ -85,5 +85,7 @@ async def badge(uid: int) -> str:
     st = await get_status(uid)
     if not st["active"]:
         return ""
-    cfg = TIERS[st["tier"]]
+    cfg = TIERS.get(st["tier"])
+    if not cfg:  # legacy/corrupt tier id outside TIERS — show a neutral Premium badge
+        return "👑 Premium"
     return f"{cfg['emoji']} {cfg['name']}"

@@ -94,7 +94,7 @@ async def _render(message: Message, uid: int, page: int, *, edit: bool) -> None:
     for f in chunk:
         fuid = f["file_unique_id"]
         ext = (f.get("ext") or "").lower()
-        name = f.get("name", "Untitled")[:32]
+        name = (f.get("name") or "Untitled")[:32]
         is_audio = f.get("kind") == "audio" or ext in _AUDIO_EXT
         # title row
         rows.append([btn(f"{icon_for(ext)} {name}", f"fav_get:{fuid}", style="primary")])
@@ -227,7 +227,7 @@ async def cb_continue(call: CallbackQuery) -> None:
         if not fav:
             continue
         ext = (fav.get("ext") or "").lower()
-        label = f"{icon_for(ext)} {fav.get('name','Untitled')[:32]}"
+        label = f"{icon_for(ext)} {(fav.get('name') or 'Untitled')[:32]}"
         rows.append([webapp_btn(label, "view.html", query=f"fuid={fuid}&ext={ext}",
                                 style="success", fallback_cb=f"fav_get:{fuid}")])
     rows.append([btn("🔙 Back to Library", "menu_library", style="danger")])

@@ -134,14 +134,9 @@ async def on_value(message: Message, state: FSMContext) -> None:
 
 
 # ── flash sale / deals ─────────────────────────────────────────────────────────
-@router.callback_query(F.data == "admin_deal")
-async def cb_deal(call: CallbackQuery) -> None:
-    if call.from_user.id != SUPER_ADMIN_ID:
-        await call.answer("This control is reserved for the super admin.", show_alert=True)
-        return
-    await call.answer()
+async def _deal_view():
     cur = await banner() or "💤 <b>Status:</b> no flash sale running right now."
-    await call.message.edit_text(
+    text = (
         "🔥 <b>Flash Sale</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
         "<i>A timed bonus that makes every 💎 BGM purchase go further.</i>\n"
@@ -149,10 +144,21 @@ async def cb_deal(call: CallbackQuery) -> None:
         "🎁 <b>What buyers get:</b> extra bonus BGM on top of every purchase for the window you set\n"
         "💡 <i>Perfect for launches, paydays and quiet stretches you'd like to spark.</i>"
         "</blockquote>\n"
-        "<i>Launch a fresh sale below, or wind the current one down.</i>",
-        reply_markup=kb([btn("⚡ Launch Flash Sale", "deal_new", style="success")],
-                        [btn("🛑 End Sale", "deal_clear", style="danger")],
-                        [btn("🔙 Back to Admin", "admin_open", style="primary")]))
+        "<i>Launch a fresh sale below, or wind the current one down.</i>")
+    markup = kb([btn("⚡ Launch Flash Sale", "deal_new", style="success")],
+                [btn("🛑 End Sale", "deal_clear", style="danger")],
+                [btn("🔙 Back to Admin", "admin_open", style="primary")])
+    return text, markup
+
+
+@router.callback_query(F.data == "admin_deal")
+async def cb_deal(call: CallbackQuery) -> None:
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("This control is reserved for the super admin.", show_alert=True)
+        return
+    await call.answer()
+    text, markup = await _deal_view()
+    await call.message.edit_text(text, reply_markup=markup)
 
 
 @router.callback_query(F.data == "deal_new")
@@ -230,4 +236,5 @@ async def cb_deal_clear(call: CallbackQuery) -> None:
         return
     await clear_deal()
     await call.answer("✅ Flash sale ended — purchases are back to standard bonuses.")
-    await cb_deal(call)
+    text, markup = await _deal_view()
+    await call.message.edit_text(text, reply_markup=markup)

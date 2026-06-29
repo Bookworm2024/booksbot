@@ -69,13 +69,20 @@ async def _consume_play(db, uid: int, lim: int) -> bool:
     """Atomically count one play under the daily cap `lim`. Returns False when the
     cap is reached. The day-reset sets mm_plays=1 in the same op as the day flip,
     and the same-day path is a conditional $inc under the cap — so concurrent
-    _start calls can never both slip past the limit (the BGM faucet for this game)."""
+    _start calls can never both slip past the limit (the BGM faucet for this game).
+    Mirrors utils/quota.py's sentinels: lim == 0 is closed, lim < 0 is unlimited."""
+    if lim == 0:
+        return False
     today = _today()
     did_reset = await db.find_one_and_update_global(
         "users", {"user_id": uid, "mm_day": {"$ne": today}},
         {"$set": {"mm_day": today, "mm_plays": 1}})
     if did_reset is not None:
         return True  # first play of a new day
+    if lim < 0:  # unlimited: bump the counter for stats and always allow
+        await db.find_one_and_update_global(
+            "users", {"user_id": uid, "mm_day": today}, {"$inc": {"mm_plays": 1}})
+        return True
     inc = await db.find_one_and_update_global(
         "users", {"user_id": uid, "mm_day": today, "mm_plays": {"$lt": lim}},
         {"$inc": {"mm_plays": 1}})

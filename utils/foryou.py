@@ -59,7 +59,9 @@ async def _from_library(uid: int) -> tuple[str | None, int, int]:
         return None, 0, 0
     files = await db.find_global("files", {"file_unique_id": {"$in": fuids[:400]}},
                                 proj={"genre": 1})
-    c = Counter(f.get("genre") for f in files if f.get("genre"))
+    # "Other" is the catch-all bucket, not a real taste signal — don't let it
+    # become the user's favourite genre.
+    c = Counter(f.get("genre") for f in files if f.get("genre") and f.get("genre") != "Other")
     if not c:
         return None, 0, 0
     genre, count = c.most_common(1)[0]
@@ -75,8 +77,12 @@ async def favorite_genre(uid: int) -> tuple[str | None, int, int]:
     u = await db.find_one_global("users", {"user_id": uid},
                                  {"genre_reads": 1, "genre_reads_total": 1}) or {}
     reads = u.get("genre_reads") or {}
-    if reads:
-        genre, count = max(reads.items(), key=lambda kv: kv[1])
+    # Exclude the "Other" catch-all from the favourite pick (it's not a real taste
+    # signal); keep it in the displayed total. Fall back to the library if the only
+    # reads so far are "Other".
+    picks = {g: n for g, n in reads.items() if g != "Other"}
+    if picks:
+        genre, count = max(picks.items(), key=lambda kv: kv[1])
         total = int(u.get("genre_reads_total") or sum(reads.values()))
         return genre, int(count), total
     return await _from_library(uid)

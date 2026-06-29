@@ -8,6 +8,7 @@ Super-admin panel → 🎮 Questions:
 Questions feed utils.games (the seeded starter bank is supplemented by these).
 """
 import logging
+from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -168,7 +169,8 @@ async def q_d(message: Message, state: FSMContext) -> None:
         "🎯 <b>Mark the Correct Answer</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>Tap the option players should be rewarded for.</i>\n\n"
-        f"<blockquote>🅰️ {data['A']}\n🅱️ {data['B']}\n🇨 {data['C']}\n🇩 {data['D']}</blockquote>",
+        f"<blockquote>🅰️ {escape(data['A'])}\n🅱️ {escape(data['B'])}\n"
+        f"🇨 {escape(data['C'])}\n🇩 {escape(data['D'])}</blockquote>",
         reply_markup=kb([btn("A", "qa_correct:A", style="primary"),
                          btn("B", "qa_correct:B", style="primary"),
                          btn("C", "qa_correct:C", style="primary"),

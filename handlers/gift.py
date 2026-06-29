@@ -94,6 +94,12 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     await state.clear()
     sender = message.chat.id
 
+    # guard a lost/invalid recipient (e.g. FSM data gone) so a charge can never be
+    # taken from the sender and credited to a phantom (user_id=None) doc.
+    if not isinstance(target, int) or target == sender:
+        await message.answer("⚠️ Something went wrong — please start the gift again.")
+        return
+
     # anti-abuse: flagged accounts can't funnel BGM out via gifts
     from utils.risk import is_flagged, record
     if await is_flagged(sender):

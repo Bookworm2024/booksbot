@@ -49,20 +49,24 @@ async def buy(uid: int, fid: str) -> tuple[bool, str]:
         return False, "free"
     db = await MongoManager.get()
     # atomically claim ownership in whichever cluster holds the user's doc
-    claimed = False
+    claimed_idx = None
     for idx in db.healthy:
         res = await db.dbs[idx]["users"].update_one(
             {"user_id": uid, "cosmetics": {"$ne": fid}},
             {"$addToSet": {"cosmetics": fid}})
         if res.modified_count:
-            claimed = True
+            claimed_idx = idx
             break
-    if not claimed:
+    if claimed_idx is None:
         # already owned (somewhere), or the user has no doc yet
         return False, ("owned" if fid in await owned(uid) else "insufficient")
     if not await charge_bgm(uid, float(item["price"])):
-        await db.safe_update("users", {"user_id": uid},
-                             {"$pull": {"cosmetics": fid}}, upsert=False)
+        # roll back in the SAME cluster the grant landed in — safe_update would
+        # pull from the first cluster holding any doc for this user, which on a
+        # cross-cluster split may not be the one that got the flair (leaving an
+        # unpaid emblem behind).
+        await db.dbs[claimed_idx]["users"].update_one(
+            {"user_id": uid}, {"$pull": {"cosmetics": fid}})
         return False, "insufficient"
     return True, "ok"
 

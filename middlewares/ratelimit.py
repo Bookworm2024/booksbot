@@ -81,6 +81,7 @@ class RateLimitMiddleware(BaseMiddleware):
         now = time.monotonic()
         if len(_hits) > _MAX_TRACKED:   # crude safety reset (very rare)
             _hits.clear()
+            _warned.clear()  # else _warned grows unbounded (never pruned otherwise)
         hits = _hits.setdefault(uid, [])
         cutoff = now - win
         # prune timestamps outside the window

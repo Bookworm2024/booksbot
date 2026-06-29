@@ -95,10 +95,18 @@ async def api_reader_state_set(request: web.Request) -> web.Response:
     if not uid or not fuid:
         return web.json_response({"error": "auth_failed"}, status=401)
     update = {}
+    # Coerce numeric fields defensively — a malformed value from a buggy client
+    # must not 500 and drop the whole save; just skip the bad field.
     if "page" in body:
-        update["page"] = int(body["page"])
+        try:
+            update["page"] = int(body["page"])
+        except (ValueError, TypeError):
+            pass
     if "position" in body:
-        update["position"] = float(body["position"])
+        try:
+            update["position"] = float(body["position"])
+        except (ValueError, TypeError):
+            pass
     if "loc" in body:                       # EPUB CFI location string
         update["loc"] = str(body["loc"])[:500]
     if "bookmarks" in body and isinstance(body["bookmarks"], list):

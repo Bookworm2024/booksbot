@@ -278,10 +278,17 @@ async def ensure_seed() -> None:
 # ── daily limit ──────────────────────────────────────────────────────────────
 async def daily_limit(uid: int) -> int:
     """Tier-aware per-game daily cap: FREE q_game_free (2), PREMIUM q_game_premium (5).
-    Shared by the Mini-App engine and every chat game so the limit lives in one place."""
+    Shared by the Mini-App engine and every chat game so the limit lives in one place.
+
+    Honours the quota convention (utils/quota.py): a negative setting means
+    UNLIMITED — return a very large sentinel so every caller's ``plays >= lim`` /
+    ``count < lim`` comparison treats it as effectively boundless. (A raw -1 here
+    would make ``plays_today >= -1`` always true and lock unlimited users out of
+    every game.) 0 stays 0 (feature closed)."""
     from utils.premium import is_premium
     from utils.settings import get_float
-    return int(await get_float("q_game_premium" if await is_premium(uid) else "q_game_free"))
+    raw = int(await get_float("q_game_premium" if await is_premium(uid) else "q_game_free"))
+    return 10 ** 9 if raw < 0 else raw
 
 
 async def plays_today(uid: int, game: str) -> int:

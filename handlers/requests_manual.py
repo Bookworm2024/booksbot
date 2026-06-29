@@ -72,9 +72,19 @@ def _now():
 
 
 # ── tier-gate cards ──────────────────────────────────────────────────────────
+async def _edit_or_send(call: CallbackQuery, text: str, reply_markup) -> None:
+    """Edit the source message in place, or send a fresh one if it can't be edited
+    (e.g. the confirm card is a photo+caption message, which edit_text can't touch)."""
+    try:
+        await call.message.edit_text(text, reply_markup=reply_markup)
+    except Exception:  # noqa: BLE001
+        await call.message.answer(text, reply_markup=reply_markup)
+
+
 async def _audio_locked_card(call: CallbackQuery) -> None:
     """Audiobook concierge requests are premium-only — show the upsell."""
-    await call.message.edit_text(
+    await _edit_or_send(
+        call,
         "🔒 <b>Audiobook requests are a Premium perk</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>Hand-sourced audiobooks are reserved for our Premium readers.</i>\n"
@@ -98,7 +108,8 @@ async def _limit_card(call: CallbackQuery, key: str, kind: str, label: str) -> N
     extra = ("" if is_prem else
              "\n<i>💡 Premium readers get more requests every day — and audiobook "
              "concierge requests too.</i>")
-    await call.message.edit_text(
+    await _edit_or_send(
+        call,
         "🛑 <b>Daily request limit reached</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"<i>You've used today's {label} concierge requests.</i>\n"
@@ -218,23 +229,33 @@ async def cb_format(call: CallbackQuery, state: FSMContext) -> None:
 @router.message(ManualFSM.cover, F.photo | F.document)
 async def on_cover(message: Message, state: FSMContext) -> None:
     cover_id = message.photo[-1].file_id if message.photo else message.document.file_id
-    await state.update_data(cover_id=cover_id)
     data = await state.get_data()
     fmt = f"📂 <b>Format:</b> {data.get('format')}\n" if data.get("category") == "ebook" else ""
-    await message.answer_photo(
-        cover_id,
-        caption=("📋 <b>Review &amp; Confirm</b>\n"
-                 "━━━━━━━━━━━━━━━━━━━━\n"
-                 "<i>One last look before we send this to the order desk.</i>\n"
-                 "<blockquote>"
-                 f"📖 <b>Title:</b> {escape(data.get('title') or '')}\n"
-                 f"✍️ <b>Author:</b> {escape(data.get('author') or '')}\n"
-                 f"📦 <b>Type:</b> {data.get('category').title()}\n"
-                 f"{fmt}"
-                 "🎁 <b>Cost:</b> Free — counts toward today's request allowance.</blockquote>\n"
-                 "<i>💡 Tap Confirm and we'll take it from here.</i>"),
-        reply_markup=kb([btn("✅ Confirm & Submit", "mreq_confirm", style="success")],
-                        [btn("❌ Cancel", "mreq_cancel", style="danger")]))
+    try:
+        await message.answer_photo(
+            cover_id,
+            caption=("📋 <b>Review &amp; Confirm</b>\n"
+                     "━━━━━━━━━━━━━━━━━━━━\n"
+                     "<i>One last look before we send this to the order desk.</i>\n"
+                     "<blockquote>"
+                     f"📖 <b>Title:</b> {escape(data.get('title') or '')}\n"
+                     f"✍️ <b>Author:</b> {escape(data.get('author') or '')}\n"
+                     f"📦 <b>Type:</b> {data.get('category').title()}\n"
+                     f"{fmt}"
+                     "🎁 <b>Cost:</b> Free — counts toward today's request allowance.</blockquote>\n"
+                     "<i>💡 Tap Confirm and we'll take it from here.</i>"),
+            reply_markup=kb([btn("✅ Confirm & Submit", "mreq_confirm", style="success")],
+                            [btn("❌ Cancel", "mreq_cancel", style="danger")]))
+    except Exception:  # noqa: BLE001 — a non-image document can't render as a photo
+        await message.answer(
+            "⚠️ <b>That file can't be used as a cover</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>Send the cover as a <b>photo</b> or an <b>image file</b> "
+            "(JPG/PNG) so we can preview it. A screenshot from Google Images is "
+            "perfect.</blockquote>",
+            reply_markup=kb([btn("❌ Cancel", "mreq_cancel", style="danger")]))
+        return
+    await state.update_data(cover_id=cover_id)
 
 
 @router.message(ManualFSM.cover)
@@ -528,7 +549,7 @@ async def on_admin_file(message: Message, state: FSMContext) -> None:
             "❌ <b>Delivery didn't go through</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             f"<blockquote>We couldn't hand this file to the reader.\n🛡 <b>Details:</b> "
-            f"{exc}</blockquote>\n"
+            f"{escape(str(exc))}</blockquote>\n"
             "<i>💡 The ticket is still open — try sending the file again.</i>")
         return
 

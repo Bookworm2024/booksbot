@@ -78,6 +78,11 @@ def _parse_dt(raw: Any) -> Optional[datetime]:
 def _build_doc(rec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Map one exported record to a fresh `users` document, or None if the
     user_id is missing/invalid (the only field we truly require)."""
+    # A JSON array may legally contain non-object elements (a stray null/string/
+    # number); treat anything that isn't a dict as an invalid row instead of
+    # crashing the whole import on `rec.get(...)`.
+    if not isinstance(rec, dict):
+        return None
     try:
         uid = int(str(rec.get("user_id", "")).strip())
     except (ValueError, TypeError):

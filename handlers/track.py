@@ -52,7 +52,7 @@ async def _prompt(message: Message, state: FSMContext, st) -> None:
         "<blockquote>Send the <b>Request ID</b> from your confirmation message and "
         "we'll pull up exactly where it stands — pending in the queue, fulfilled and "
         "ready, or cancelled with a refund.</blockquote>\n"
-        "<i>💡 Your ID looks like <code>R-XXXXXX</code> — paste it just as it appears.</i>")
+        "<i>💡 Your ID is a 10-character code like <code>A7B3K9M2QX</code> — paste it just as it appears.</i>")
 
 
 @router.message(TrackFSM.awaiting_id, F.text)
