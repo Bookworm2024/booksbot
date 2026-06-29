@@ -1,9 +1,13 @@
 """
 handlers/recommend.py — AI book recommendations.
 
-  /recommend (or 🤖 AI Recommendations) → Proceed (1 token, BCN-first) →
+  /recommend (or 🤖 AI Recommendations) → Proceed (quota-gated, no token cost) →
   type a genre → Claude returns ~100 titles, shown 20 at a time
-  (Get More / End). Invalid genre → refund (BCN→0.75 BGM, BGM→0.9 BGM).
+  (Get More / End). Tier gating via utils/quota.py:
+    • By Genre — FREE 2/24h · PREMIUM 5/24h  (quota "airec")
+    • Similar / By Mood — PREMIUM-ONLY (count toward the same "airec" quota)
+    • Book summary — FREE 1/24h · PREMIUM 5/24h  (quota "aisum")
+  A search that fails / returns no titles is refunded its quota use.
 """
 import logging
 from html import escape
@@ -15,12 +19,10 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
+from utils import premium, quota
 from utils.ai import (ai_enabled, mood_titles, recommend_titles, similar_titles,
                       summarize_book)
-from utils.format import fmt_amount
 from utils.keyboards import btn, cancel_row, kb
-from utils.settings import get_float
-from utils.wallet import get_balances, refund, spend
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -28,8 +30,31 @@ router = Router()
 _BATCH = 20
 
 
-async def _ai_cost() -> float:
-    return await get_float("ai_cost")
+def _limit_card(title: str, body: str, used: int, lim) -> tuple[str, object]:
+    """A shared 'daily limit reached' card + Go Premium upsell. `lim` is the
+    resolved quota limit (int) for display."""
+    text = (
+        f"🔒 <b>{title}</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>{body}\n\n"
+        f"You've used <b>{used}/{quota.fmt_limit(lim)}</b> today — the counter "
+        "resets at midnight UTC.</blockquote>\n"
+        "<i>💡 Go Premium for a bigger daily allowance and no waiting.</i>")
+    markup = kb([btn("👑 Go Premium", "go_premium", style="success")],
+                [btn("🔙 Back", "menu_library", style="danger")])
+    return text, markup
+
+
+def _premium_lock_card(title: str, body: str) -> tuple[str, object]:
+    """A shared 'this is a Premium feature' card + Go Premium upsell."""
+    text = (
+        f"🔒 <b>{title}</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>{body}</blockquote>\n"
+        "<i>💡 Unlock it — and a bigger daily allowance — with Premium.</i>")
+    markup = kb([btn("👑 Go Premium", "go_premium", style="success")],
+                [btn("🔙 Back", "menu_library", style="danger")])
+    return text, markup
 
 
 class RecFSM(StatesGroup):
@@ -62,47 +87,55 @@ async def _intro(message: Message, uid: int) -> None:
             "back online.</blockquote>\n"
             "<i>💡 Admins can re-enable AI from /admin.</i>")
         return
-    bgm, bcn = await get_balances(uid)
-    cost = await _ai_cost()
-    if bgm + bcn < cost:
-        await message.answer(
-            "🔒 <b>Not Quite Enough To Begin</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "<blockquote>A personal recommendation list costs "
-            f"<code>{fmt_amount(cost)}</code> BCN or BGM, and your wallet is a little "
-            "short right now.</blockquote>\n"
-            "<i>💡 Claim your free daily 🪙 BCN or top up 💎 BGM, then your librarian "
-            "will be ready when you are.</i>")
-        return
+    prem = await premium.is_premium(uid)
+    used, lim = await quota.status(uid, "airec")
+    # Free users see Similar / By Mood as Premium-locked (route to the upsell);
+    # premium users get the normal callbacks. By Genre is open to everyone.
+    if prem:
+        similar_row = [btn("📚 Similar to a Book", "rec_similar", style="success")]
+        mood_row = [btn("🎭 By Mood", "rec_mood", style="success")]
+        feature_lines = (
+            "🎯 <b>By Genre</b> — up to 100 standout titles in any genre you name\n"
+            "📚 <b>Similar To A Book</b> — more of what you loved, matched on theme and vibe\n"
+            "🎭 <b>By Mood</b> — describe a feeling (cozy, fast, dark…) and we'll find the "
+            "fit")
+    else:
+        similar_row = [btn("🔒 Similar to a Book (Premium)", "go_premium", style="primary")]
+        mood_row = [btn("🔒 By Mood (Premium)", "go_premium", style="primary")]
+        feature_lines = (
+            "🎯 <b>By Genre</b> — up to 100 standout titles in any genre you name\n"
+            "🔒 <b>Similar To A Book</b> — Premium: more of what you loved, matched on vibe\n"
+            "🔒 <b>By Mood</b> — Premium: describe a feeling and we'll find the fit")
     await message.answer(
         "🤖 <b>AI Recommendations</b>\n"
         "<i>Your personal librarian, ready to curate.</i>\n"
         "━━━━━━━━━━━━━━━━━━\n"
         "<blockquote>Tell us what you're in the mood for and we'll hand-pick reads "
-        "tailored to you — three ways to begin:\n\n"
-        "🎯 <b>By Genre</b> — up to 100 standout titles in any genre you name\n"
-        "📚 <b>Similar To A Book</b> — more of what you loved, matched on theme and vibe\n"
-        "🎭 <b>By Mood</b> — describe a feeling (cozy, fast, dark…) and we'll find the "
-        "fit</blockquote>\n"
-        f"💎 <b>Cost:</b> <code>{fmt_amount(cost)}</code> BCN / BGM per list\n"
-        f"💼 <b>Your balance:</b> <code>{bcn:.2f}</code> BCN · <code>{bgm:.2f}</code> BGM\n"
-        "<i>💡 Spend dries up your free 🪙 BCN first, so your 💎 BGM stays untouched.</i>",
+        "tailored to you:\n\n"
+        f"{feature_lines}</blockquote>\n"
+        f"🎟 <b>Today:</b> <code>{used}/{quota.fmt_limit(lim)}</code> AI searches used\n"
+        "<i>💡 Searches are free — just capped per day. Go Premium for a bigger "
+        "allowance and the Similar &amp; Mood tools.</i>",
         reply_markup=kb([btn("🎯 By Genre", "rec_proceed", style="success")],
-                        [btn("📚 Similar to a Book", "rec_similar", style="success")],
-                        [btn("🎭 By Mood", "rec_mood", style="success")],
+                        similar_row,
+                        mood_row,
                         [btn("🔙 Back", "menu_library", style="danger")]))
 
 
 @router.callback_query(F.data == "rec_proceed")
 async def cb_proceed(call: CallbackQuery, state: FSMContext) -> None:
     uid = call.from_user.id
-    currency = await spend(uid, await _ai_cost())
-    if not currency:
-        await call.answer("Your wallet's a touch short — claim your daily BCN or top up BGM to begin.", show_alert=True)
+    if not await quota.consume(uid, "airec"):
+        await call.answer()
+        used, lim = await quota.status(uid, "airec")
+        text, markup = _limit_card(
+            "Daily AI Searches Used Up",
+            "You've reached today's allowance of AI recommendation searches.",
+            used, lim)
+        await call.message.edit_text(text, reply_markup=markup)
         return
     await call.answer()
     await state.set_state(RecFSM.awaiting_genre)
-    await state.update_data(currency=currency)
     await call.message.edit_text(
         "🎯 <b>Name Your Genre</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
@@ -124,8 +157,6 @@ async def on_genre(message: Message, state: FSMContext) -> None:
             "<i>Your recommendation request has been set aside — nothing was charged. "
             "Return any time you'd like a fresh list.</i>")
         return
-    data = await state.get_data()
-    currency = data.get("currency", "BGM")
     await state.clear()
     uid = message.chat.id
 
@@ -135,14 +166,13 @@ async def on_genre(message: Message, state: FSMContext) -> None:
     titles = await recommend_titles(genre)
 
     if not titles:
-        refund_amt = round(await _ai_cost() * (0.75 if currency == "BCN" else 0.9), 3)
-        await refund(uid, refund_amt, "BGM")
+        await quota.refund_one(uid, "airec")
         await notice.edit_text(
             f"🤔 <b>Couldn't Place “{escape(genre)}”</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "<blockquote>That didn't read as a genre your librarian could shelve, so "
-            "nothing was curated this time. We've put the spend straight back into your "
-            f"wallet — <b><code>{fmt_amount(refund_amt)}</code> BGM</b> returned.</blockquote>\n"
+            "nothing was curated this time — and this search hasn't been counted against "
+            "your daily allowance.</blockquote>\n"
             "<i>💡 Try something a little clearer — <b>historical fiction</b>, "
             "<b>space opera</b>, <b>true crime</b> — via 🤖 AI Recommendations.</i>")
         return
@@ -157,13 +187,25 @@ async def on_genre(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data == "rec_similar")
 async def cb_similar(call: CallbackQuery, state: FSMContext) -> None:
     uid = call.from_user.id
-    currency = await spend(uid, await _ai_cost())
-    if not currency:
-        await call.answer("Your wallet's a touch short — claim your daily BCN or top up BGM to begin.", show_alert=True)
+    if not await premium.is_premium(uid):
+        await call.answer()
+        text, markup = _premium_lock_card(
+            "A Premium Tool",
+            "“Similar to a book” matches reads on theme, genre and feel — it's part "
+            "of Premium. By Genre stays free for everyone.")
+        await call.message.edit_text(text, reply_markup=markup)
+        return
+    if not await quota.consume(uid, "airec"):
+        await call.answer()
+        used, lim = await quota.status(uid, "airec")
+        text, markup = _limit_card(
+            "Daily AI Searches Used Up",
+            "You've reached today's allowance of AI recommendation searches.",
+            used, lim)
+        await call.message.edit_text(text, reply_markup=markup)
         return
     await call.answer()
     await state.set_state(RecFSM.awaiting_similar_title)
-    await state.update_data(currency=currency)
     await call.message.edit_text(
         "📚 <b>More Like A Book You Loved</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
@@ -177,13 +219,25 @@ async def cb_similar(call: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "rec_mood")
 async def cb_mood(call: CallbackQuery, state: FSMContext) -> None:
     uid = call.from_user.id
-    currency = await spend(uid, await _ai_cost())
-    if not currency:
-        await call.answer("Your wallet's a touch short — claim your daily BCN or top up BGM to begin.", show_alert=True)
+    if not await premium.is_premium(uid):
+        await call.answer()
+        text, markup = _premium_lock_card(
+            "A Premium Tool",
+            "“By mood” finds books to match a feeling you describe — it's part of "
+            "Premium. By Genre stays free for everyone.")
+        await call.message.edit_text(text, reply_markup=markup)
+        return
+    if not await quota.consume(uid, "airec"):
+        await call.answer()
+        used, lim = await quota.status(uid, "airec")
+        text, markup = _limit_card(
+            "Daily AI Searches Used Up",
+            "You've reached today's allowance of AI recommendation searches.",
+            used, lim)
+        await call.message.edit_text(text, reply_markup=markup)
         return
     await call.answer()
     await state.set_state(RecFSM.awaiting_mood)
-    await state.update_data(currency=currency)
     await call.message.edit_text(
         "🎭 <b>Tell Us The Mood</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
@@ -195,18 +249,16 @@ async def cb_mood(call: CallbackQuery, state: FSMContext) -> None:
         reply_markup=kb(cancel_row("menu_library")))
 
 
-async def _deliver_or_refund(message: Message, uid: int, currency: str, label: str,
+async def _deliver_or_refund(message: Message, uid: int, label: str,
                              titles: list | None, notice) -> None:
     if not titles:
-        refund_amt = round(await _ai_cost() * (0.75 if currency == "BCN" else 0.9), 3)
-        await refund(uid, refund_amt, "BGM")
+        await quota.refund_one(uid, "airec")
         await notice.edit_text(
             f"🤔 <b>Nothing To Shelve For “{escape(label)}”</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "<blockquote>Your librarian couldn't build a confident list from that, so "
-            "we didn't curate one — and we've returned the spend in full: "
-            f"<b><code>{fmt_amount(refund_amt)}</code> BGM</b> back in your "
-            "wallet.</blockquote>\n"
+            "we didn't curate one — and this search hasn't been counted against your "
+            "daily allowance.</blockquote>\n"
             "<i>💡 Try again with a clearer book title or a more vivid mood — "
             "specifics give us the best picks.</i>")
         return
@@ -227,14 +279,12 @@ async def on_similar(message: Message, state: FSMContext) -> None:
             "<i>Your request has been set aside — nothing was charged. Come back any "
             "time for more reads like the ones you love.</i>")
         return
-    data = await state.get_data()
-    currency = data.get("currency", "BGM")
     await state.clear()
     uid = message.chat.id
     notice = await message.answer(
         f"📚 <b>Finding reads like “{escape(q)}”…</b>\n"
         "<i>Your librarian is matching on theme, genre and feel — one moment.</i>")
-    await _deliver_or_refund(message, uid, currency, f"similar to {q}",
+    await _deliver_or_refund(message, uid, f"similar to {q}",
                              await similar_titles(q), notice)
 
 
@@ -248,14 +298,12 @@ async def on_mood(message: Message, state: FSMContext) -> None:
             "<i>Your request has been set aside — nothing was charged. Return whenever "
             "you'd like reads to match a mood.</i>")
         return
-    data = await state.get_data()
-    currency = data.get("currency", "BGM")
     await state.clear()
     uid = message.chat.id
     notice = await message.answer(
         f"🎭 <b>Matching the “{escape(q)}” mood…</b>\n"
         "<i>Your librarian is finding books that fit the feeling — one moment.</i>")
-    await _deliver_or_refund(message, uid, currency, f"{q} mood",
+    await _deliver_or_refund(message, uid, f"{q} mood",
                              await mood_titles(q), notice)
 
 
@@ -365,18 +413,7 @@ async def _summary_intro(message: Message, uid: int) -> None:
             "search any title or browse Discover in the meantime.</blockquote>\n"
             "<i>💡 Admins can re-enable AI from /admin.</i>")
         return
-    bgm, bcn = await get_balances(uid)
-    cost = await _ai_cost()
-    if bgm + bcn < cost:
-        await message.answer(
-            "🔒 <b>Not Quite Enough To Begin</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "<blockquote>A book summary costs <code>"
-            f"{fmt_amount(cost)}</code> BCN or BGM, and your wallet is a little short "
-            "right now.</blockquote>\n"
-            "<i>💡 Claim your free daily 🪙 BCN or top up 💎 BGM, then your librarian "
-            "will brief you in seconds.</i>")
-        return
+    used, lim = await quota.status(uid, "aisum")
     await message.answer(
         "📝 <b>AI Book Summary</b>\n"
         "<i>A clear briefing before you commit a single chapter.</i>\n"
@@ -387,23 +424,27 @@ async def _summary_intro(message: Message, uid: int) -> None:
         "🎭 <b>Themes</b> — the ideas it explores\n"
         "👤 <b>Best for</b> — the readers who'll love it\n"
         "✨ <b>Takeaways</b> — what you'll walk away with</blockquote>\n"
-        f"💎 <b>Cost:</b> <code>{fmt_amount(cost)}</code> BCN / BGM\n"
-        f"💼 <b>Your balance:</b> <code>{bcn:.2f}</code> BCN · <code>{bgm:.2f}</code> BGM\n"
-        "<i>💡 Spend dries up your free 🪙 BCN first, so your 💎 BGM stays untouched.</i>",
-        reply_markup=kb([btn("🚀 Proceed & Pay", "sum_proceed", style="success")],
+        f"🎟 <b>Today:</b> <code>{used}/{quota.fmt_limit(lim)}</code> summaries used\n"
+        "<i>💡 Summaries are free — just capped per day. Go Premium for a bigger "
+        "allowance.</i>",
+        reply_markup=kb([btn("🚀 Proceed", "sum_proceed", style="success")],
                         [btn("🔙 Back", "menu_library", style="danger")]))
 
 
 @router.callback_query(F.data == "sum_proceed")
 async def cb_sum_proceed(call: CallbackQuery, state: FSMContext) -> None:
     uid = call.from_user.id
-    currency = await spend(uid, await _ai_cost())
-    if not currency:
-        await call.answer("Your wallet's a touch short — claim your daily BCN or top up BGM to begin.", show_alert=True)
+    if not await quota.consume(uid, "aisum"):
+        await call.answer()
+        used, lim = await quota.status(uid, "aisum")
+        text, markup = _limit_card(
+            "Daily Summaries Used Up",
+            "You've reached today's allowance of AI book summaries.",
+            used, lim)
+        await call.message.edit_text(text, reply_markup=markup)
         return
     await call.answer()
     await state.set_state(RecFSM.awaiting_summary_title)
-    await state.update_data(currency=currency)
     await call.message.edit_text(
         "✍️ <b>Which Book Shall We Brief?</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
@@ -424,8 +465,6 @@ async def on_summary_title(message: Message, state: FSMContext) -> None:
             "<i>Your summary request has been set aside — nothing was charged. Return "
             "whenever you'd like a book briefed.</i>")
         return
-    data = await state.get_data()
-    currency = data.get("currency", "BGM")
     await state.clear()
     uid = message.chat.id
     notice = await message.answer(
@@ -434,15 +473,13 @@ async def on_summary_title(message: Message, state: FSMContext) -> None:
         "incoming.</i>")
     summary = await summarize_book(title)
     if not summary:
-        refund_amt = round(await _ai_cost() * (0.75 if currency == "BCN" else 0.9), 3)
-        await refund(uid, refund_amt, "BGM")
+        await quota.refund_one(uid, "aisum")
         await notice.edit_text(
             f"🤔 <b>Couldn't Find “{escape(title)}”</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "<blockquote>Your librarian didn't recognise that one well enough to brief "
-            "it, so nothing was prepared — and we've returned the spend in full: "
-            f"<b><code>{fmt_amount(refund_amt)}</code> BGM</b> back in your "
-            "wallet.</blockquote>\n"
+            "it, so nothing was prepared — and this summary hasn't been counted against "
+            "your daily allowance.</blockquote>\n"
             "<i>💡 Try the exact title with the author — the precise spelling helps us "
             "find the right book.</i>")
         return

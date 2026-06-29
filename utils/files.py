@@ -64,6 +64,38 @@ def icon_for(ext: str) -> str:
     return "📁"
 
 
+# Non-book / junk filters for the RECOMMENDATION & DISCOVERY surfaces (For You,
+# New Arrivals, Popular, genre browse, Book of the Day). Explicit search is left
+# unfiltered — a user who searches "game" may genuinely want it — but where the
+# bot picks FOR the user, a dead non-book entry (e.g. a bare "Game.zip" that fails
+# to deliver) must never surface. This is the fix for the "🎮 Game" junk card.
+_NONBOOK_EXT = {"zip", "rar", "7z", "gz", "tar", "exe", "apk", "app", "dmg",
+                "iso", "bin", "msi", "xapk", "apkm", "txt0"}
+_JUNK_NAMES = {"game", "games", "test", "sample", "file", "files", "video",
+               "videos", "photo", "photos", "image", "images", "document",
+               "documents", "audio", "untitled", "null", "none", "new", "temp"}
+# Mongo-side coarse filter (cheap); is_bookish() does the finer name check after.
+_BOOKISH_Q = {"ext": {"$nin": list(_NONBOOK_EXT)}, "kind": {"$nin": ["photo", "video"]}}
+
+
+def is_bookish(f: dict) -> bool:
+    """True if a file looks like a real book/audiobook worth recommending — keeps
+    junk (non-book archives/apps, bare generic names) out of For You / Discover."""
+    ext = (f.get("ext") or "").lower()
+    if ext in _NONBOOK_EXT:
+        return False
+    if (f.get("kind") or "").lower() in ("photo", "video"):
+        return False
+    name = (f.get("name") or "").strip().lower()
+    if len(name) < 3 or name in _JUNK_NAMES:
+        return False
+    return True
+
+
+def _bookish(rows: list[dict], limit: int) -> list[dict]:
+    return [d for d in rows if is_bookish(d)][:limit]
+
+
 def _norm_words(q: str) -> list[str]:
     q = _NORM_RE.sub(" ", (q or "").lower())
     return [w for w in q.split() if len(w) >= 2]
@@ -318,19 +350,22 @@ _DISC_PROJ = {"name": 1, "ext": 1, "kind": 1, "file_unique_id": 1, "dl_count": 1
 
 
 async def recent_files(limit: int = 48) -> list[dict]:
-    """Newest-indexed files (New Arrivals)."""
+    """Newest-indexed files (New Arrivals), junk filtered out."""
     from pymongo import DESCENDING
     db = await MongoManager.get()
-    return await db.find_global("files", {}, limit=limit,
+    rows = await db.find_global("files", dict(_BOOKISH_Q), limit=limit * 2,
                                 sort=[("indexed_at", DESCENDING)], proj=_DISC_PROJ)
+    return _bookish(rows, limit)
 
 
 async def popular_files(limit: int = 48) -> list[dict]:
-    """Most-downloaded files (all-time)."""
+    """Most-downloaded files (all-time), junk filtered out."""
     from pymongo import DESCENDING
     db = await MongoManager.get()
-    return await db.find_global("files", {"dl_count": {"$gt": 0}}, limit=limit,
-                                sort=[("dl_count", DESCENDING)], proj=_DISC_PROJ)
+    rows = await db.find_global("files", {"dl_count": {"$gt": 0}, **_BOOKISH_Q},
+                                limit=limit * 2, sort=[("dl_count", DESCENDING)],
+                                proj=_DISC_PROJ)
+    return _bookish(rows, limit)
 
 
 async def bump_download(file_unique_id: str) -> None:
@@ -372,5 +407,7 @@ async def untagged_count() -> int:
 
 async def files_by_genre(genre: str, limit: int = 48) -> list[dict]:
     db = await MongoManager.get()
-    return await db.find_global("files", {"genre": genre}, limit=limit,
-                                sort=[("dl_count", DESCENDING)], proj=_DISC_PROJ)
+    rows = await db.find_global("files", {"genre": genre, **_BOOKISH_Q},
+                                limit=limit * 2, sort=[("dl_count", DESCENDING)],
+                                proj=_DISC_PROJ)
+    return _bookish(rows, limit)

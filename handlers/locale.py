@@ -10,11 +10,10 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from config import MIN_BGM_PURCHASE
 from utils.currency import CURRENCIES, fmt as fmt_cur, get_currency, set_currency
+from utils.format import fmt_amount
 from utils.i18n import LANGUAGES, get_lang, set_lang, t
 from utils.keyboards import btn, kb
-from utils.settings import get_float
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -87,9 +86,9 @@ async def cb_setlang(call: CallbackQuery) -> None:
 @router.callback_query(F.data == "loc_cur")
 async def cb_cur(call: CallbackQuery) -> None:
     await call.answer()
+    from utils.premium import price_usd
     cur = await get_currency(call.from_user.id)
-    usd_price = await get_float("bgm_price_usd")
-    min_cost_usd = usd_price * MIN_BGM_PURCHASE
+    prem_usd = await price_usd()
     rows, row = [], []
     for code in CURRENCIES:
         mark = "✅ " if code == cur else ""
@@ -102,9 +101,9 @@ async def cb_cur(call: CallbackQuery) -> None:
     await call.message.edit_text(
         "💱 <b>Display Currency</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "<i>See 💎 BGM prices in the currency you think in — clearer at a glance.</i>\n\n"
+        "<i>See prices in the currency you think in — clearer at a glance.</i>\n\n"
         "<blockquote>"
-        f"📊 Smallest top-up · <code>{MIN_BGM_PURCHASE} BGM</code> ≈ <b>{fmt_cur(min_cost_usd, cur)}</b>\n"
+        f"👑 Premium · <code>${fmt_amount(prem_usd)}</code> ≈ <b>{fmt_cur(prem_usd, cur)}</b> / month\n"
         "💡 This is a preview only — checkout still settles in UPI (₹) or crypto ($)."
         "</blockquote>\n"
         "<i>Tap a currency below — the ✅ shows your current pick.</i>",

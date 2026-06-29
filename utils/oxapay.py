@@ -78,7 +78,7 @@ async def create_invoice(order_id: str, usd_amount: float,
         "lifetime": INVOICE_LIFETIME_MIN,
         "callback_url": callback_url,
         "order_id": order_id,
-        "description": f"BookGems top-up ({order_id})",
+        "description": f"Wallet top-up ({order_id})",
         # fee_paid_by_payer=1 → the payer covers OxaPay's processing fee on top of
         # `amount`. OxaPay's API doesn't expose the fee figure, so the portal can't
         # show a live number; instead it discloses that OxaPay (an independent

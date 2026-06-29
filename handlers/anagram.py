@@ -18,13 +18,14 @@ from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
 from utils.format import fmt_amount
+from utils.games import daily_limit
 from utils.keyboards import btn, kb
+from utils.premium import is_premium
 from utils.wallet import add_bgm
 
 logger = logging.getLogger(__name__)
 router = Router()
 
-_DAILY = 5
 _MAX_TRIES = 3
 _WORDS = [
     "NOVEL", "POETRY", "AUTHOR", "READER", "CHAPTER", "LIBRARY", "FICTION",
@@ -81,16 +82,23 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
                    reply_markup=kb([btn("🔙 Back to Menu", "menu_home", style="danger")]))
         return
     db = await MongoManager.get()
+    lim = await daily_limit(uid)
     prev = await _plays_today(db, uid)
-    if prev >= _DAILY:
-        await send(f"🎮 <b>Word Anagram</b>\n"
-                   f"━━━━━━━━━━━━━━━━━━━━\n"
-                   f"⏳ <b>You've played today's full set.</b>\n"
-                   f"<blockquote>You've used all <code>{_DAILY}</code> rounds for today — well played. "
-                   f"Your puzzles refresh at midnight for a brand-new run.\n\n"
-                   f"<i>Plenty more rewards waiting across the Games Hub in the meantime.</i></blockquote>\n"
-                   f"<i>💡 Come back tomorrow to unscramble a fresh set.</i>",
-                   reply_markup=kb([btn("🎮 Games Hub", "menu_games", style="primary")]))
+    if prev >= lim:
+        free = not await is_premium(uid)
+        txt = (f"🎮 <b>Word Anagram</b>\n"
+               f"━━━━━━━━━━━━━━━━━━━━\n"
+               f"⏳ <b>You've played today's full set.</b>\n"
+               f"<blockquote>You've used all <code>{lim}</code> rounds for today — well played. "
+               f"Your puzzles refresh at midnight for a brand-new run.\n\n"
+               f"<i>Plenty more rewards waiting across the Games Hub in the meantime.</i></blockquote>\n"
+               f"<i>💡 Come back tomorrow to unscramble a fresh set.</i>")
+        rows = []
+        if free:
+            txt += "\n<i>👑 Premium plays 5 rounds a day, every game.</i>"
+            rows.append([btn("👑 Go Premium for 5/day", "go_premium", style="success")])
+        rows.append([btn("🎮 Games Hub", "menu_games", style="primary")])
+        await send(txt, reply_markup=kb(*rows))
         return
     await db.safe_update("users", {"user_id": uid},
                          {"$set": {"anag_day": _today(), "anag_plays": prev + 1}})

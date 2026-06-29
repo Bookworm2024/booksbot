@@ -25,7 +25,7 @@ async def _view(uid: int):
             "━━━━━━━━━━━━━━━━━━━━\n"
             "<i>Gentle reminders so you never leave free rewards on the table.</i>\n\n"
             f"Reminders are currently <b>{'🟢 ON' if on else '🔴 OFF'}</b>\n\n"
-            "<blockquote>🎁 We nudge you when your free daily 🪙 BCN is ready to claim before it expires.\n"
+            "<blockquote>🎁 We nudge you when your free daily 💎 BGM reward is ready to claim.\n"
             "⏳ The occasional heads-up about a streak about to lapse or a reward you've earned.\n"
             "🚫 Never marketing spam — only things that put value back in your wallet.</blockquote>\n"
             "<i>💡 You're in control — switch this off any time and turn it back on whenever you like.</i>")

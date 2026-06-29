@@ -118,7 +118,7 @@ async def _xp_view(uid: int) -> str:
         "<b>Ways to earn XP</b>\n"
         "📥 Unlock a book · <b>+5</b>\n"
         "🎮 Play a game · <b>+3</b>\n"
-        "🪙 Claim your daily BCN · <b>+2</b>\n"
+        "🎁 Claim your daily reward · <b>+2</b>\n"
         "🎡 Spin the wheel · <b>+1</b>\n"
         "⭐ Write a review · <b>+4</b>\n"
         "🎁 Refer a friend · <b>+20</b>"

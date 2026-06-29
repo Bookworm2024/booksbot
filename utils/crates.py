@@ -21,13 +21,15 @@ def _now():
 
 ACTIONS_PER_KEY = 5
 
-# (tier label, BGM, BCN, weight) — common small, legendary rare
+# (tier label, BGM, BCN, weight) — common small, legendary rare.
+# BCN is retired in the freemium model, so its old value is folded into BGM and
+# the BCN column stays 0 (kept only so the return shape is unchanged).
 _TIERS = [
     ("⚪ Common", 0.1, 0, 38),
     ("⚪ Common", 0.2, 0, 25),
     ("🟢 Uncommon", 0.5, 0, 18),
-    ("🔵 Rare", 1.0, 1, 10),
-    ("🟣 Epic", 2.0, 2, 6),
+    ("🔵 Rare", 2.0, 0, 10),
+    ("🟣 Epic", 4.0, 0, 6),
     ("🟡 Legendary", 5.0, 0, 3),
 ]
 # Rarity ladder shown to the reader: Common → Uncommon → Rare → Epic → Legendary.

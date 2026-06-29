@@ -19,13 +19,14 @@ from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
 from utils.format import fmt_amount
+from utils.games import daily_limit
 from utils.keyboards import btn, kb
+from utils.premium import is_premium
 from utils.wallet import add_bgm
 
 logger = logging.getLogger(__name__)
 router = Router()
 
-_DAILY = 6
 _START_LEN = 3
 _MAX_LEN = 8
 _PALETTE = ["📕", "📗", "📘", "📙", "📔", "📓"]
@@ -64,11 +65,11 @@ class MemoryFSM(StatesGroup):
     repeating = State()  # sequence hidden, user tapping it back
 
 
-async def _consume_play(db, uid: int) -> bool:
-    """Atomically count one play under the daily cap. Returns False when the cap is
-    reached. The day-reset sets mm_plays=1 in the same op as the day flip, and the
-    same-day path is a conditional $inc under the cap — so concurrent _start calls
-    can never both slip past the limit (the BGM faucet for this game)."""
+async def _consume_play(db, uid: int, lim: int) -> bool:
+    """Atomically count one play under the daily cap `lim`. Returns False when the
+    cap is reached. The day-reset sets mm_plays=1 in the same op as the day flip,
+    and the same-day path is a conditional $inc under the cap — so concurrent
+    _start calls can never both slip past the limit (the BGM faucet for this game)."""
     today = _today()
     did_reset = await db.find_one_and_update_global(
         "users", {"user_id": uid, "mm_day": {"$ne": today}},
@@ -76,7 +77,7 @@ async def _consume_play(db, uid: int) -> bool:
     if did_reset is not None:
         return True  # first play of a new day
     inc = await db.find_one_and_update_global(
-        "users", {"user_id": uid, "mm_day": today, "mm_plays": {"$lt": _DAILY}},
+        "users", {"user_id": uid, "mm_day": today, "mm_plays": {"$lt": lim}},
         {"$inc": {"mm_plays": 1}})
     return inc is not None
 
@@ -93,15 +94,22 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool, l
                    reply_markup=kb([btn("🔙 Back", "menu_home", style="danger")]))
         return
     db = await MongoManager.get()
-    if not await _consume_play(db, uid):
-        await send(f"🧠 <b>Memory Match</b>\n"
-                   "━━━━━━━━━━━━━━━━━━━━\n"
-                   f"<i>That's a full round of training for today.</i>\n\n"
-                   f"<blockquote>You've played all <code>{_DAILY}</code> of today's "
-                   "rounds — nicely done. Your plays refresh at midnight, so come back "
-                   "tomorrow for a fresh set and another shot at the 💎 BGM rewards. "
-                   "Plenty of other games are open in the meantime.</blockquote>",
-                   reply_markup=kb([btn("🎮 More Games", "menu_games", style="primary")]))
+    lim = await daily_limit(uid)
+    if not await _consume_play(db, uid, lim):
+        free = not await is_premium(uid)
+        txt = (f"🧠 <b>Memory Match</b>\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               f"<i>That's a full round of training for today.</i>\n\n"
+               f"<blockquote>You've played all <code>{lim}</code> of today's "
+               "rounds — nicely done. Your plays refresh at midnight, so come back "
+               "tomorrow for a fresh set and another shot at the 💎 BGM rewards. "
+               "Plenty of other games are open in the meantime.</blockquote>")
+        rows = []
+        if free:
+            txt += "\n<i>👑 Premium plays 5 rounds a day, every game.</i>"
+            rows.append([btn("👑 Go Premium for 5/day", "go_premium", style="success")])
+        rows.append([btn("🎮 More Games", "menu_games", style="primary")])
+        await send(txt, reply_markup=kb(*rows))
         return
     length = max(_START_LEN, min(_MAX_LEN, length))
     seq = [random.randrange(len(_PALETTE)) for _ in range(length)]

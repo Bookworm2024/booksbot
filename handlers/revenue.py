@@ -39,7 +39,6 @@ async def _build() -> str:
 
     inr_total = sum(float(d.get("total_due_inr") or d.get("email_amount_inr") or 0) for d in upi)
     usd_total = sum(float(d.get("amount_usd") or 0) for d in crypto)
-    bgm_sold = sum(float(d.get("bgm") or 0) for d in upi + crypto)
     orders = len(upi) + len(crypto)
 
     def _is_today(d):
@@ -50,15 +49,19 @@ async def _build() -> str:
     usd_today = sum(float(d.get("amount_usd") or 0) for d in crypto if _is_today(d))
     orders_today = sum(1 for d in upi + crypto if _is_today(d))
 
-    # top buyers by BGM purchased
+    # top spenders by ₹-equivalent wallet top-up (crypto valued at ≈ ₹85/$)
     buyers: dict[int, float] = {}
-    for d in upi + crypto:
+    for d in upi:
         uid = d.get("user_id")
         if uid is not None:
-            buyers[uid] = buyers.get(uid, 0) + float(d.get("bgm") or 0)
+            buyers[uid] = buyers.get(uid, 0) + float(d.get("total_due_inr") or d.get("email_amount_inr") or 0)
+    for d in crypto:
+        uid = d.get("user_id")
+        if uid is not None:
+            buyers[uid] = buyers.get(uid, 0) + float(d.get("amount_usd") or 0) * 85
     top = sorted(buyers.items(), key=lambda kv: kv[1], reverse=True)[:5]
-    top_lines = "\n".join(f"  {i}. <code>{u}</code> — <code>{fmt_amount(b)}</code> 💎 BGM"
-                          for i, (u, b) in enumerate(top, 1)) or "  <i>No buyers yet — the first sale will appear here.</i>"
+    top_lines = "\n".join(f"  {i}. <code>{u}</code> — <code>≈₹{b:,.0f}</code>"
+                          for i, (u, b) in enumerate(top, 1)) or "  <i>No top-ups yet — the first will appear here.</i>"
 
     # rough gross (INR + crypto converted at a nominal ₹85/$ for a single figure)
     gross_inr = inr_total + usd_total * 85
@@ -66,10 +69,9 @@ async def _build() -> str:
     return (
         "📊 <b>Revenue Dashboard</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "<i>Every paid order, all currencies, in one ledger.</i>\n\n"
+        "<i>Every paid wallet top-up, all currencies, in one ledger.</i>\n\n"
         "<blockquote>"
-        f"🧾 <b>Paid orders</b> · <code>{orders}</code>\n"
-        f"💎 <b>BGM sold</b> · <code>{fmt_amount(bgm_sold)}</code>"
+        f"🧾 <b>Paid top-ups</b> · <code>{orders}</code>"
         "</blockquote>\n"
         "💱 <b>Collected to date</b>\n"
         "<blockquote>"

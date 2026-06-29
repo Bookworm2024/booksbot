@@ -9,7 +9,7 @@ handlers/economy.py — wallet, daily claim, redeem codes.
 import logging
 import random
 import string
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
@@ -23,9 +23,7 @@ from utils.format import fmt_amount
 from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import is_super
 from utils.settings import get_float
-from utils.wallet import (
-    add_bcn, add_bgm, drain_bcn, get_balances, seconds_until_claim, set_daily_bcn,
-)
+from utils.wallet import add_bgm, get_balances, get_money, seconds_until_claim
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -56,7 +54,8 @@ def _fmt_dur(seconds: int) -> str:
 
 # ── /balance ─────────────────────────────────────────────────────────────────
 async def _balance_view(uid: int):
-    bgm, bcn = await get_balances(uid)
+    bgm, _ = await get_balances(uid)
+    inr, usd = await get_money(uid)
     left = await seconds_until_claim(uid)
     db = await MongoManager.get()
     u = await db.find_one_global("users", {"user_id": uid},
@@ -66,17 +65,17 @@ async def _balance_view(uid: int):
     ab = int(u.get("audiobook_requests") or 0)
     from utils.vip import badge
     vip = await badge(uid)
-    claim_line = ("🎁 <b>Daily bonus:</b> <i>ready now</i> — tap below to collect"
-                  if left == 0 else f"🎁 <b>Daily bonus:</b> <i>unlocks in {_fmt_dur(left)}</i>")
+    claim_line = ("🎁 <b>Daily reward:</b> <i>ready now</i> — tap below to collect"
+                  if left == 0 else f"🎁 <b>Daily reward:</b> <i>unlocks in {_fmt_dur(left)}</i>")
     text = (
         "💼 <b>Your Wallet</b>\n"
-        + (f"{vip}\n" if vip else "")
+        + (f"{vip} member\n" if vip else "")
         + "━━━━━━━━━━━━━━━━━━━━\n"
-        "<i>A premium statement of everything you hold.</i>\n"
+        "<i>Everything you hold, in one place.</i>\n"
         "<blockquote>"
-        f"💎 <b>BGM</b>  <code>{fmt_amount(bgm, 3)}</code>  <i>· permanent, your premium balance</i>\n"
-        f"🪙 <b>BCN</b>  <code>{fmt_amount(bcn, 3)}</code>  <i>· free daily, expires in 24h</i>\n"
-        f"⚖️ <b>Total</b>  <code>{fmt_amount(bgm + bcn, 3)}</code>  <i>· combined spending power</i>"
+        f"💎 <b>BGM</b>  <code>{fmt_amount(bgm, 2)}</code>  <i>· earned in games, referrals &amp; rewards — redeem for Premium</i>\n"
+        f"🇮🇳 <b>Wallet ₹</b>  <code>{fmt_amount(inr, 2)}</code>\n"
+        f"💵 <b>Wallet $</b>  <code>{fmt_amount(usd, 2)}</code>"
         "</blockquote>\n"
         "<blockquote>"
         f"📚 eBook requests  <code>{eb}</code>\n"
@@ -85,17 +84,12 @@ async def _balance_view(uid: int):
         "</blockquote>\n"
         f"{claim_line}"
     )
-    # low-balance upsell — surface a gentle prompt when nearly out of tokens
-    if bgm + bcn < 1:
-        text += ("\n\n💡 <i>Running low — claim your free daily BCN, spin the wheel, "
-                 "or top up BGM and keep your library growing.</i>")
     rows = []
     if left == 0:
-        rows.append([btn("⚡ Claim Daily BCN", "do_claim", style="success")])
-    rows.append([btn("💎 Top Up BGM", "acc_buy", style="success"),
+        rows.append([btn("⚡ Claim Daily BGM", "do_claim", style="success")])
+    rows.append([btn("👑 Get Premium", "go_premium", style="success")])
+    rows.append([btn("💳 Top Up Wallet", "acc_buy", style="primary"),
                  btn("🎟 Redeem a Code", "acc_redeem", style="primary")])
-    if bcn > 0:
-        rows.append([btn("💱 Convert BCN → BGM", "convert_bcn", style="primary")])
     rows.append([btn("🔙 Back to Account", "menu_account", style="danger")])
     return text, kb(*rows)
 
@@ -114,32 +108,52 @@ async def cb_balance(call: CallbackQuery) -> None:
 
 
 # ── /claim ───────────────────────────────────────────────────────────────────
+def _resting_card(left: int):
+    return ("⏳ <b>Daily Reward Resting</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>You have already collected today's BGM. The reward "
+            f"recharges once a day — your next claim unlocks in <b>{_fmt_dur(left)}</b>.</blockquote>\n"
+            "💡 <i>Premium members earn 2× the daily reward.</i>",
+            kb([btn("👑 Get Premium", "go_premium", style="success")],
+               [btn("🔙 Back to Account", "menu_account", style="danger")]))
+
+
 async def _do_claim(uid: int, bot) -> tuple[str, object]:
     left = await seconds_until_claim(uid)
     if left > 0:
-        return ("⏳ <b>Daily Bonus Resting</b>\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "<blockquote>You have already collected today's free BCN. The reward "
-                f"recharges once a day — your next claim unlocks in <b>{_fmt_dur(left)}</b>.</blockquote>\n"
-                "💡 <i>Can't wait? Top up BGM for instant, permanent balance.</i>",
-                kb([btn("💎 Top Up BGM (skip the wait)", "acc_buy", style="success")],
-                   [btn("🔙 Back to Account", "menu_account", style="danger")]))
+        return _resting_card(left)
     from utils.settings import get_float
     from utils.vip import claim_multiplier
+    # Atomically claim the cooldown FIRST: only the op that flips last_claim_at past
+    # the 24h window proceeds to credit, so a double-tap can't double-claim.
+    db = await MongoManager.get()
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(seconds=BCN_EXPIRY_SECONDS)
+    claimed = await db.find_one_and_update_global(
+        "users",
+        {"user_id": uid, "$or": [{"last_claim_at": {"$lt": cutoff}},
+                                 {"last_claim_at": None},
+                                 {"last_claim_at": {"$exists": False}}]},
+        {"$set": {"last_claim_at": now}})
+    if not claimed:
+        return _resting_card(await seconds_until_claim(uid) or BCN_EXPIRY_SECONDS)
     lo = await get_float("claim_min")
     hi = await get_float("claim_max")
     mult = await claim_multiplier(uid)
     bonus = round(random.uniform(min(lo, hi), max(lo, hi)) * mult, 2)
-    await set_daily_bcn(uid, bonus)
+    await add_bgm(uid, bonus)
     from utils.missions import mark
     await mark(uid, "claim")
-    from utils.logs import log_bcn_claim
-    await log_bcn_claim(bot, uid, bonus)
-    return ("✨ <b>Daily Bonus Collected</b>\n"
+    try:
+        from utils.logs import log_bcn_claim
+        await log_bcn_claim(bot, uid, bonus)
+    except Exception:  # noqa: BLE001
+        pass
+    return ("✨ <b>Daily Reward Collected</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "<blockquote>"
-            f"🪙 <b>+{bonus:.2f} BCN</b> credited to your wallet\n"
-            "⏳ <i>Good for the next 24 hours — spend it before it expires</i>"
+            f"💎 <b>+{bonus:.2f} BGM</b> credited to your wallet\n"
+            "♾️ <i>BGM never expires — save it up to redeem Premium</i>"
             "</blockquote>\n"
             "💡 <i>Come back tomorrow to keep your daily streak alive.</i>",
             kb([btn("💼 View My Wallet", "acc_balance", style="primary")],
@@ -246,133 +260,6 @@ async def on_code(message: Message, state: FSMContext) -> None:
         "💡 <i>Put it to work on a download, a perk, or your next great read.</i>",
         reply_markup=kb([btn("💼 View My Wallet", "acc_balance", style="primary")]),
     )
-
-
-# ── BCN → BGM converter ────────────────────────────────────────────────────────
-# Tax % and min-BGM are admin-editable (utils.settings: convert_tax_pct,
-# convert_min_bgm); defaults preserve the spec (25% tax, ≥50 BGM).
-_CONVERT_MONTHLY_CAP = 10      # uses per calendar month
-
-
-def _month_key() -> str:
-    n = datetime.now(timezone.utc)
-    return f"{n.year}-{n.month:02d}"
-
-
-async def _convert_params() -> tuple[float, float]:
-    """Return (tax_fraction, min_bgm) from live settings, tax clamped to [0, .95]."""
-    tax = min(0.95, max(0.0, await get_float("convert_tax_pct") / 100.0))
-    return tax, await get_float("convert_min_bgm")
-
-
-@router.callback_query(F.data == "convert_bcn")
-async def cb_convert(call: CallbackQuery) -> None:
-    await call.answer()
-    uid = call.from_user.id
-    bgm, bcn = await get_balances(uid)
-    db = await MongoManager.get()
-    udoc = await db.find_one_global("users", {"user_id": uid},
-                                    {"convert_month": 1, "convert_count": 1}) or {}
-    used = udoc.get("convert_count", 0) if udoc.get("convert_month") == _month_key() else 0
-    tax, min_bgm = await _convert_params()
-
-    if bcn <= 0:
-        await call.message.edit_text(
-            "🪙 <b>No BCN to Convert</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "<blockquote>Your BCN balance is empty right now. Claim your free daily bonus "
-            "or win more in games, then come back to turn it into permanent 💎 BGM.</blockquote>\n"
-            "💡 <i>Tip: BCN expires after 24h — converting locks its value in for good.</i>",
-            reply_markup=kb([btn("🔙 Back to Wallet", "acc_balance", style="danger")]))
-        return
-    if bgm < min_bgm:
-        await call.message.edit_text(
-            "🔒 <b>Converter Locked</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "<blockquote>The BCN → BGM converter unlocks once you hold a minimum premium "
-            f"balance.\n💎 <b>Required:</b> <code>{fmt_amount(min_bgm)} BGM</code>\n"
-            f"💼 <b>You hold:</b> <code>{fmt_amount(bgm)} BGM</code></blockquote>\n"
-            "💡 <i>Top up to reach the threshold and the converter opens right away.</i>",
-            reply_markup=kb([btn("💎 Top Up BGM", "acc_buy", style="success")],
-                            [btn("🔙 Back to Wallet", "acc_balance", style="danger")]))
-        return
-    if used >= _CONVERT_MONTHLY_CAP:
-        await call.message.edit_text(
-            "🔒 <b>Monthly Limit Reached</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "<blockquote>You've used all of this month's conversions "
-            f"(<code>{_CONVERT_MONTHLY_CAP}×</code>). The allowance refreshes at the start "
-            "of next month — your BCN keeps working in games and downloads until then.</blockquote>",
-            reply_markup=kb([btn("🔙 Back to Wallet", "acc_balance", style="danger")]))
-        return
-
-    credited = round(bcn * (1 - tax), 3)
-    await call.message.edit_text(
-        "💱 <b>Convert BCN → BGM</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "<i>Lock your free daily coins into permanent premium balance.</i>\n"
-        "<blockquote>"
-        f"🪙 <b>Converting</b>  <code>{fmt_amount(bcn, 3)} BCN</code>\n"
-        f"🧾 <b>Tax ({fmt_amount(tax * 100)}%)</b>  <code>−{fmt_amount(bcn * tax, 3)}</code>\n"
-        f"💎 <b>You receive</b>  <code>{fmt_amount(credited, 3)} BGM</code>"
-        "</blockquote>\n"
-        f"📊 <i>Conversions this month: <code>{used}/{_CONVERT_MONTHLY_CAP}</code></i>\n"
-        "💡 <i>This converts your full BCN balance. Confirm to lock it in.</i>",
-        reply_markup=kb([btn("✅ Confirm Conversion", "convert_do", style="success")],
-                        [btn("🔙 Back to Wallet", "acc_balance", style="danger")]))
-
-
-@router.callback_query(F.data == "convert_do")
-async def cb_convert_do(call: CallbackQuery) -> None:
-    uid = call.from_user.id
-    bgm, bcn = await get_balances(uid)
-    db = await MongoManager.get()
-    udoc = await db.find_one_global("users", {"user_id": uid},
-                                    {"convert_month": 1, "convert_count": 1}) or {}
-    used = udoc.get("convert_count", 0) if udoc.get("convert_month") == _month_key() else 0
-    tax, min_bgm = await _convert_params()
-    if bcn <= 0 or bgm < min_bgm or used >= _CONVERT_MONTHLY_CAP:
-        await call.answer(
-            "The conversion conditions have changed since this preview. Reopen the "
-            "converter from your wallet to see the latest numbers.", show_alert=True)
-        return
-    await call.answer()
-    # Atomically zero bookcoin across ALL clusters, returning the TOTAL drained so
-    # a split BCN balance converts in full and the credited amount matches exactly
-    # what we zeroed. A concurrent second tap drains 0 → no double credit.
-    drained = await drain_bcn(uid)
-    if drained <= 0:
-        await call.message.edit_text(
-            "🪙 <b>Nothing Left to Convert</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "<blockquote>Your BCN balance just reached zero, so there's nothing to "
-            "convert right now. Claim your daily bonus and it'll be ready again.</blockquote>",
-            reply_markup=kb([btn("🔙 Back to Wallet", "acc_balance", style="danger")]))
-        return
-    await db.safe_update("users", {"user_id": uid},
-                         {"$set": {"convert_month": _month_key(), "convert_count": used + 1}})
-    credited = round(drained * (1 - tax), 3)
-    try:
-        await add_bgm(uid, credited)
-    except Exception:  # noqa: BLE001 — never strand the user's drained BCN
-        logger.exception("convert: crediting %.3f BGM failed for %s; restoring %.3f BCN",
-                         credited, uid, drained)
-        await add_bcn(uid, drained)
-        await call.message.edit_text(
-            "⚠️ <b>Conversion Hit a Snag</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "<blockquote>Something interrupted the conversion, so we safely restored your "
-            "full BCN balance — nothing was lost. Please give it another try in a moment.</blockquote>",
-            reply_markup=kb([btn("💱 Try Again", "convert_bcn", style="success")],
-                            [btn("🔙 Back to Wallet", "acc_balance", style="danger")]))
-        return
-    text, markup = await _balance_view(uid)
-    await call.message.edit_text(
-        "✨ <b>Conversion Complete</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        f"<blockquote>💎 <b>+{fmt_amount(credited, 3)} BGM</b> locked into your permanent "
-        "balance — your daily coins now carry forward for good.</blockquote>\n\n" + text,
-        reply_markup=markup)
 
 
 # ── /create (admin) ────────────────────────────────────────────────────────────

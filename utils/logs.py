@@ -146,24 +146,23 @@ async def log_request_fulfilled(bot, uid: int, title: str, author: str = "",
         photo=cover_id)
 
 
-async def log_purchase(bot, uid: int, bgm_total: float, paid_label: str = "",
+async def log_purchase(bot, uid: int, amount: float, paid_label: str = "",
                        method: str = "") -> None:
-    """A confirmed BGM purchase. `paid_label` is a ready string like '₹40' / '$5'."""
+    """A confirmed wallet top-up. `paid_label` is a ready string like '₹40' / '$5'."""
     at = stamp()
     meth = {"upi": "UPI", "crypto": "Crypto"}.get((method or "").lower(), _u(method) or "—")
-    paid = f" ({_u(paid_label)})" if paid_label else ""
+    label = _u(paid_label) or fmt_amount(amount)
     await admin_log(
         bot,
-        f"💰 <b>Payment Received</b>\n{DIV}\n"
+        f"💰 <b>Wallet Topped Up</b>\n{DIV}\n"
         "<blockquote>"
-        f"💎 <b>+{fmt_amount(bgm_total)} BGM</b>\n"
-        f"💳 Amount: <b>{_u(paid_label) or '—'}</b> · {meth}\n"
+        f"💳 <b>{label}</b> · {meth}\n"
         f"👤 <code>{uid}</code>\n"
         f"🕒 {at}</blockquote>")
     await public_log(
         bot,
-        "💎 <b>Someone just powered up!</b>\n" + DIV + "\n"
-        f"<blockquote>🚀 A reader unlocked <b>{fmt_amount(bgm_total)} BGM</b>{paid}\n"
+        "💳 <b>Someone just topped up!</b>\n" + DIV + "\n"
+        f"<blockquote>🚀 A reader added <b>{label}</b> to their wallet\n"
         f"🕒 {at}</blockquote>\n"
         "💛 Thank you for keeping the library free for everyone.")
 

@@ -1,11 +1,12 @@
 """
-utils/nudges.py — revenue nudges (abandoned-cart + low-balance upsell).
+utils/nudges.py — revenue nudges (abandoned-cart + premium upsell).
 
 A background loop, separate from the win-back reminder loop, that gently
 re-engages two monetisable segments:
 
-  • Abandoned cart — opened 💎 Buy BGM but didn't pay within a couple of hours.
-  • Low-balance upsell — engaged users (have downloaded) who are now out of tokens.
+  • Abandoned cart — opened 💳 Wallet top-up but didn't pay within a couple hours.
+  • Premium upsell — free users who have used up today's free download quota
+    (the precise moment Premium is most appealing).
 
 Both respect the per-user notif toggle, fire at most once per cart / once per day,
 and are rate-limited well under Telegram's flood limits.
@@ -27,25 +28,20 @@ _CART_MAX_AGE_H = 48      # …but not older than this (stale)
 _CART_TEXT = ("🛒 <b>Your top-up is still waiting</b>\n"
               "<i>Right where you left it — ready whenever you are.</i>\n"
               "<blockquote>"
-              "💎 <b>BookGems</b> are your permanent currency — buy once and they "
-              "never expire.\n"
-              "⚡ <b>Instant unlock</b> — finish checkout and your next read is one "
-              "tap away.\n"
-              "🎁 <b>Buy more, save more</b> — larger top-ups earn a bigger bonus on "
-              "the house."
+              "💳 Your <b>wallet</b> balance never expires — top up once and spend it on "
+              "👑 Premium or extra downloads whenever you like.\n"
+              "⚡ <b>Instant</b> — finish checkout and you're set in seconds."
               "</blockquote>"
-              "<i>💡 Pick up where you left off — we'll have your library ready in "
-              "seconds.</i>")
-_LOWBAL_TEXT = ("💼 <b>Your wallet's running low</b>\n"
-                "<i>A quick refill and you're back to reading — no limits.</i>\n"
+              "<i>💡 Pick up where you left off — it only takes a moment.</i>")
+_UPSELL_TEXT = ("👑 <b>You're reading a lot today — nice!</b>\n"
+                "<i>You've used up today's free downloads.</i>\n"
                 "<blockquote>"
-                "🎁 <b>Claim free 🪙 BCN</b> with /claim — a fresh daily reward, "
-                "on us.\n"
-                "🎡 <b>Take a free spin</b> for a shot at bonus tokens and perks.\n"
-                "💎 <b>Top up 💎 BGM</b> for permanent credit that never expires."
+                "📥 <b>Go Premium</b> for <b>unlimited</b> downloads, the full Discover, "
+                "5 AI searches &amp; summaries a day, and more game plays.\n"
+                "💎 Short on cash? Redeem the <b>BGM</b> you've earned in games &amp; "
+                "referrals for a free Premium week."
                 "</blockquote>"
-                "<i>💡 Free tokens cover most reads — start with your daily claim "
-                "below.</i>")
+                "<i>💡 Or grab just this one file with a small wallet charge — your call.</i>")
 
 
 def _now():
@@ -56,10 +52,16 @@ def _today() -> str:
     return _now().strftime("%Y-%m-%d")
 
 
-async def _buy_kb():
+def _cart_kb():
     from utils.keyboards import btn, kb
-    return kb([btn("💎 Top Up BGM", "acc_buy", style="success"),
-               btn("🎁 Claim Daily Reward", "daily_reward", style="primary")])
+    return kb([btn("💳 Finish Top Up", "acc_buy", style="success")],
+              [btn("👑 Get Premium", "go_premium", style="primary")])
+
+
+def _upsell_kb():
+    from utils.keyboards import btn, kb
+    return kb([btn("👑 Go Premium", "go_premium", style="success")],
+              [btn("💎 Redeem BGM → Premium", "go_premium", style="primary")])
 
 
 async def _abandoned_cart(bot, db) -> int:
@@ -70,7 +72,7 @@ async def _abandoned_cart(bot, db) -> int:
         {"cart_opened_at": {"$gt": lo, "$lt": hi}, "cart_nudged": {"$ne": True},
          "notif": {"$ne": False}, "is_banned": {"$ne": True}},
         limit=_PER_TICK, proj={"user_id": 1})
-    kbd = await _buy_kb()
+    kbd = _cart_kb()
     sent = 0
     for u in targets:
         uid = u["user_id"]
@@ -85,48 +87,49 @@ async def _abandoned_cart(bot, db) -> int:
     return sent
 
 
-async def _low_balance(bot, db) -> int:
-    from utils.wallet import get_balances
+async def _premium_upsell(bot, db) -> int:
+    """Nudge free users who hit today's free download quota toward Premium — once
+    per day, never premium members."""
+    from utils.premium import is_premium
     from utils.settings import get_float
-    active_cut = _now() - timedelta(days=3)
+    free_lim = int(await get_float("q_dl_free"))
+    if free_lim < 0:
+        return 0  # downloads unlimited for everyone → nothing to upsell
     today = _today()
-    # cheap pre-filter on the stored bookgem field; confirm with the summed balance
     candidates = await db.find_global(
         "users",
-        {"downloads": {"$gte": 1}, "last_active": {"$gte": active_cut},
-         "lowbal_nudged": {"$ne": today}, "notif": {"$ne": False},
-         "is_banned": {"$ne": True}, "bookgem": {"$lte": 0.05}},
+        {"q_dl_d": today, "q_dl_n": {"$gte": free_lim},
+         "premup_nudged": {"$ne": today}, "notif": {"$ne": False},
+         "is_banned": {"$ne": True}},
         limit=_PER_TICK, proj={"user_id": 1})
-    cost = await get_float("download_cost")
-    kbd = await _buy_kb()
+    kbd = _upsell_kb()
     sent = 0
     for u in candidates:
         uid = u["user_id"]
-        bgm, bcn = await get_balances(uid)
-        if bgm + bcn >= cost:
-            continue  # actually has enough — skip
+        if await is_premium(uid):
+            continue  # already Premium — nothing to sell
         try:
-            await bot.send_message(uid, _LOWBAL_TEXT, reply_markup=kbd)
+            await bot.send_message(uid, _UPSELL_TEXT, reply_markup=kbd)
             sent += 1
         except Exception:  # noqa: BLE001
             pass
         await db.safe_update("users", {"user_id": uid},
-                             {"$set": {"lowbal_nudged": today}}, upsert=False)
+                             {"$set": {"premup_nudged": today}}, upsert=False)
         await asyncio.sleep(_SLEEP)
     return sent
 
 
 async def run_nudge_loop(bot) -> None:
-    logger.info("Nudge loop started (abandoned-cart + low-balance, every %dm).",
+    logger.info("Nudge loop started (abandoned-cart + premium upsell, every %dm).",
                 _INTERVAL // 60)
     while True:
         try:
             await asyncio.sleep(_INTERVAL)
             db = await MongoManager.get()
             c = await _abandoned_cart(bot, db)
-            l = await _low_balance(bot, db)
-            if c or l:
-                logger.info("Nudges sent — cart: %d, low-balance: %d", c, l)
+            p = await _premium_upsell(bot, db)
+            if c or p:
+                logger.info("Nudges sent — cart: %d, premium: %d", c, p)
         except asyncio.CancelledError:
             logger.info("Nudge loop stopped.")
             break

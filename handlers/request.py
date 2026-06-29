@@ -28,7 +28,6 @@ from utils.channel import get_file_channel
 from utils.files import archive_count, fuzzy_search, get_file, icon_for, search
 from utils.format import fmt_amount
 from utils.keyboards import btn, kb, webapp_btn
-from utils.wallet import get_balances, refund, spend
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -343,8 +342,8 @@ async def _render_results(message: Message, state: FSMContext, query: str,
             f"📊 <code>{total}</code> match(es) · page <code>{page + 1}/{pages}</code>{hint}\n\n"
             "<blockquote>"
             "📥 Tap any title below and it's delivered to your chat instantly.\n\n"
-            "💸 <b>Delivery</b> — from <code>1</code> 🪙 BCN / 💎 BGM per title "
-            "<i>(less with VIP and during Happy Hour; more during surge).</i>"
+            "💸 <b>Delivery</b> — free with your daily quota. "
+            "<i>👑 Premium reads unlimited; past the free limit a single file is a small wallet charge.</i>"
             "</blockquote>")
     await (message.edit_text if edit else message.answer)(text, reply_markup=kb(*rows))
 
@@ -385,64 +384,32 @@ async def cb_watch_last(call: CallbackQuery) -> None:
 
 
 # ── Download / delivery ─────────────────────────────────────────────────────────
-@router.callback_query(F.data.startswith("dl:"))
-async def cb_download(call: CallbackQuery) -> None:
-    uid = call.from_user.id
-    fuid = call.data.split(":", 1)[1]
-    f = await get_file(fuid)
-    if not f:
-        await call.answer("This title is no longer in the archive. Try a fresh search and we'll find another copy.", show_alert=True)
-        return
+# Freemium: archive deliveries are gated by a 24h quota (utils.quota key "dl"),
+# NOT a token cost. PREMIUM = unlimited; FREE = 2/day, then a per-file wallet
+# overage (₹100 / $2). Favorites & Finished re-fetches use their own handlers and
+# never touch this quota.
+def _file_buttons(fuid: str, f: dict):
+    ext = (f.get("ext") or "").lower()
+    is_audio = f.get("kind") == "audio"
+    rows = []
+    # Read/Listen opens the universal reader Mini App (routes by type). Shown only
+    # when a Mini-App host is configured.
+    if BOT_PUBLIC_URL:
+        rows.append([webapp_btn(
+            "🎧 Listen Now" if is_audio else "📖 Open in Reader",
+            "view.html", query=f"fuid={fuid}&ext={ext}", style="success")])
+    rows.append([btn("⭐ Save to Favorites", f"fav_add:{fuid}", style="success")])
+    return kb(*rows)
 
-    from utils.settings import get_float
-    from utils.vip import download_factor
-    from utils.pricing import download_multiplier
-    cost = round(await get_float("download_cost") * await download_factor(uid)
-                 * await download_multiplier(f), 4)
 
-    if cost <= 0:
-        currency = "VIP"  # Gold VIP → free downloads
-    else:
-        bgm, bcn = await get_balances(uid)
-        if bgm + bcn < cost:
-            await call.answer()
-            await call.message.answer(
-                "💼 <b>A little short for this one</b>\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "<i>You're almost there — top up and it's yours.</i>\n\n"
-                "<blockquote>"
-                f"This title costs <code>{fmt_amount(cost)}</code> 🪙 BCN / 💎 BGM to deliver, "
-                "and your balance doesn't quite cover it yet.\n\n"
-                "⚡ Claim your free daily 🪙 BCN with /claim\n"
-                "💎 Buy 💎 BGM for instant, lasting balance\n"
-                "👑 Go Premium for cheaper — even free — downloads"
-                "</blockquote>",
-                reply_markup=kb([btn("💎 Buy BGM", "acc_buy", style="success"),
-                                 btn("👑 Go Premium", "acc_vip", style="primary")]),
-            )
-            return
-        currency = await spend(uid, cost)
-        if not currency:
-            await call.answer("Your balance just changed and no longer covers this title — top up and try again.", show_alert=True)
-            return
-
-    await call.answer("📤 Delivering your title — one moment…")
+async def _deliver_file(call: CallbackQuery, uid: int, f: dict, fuid: str, *, tag: str) -> bool:
+    """Copy/send the file from the archive and do all success bookkeeping. Returns
+    whether it was delivered. The CALLER owns refund-on-failure (quota or wallet)."""
     caption = (f"{icon_for(f.get('ext',''))} <b>{escape(f.get('name','Your File') or 'Your File')}</b>\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
                "<i>Delivered to your library — enjoy the read.</i>\n\n"
                f"{CREDIT}")
-    # Read/Listen opens the universal reader Mini App (routes by type: PDF/EPUB →
-    # reader, audio → player, etc.). Shown only when a Mini-App host is configured.
-    ext = (f.get("ext") or "").lower()
-    is_audio = f.get("kind") == "audio"
-    fav_rows = []
-    if BOT_PUBLIC_URL:
-        fav_rows.append([webapp_btn(
-            "🎧 Listen Now" if is_audio else "📖 Open in Reader",
-            "view.html", query=f"fuid={fuid}&ext={ext}", style="success")])
-    fav_rows.append([btn("⭐ Save to Favorites", f"fav_add:{fuid}", style="success")])
-    fav_kb = kb(*fav_rows)
-
+    fav_kb = _file_buttons(fuid, f)
     delivered = False
     # Deliver from the channel the file was INDEXED in (falls back to the live
     # channel for legacy docs), so repointing the file channel never serves the
@@ -452,8 +419,7 @@ async def cb_download(call: CallbackQuery) -> None:
         if src_channel and f.get("msg_id"):
             await call.bot.copy_message(
                 chat_id=uid, from_chat_id=src_channel, message_id=f["msg_id"],
-                caption=caption, reply_markup=fav_kb,
-            )
+                caption=caption, reply_markup=fav_kb)
             delivered = True
         elif f.get("file_id"):
             await call.bot.send_document(uid, f["file_id"], caption=caption,
@@ -461,22 +427,8 @@ async def cb_download(call: CallbackQuery) -> None:
             delivered = True
     except Exception as exc:  # noqa: BLE001
         logger.warning("Delivery failed for %s: %s", fuid, exc)
-
     if not delivered:
-        if currency != "VIP":
-            await refund(uid, cost, currency)
-        await call.message.answer(
-            "⚠️ <b>That delivery didn't go through</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "<i>No tokens lost — you've been fully refunded.</i>\n\n"
-            "<blockquote>"
-            "We couldn't hand over this file just now. The copy may have been "
-            "removed from the archive, or we've briefly lost access to the source "
-            "channel.\n\n"
-            "Please try another result, or run a fresh search — we'll find you "
-            "another copy."
-            "</blockquote>")
-        return
+        return False
 
     # success bookkeeping
     db = await MongoManager.get()
@@ -500,7 +452,6 @@ async def cb_download(call: CallbackQuery) -> None:
     from utils.missions import mark
     await mark(uid, "download")
     # track reading taste by genre (AI-driven) → powers the 🎯 For You shelf.
-    # Fire-and-forget so a possible AI classify never slows delivery.
     import asyncio
     from utils.foryou import record_genre_read
     asyncio.create_task(record_genre_read(uid, f.get("name") or "", file_doc=f, fuid=fuid))
@@ -519,7 +470,122 @@ async def cb_download(call: CallbackQuery) -> None:
     except Exception:  # noqa: BLE001 — a nudge must never break delivery
         pass
     # found-a-book → admin (full detail) + public (privacy-safe) activity log
-    await log_book_found(call.bot, uid, f.get("name") or "", f.get("ext") or "", currency)
+    await log_book_found(call.bot, uid, f.get("name") or "", f.get("ext") or "", tag)
+    return True
+
+
+async def _delivery_failed(call: CallbackQuery, note: str = "") -> None:
+    await call.message.answer(
+        "⚠️ <b>That delivery didn't go through</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        + (f"<i>{note}</i>\n\n" if note else "")
+        + "<blockquote>"
+        "We couldn't hand over this file just now. The copy may have been removed "
+        "from the archive, or we've briefly lost access to the source channel.\n\n"
+        "Please try another result, or run a fresh search — we'll find you another copy."
+        "</blockquote>")
+
+
+async def _user_currency(uid: int) -> str:
+    db = await MongoManager.get()
+    u = await db.find_one_global("users", {"user_id": uid}, {"currency": 1}) or {}
+    return (u.get("currency") or "USD").upper()
+
+
+async def _overage_options(uid: int) -> list:
+    """(bucket, price, symbol) options for per-file overage, the user's preferred
+    currency first."""
+    from utils.premium import overage_inr, overage_usd
+    opts = [("wallet_inr", await overage_inr(), "₹"),
+            ("wallet_usd", await overage_usd(), "$")]
+    if (await _user_currency(uid)) != "INR":
+        opts = opts[::-1]
+    return opts
+
+
+@router.callback_query(F.data.startswith("dl:"))
+async def cb_download(call: CallbackQuery) -> None:
+    uid = call.from_user.id
+    fuid = call.data.split(":", 1)[1]
+    f = await get_file(fuid)
+    if not f:
+        await call.answer("This title is no longer in the archive. Try a fresh search and we'll find another copy.", show_alert=True)
+        return
+
+    from utils import premium, quota
+    consumed = False
+    if await premium.is_premium(uid):
+        await quota.consume(uid, "dl")  # unlimited; recorded for stats only
+        tag = "PREMIUM"
+    elif await quota.consume(uid, "dl"):
+        consumed = True
+        tag = "FREE"
+    else:
+        # free quota exhausted → offer the paid per-file overage instead of stopping
+        await call.answer()
+        await _offer_overage(call, fuid, f)
+        return
+
+    await call.answer("📤 Delivering your title — one moment…")
+    if not await _deliver_file(call, uid, f, fuid, tag=tag):
+        if consumed:
+            await quota.refund_one(uid, "dl")  # a failed delivery never burns a free download
+        await _delivery_failed(call, "Your free download wasn't used." if consumed else "")
+
+
+async def _offer_overage(call: CallbackQuery, fuid: str, f: dict) -> None:
+    uid = call.from_user.id
+    from utils import quota
+    _, lim = await quota.status(uid, "dl")
+    bucket, price, sym = (await _overage_options(uid))[0]
+    name = escape((f.get("name") or "this title")[:48])
+    await call.message.answer(
+        "📥 <b>Daily free downloads used up</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>You've delivered your {quota.fmt_limit(lim)} free files today — nice reading.</i>\n\n"
+        "<blockquote>"
+        f"📖 <b>{name}</b>\n\n"
+        f"Grab this one now for <b>{sym}{fmt_amount(price)}</b> from your wallet, or go "
+        "👑 <b>Premium</b> for unlimited downloads and the whole library.</blockquote>",
+        reply_markup=kb(
+            [btn(f"📥 Get it for {sym}{fmt_amount(price)}", f"dlpay:{fuid}", style="success")],
+            [btn("👑 Go Premium (unlimited)", "go_premium", style="primary")],
+            [btn("🔙 Back", "menu_home", style="danger")]))
+
+
+@router.callback_query(F.data.startswith("dlpay:"))
+async def cb_download_paid(call: CallbackQuery) -> None:
+    uid = call.from_user.id
+    fuid = call.data.split(":", 1)[1]
+    f = await get_file(fuid)
+    if not f:
+        await call.answer("This title is no longer in the archive. Try a fresh search.", show_alert=True)
+        return
+    from utils.wallet import spend_money, add_money
+    # Charge exactly the option we showed the user (their preferred currency), so
+    # the amount debited always matches the price on the button.
+    bucket, price, sym = (await _overage_options(uid))[0]
+    if not await spend_money(uid, bucket, price):
+        await call.answer()
+        await call.message.answer(
+            "💳 <b>Top up to grab this file</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"<i>A single extra download is {sym}{fmt_amount(price)} — your wallet's a little short.</i>\n\n"
+            "<blockquote>Top up your wallet and tap the file again, or go 👑 <b>Premium</b> for "
+            "unlimited downloads and skip per-file charges entirely.</blockquote>",
+            reply_markup=kb([btn("💳 Top Up Wallet", "acc_buy", style="success")],
+                            [btn("👑 Go Premium", "go_premium", style="primary")],
+                            [btn("🔙 Back", "menu_home", style="danger")]))
+        return
+    await call.answer("📤 Delivering your title — one moment…")
+    if not await _deliver_file(call, uid, f, fuid, tag=f"PAID {sym}{fmt_amount(price)}"):
+        await add_money(uid, bucket, price)  # refund the overage on failure
+        await _delivery_failed(call, f"Your {sym}{fmt_amount(price)} was refunded.")
+        return
+    await call.message.answer(
+        f"✅ <b>{sym}{fmt_amount(price)} charged</b> from your wallet for this file — enjoy!\n"
+        "<i>💡 👑 Premium makes downloads unlimited, no per-file charge.</i>",
+        reply_markup=kb([btn("👑 Go Premium", "go_premium", style="primary")]))
 
 
 # NOTE: req_manual and req_history are handled by requests_manual.py and track.py.

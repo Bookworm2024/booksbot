@@ -276,6 +276,14 @@ async def ensure_seed() -> None:
 
 
 # ── daily limit ──────────────────────────────────────────────────────────────
+async def daily_limit(uid: int) -> int:
+    """Tier-aware per-game daily cap: FREE q_game_free (2), PREMIUM q_game_premium (5).
+    Shared by the Mini-App engine and every chat game so the limit lives in one place."""
+    from utils.premium import is_premium
+    from utils.settings import get_float
+    return int(await get_float("q_game_premium" if await is_premium(uid) else "q_game_free"))
+
+
 async def plays_today(uid: int, game: str) -> int:
     db = await MongoManager.get()
     since = _now() - timedelta(hours=24)
@@ -287,8 +295,9 @@ async def plays_today(uid: int, game: str) -> int:
 async def new_session(uid: int, game: str, level: str = "beginner") -> dict:
     cfg = CONFIG[game]
     db = await MongoManager.get()
-    if await plays_today(uid, game) >= cfg["daily"]:
-        return {"error": f"You've enjoyed all {cfg['daily']} plays for today — nicely done. Your free rounds refresh in the morning, so come back tomorrow to keep earning."}
+    lim = await daily_limit(uid)
+    if await plays_today(uid, game) >= lim:
+        return {"error": f"You've enjoyed all {lim} plays for today — nicely done. Your rounds refresh in the morning, so come back tomorrow to keep earning."}
 
     if cfg["levels"]:
         if level not in QUIZ_REWARD:

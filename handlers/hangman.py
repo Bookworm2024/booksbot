@@ -17,7 +17,9 @@ from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
 from utils.format import fmt_amount
+from utils.games import daily_limit
 from utils.keyboards import btn, kb
+from utils.premium import is_premium
 from utils.wallet import add_bgm
 
 logger = logging.getLogger(__name__)
@@ -25,7 +27,6 @@ router = Router()
 
 _ALPHA = string.ascii_uppercase
 _MAX_WRONG = 6
-_DAILY = 3
 
 # Single-word, well-known literary terms / titles / author surnames (A–Z only).
 _WORDS = [
@@ -111,16 +112,22 @@ async def _start(message: Message, uid: int, *, edit: bool) -> None:
             reply_markup=kb([btn("🔙 Back to Menu", "menu_home", style="danger")]))
         return
     db = await MongoManager.get()
-    if await _plays_today(db, uid) >= _DAILY:
+    lim = await daily_limit(uid)
+    if await _plays_today(db, uid) >= lim:
+        free = not await is_premium(uid)
         txt = (f"🎮 <b>Literary Hangman</b>\n"
                f"━━━━━━━━━━━━━━━━━━━━\n"
                f"⏳ <b>You've played today's full set.</b>\n"
-               f"<blockquote>You've used all <code>{_DAILY}</code> rounds for today — nicely done. "
+               f"<blockquote>You've used all <code>{lim}</code> rounds for today — nicely done. "
                f"Your guessing board resets at midnight, ready for a clean run.\n\n"
                f"<i>Meanwhile, plenty more to win across the Games Hub.</i></blockquote>\n"
                f"<i>💡 Come back tomorrow for a fresh streak of rounds.</i>")
-        mk = kb([btn("🎮 Games Hub", "menu_games", style="primary")])
-        await (message.edit_text if edit else message.answer)(txt, reply_markup=mk)
+        rows = []
+        if free:
+            txt += "\n<i>👑 Premium plays 5 rounds a day, every game.</i>"
+            rows.append([btn("👑 Go Premium for 5/day", "go_premium", style="success")])
+        rows.append([btn("🎮 Games Hub", "menu_games", style="primary")])
+        await (message.edit_text if edit else message.answer)(txt, reply_markup=kb(*rows))
         return
     # count this play
     today = _today()

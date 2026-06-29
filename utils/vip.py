@@ -13,11 +13,15 @@ from database.connection import MongoManager
 from utils.format import fmt_amount
 from utils.wallet import add_bgm, charge_bgm
 
+# Single freemium "Premium" tier (id 1). Tier 2 is kept only so any legacy Gold
+# holder still reads as active Premium; new purchases always grant tier 1.
+# dl_discount is vestigial (downloads are quota-gated now, not BGM-priced);
+# claim_mult still gives Premium members a bigger daily BGM claim.
 TIERS = {
-    1: {"name": "Silver VIP", "emoji": "🥈", "price": 50, "days": 30,
-        "dl_discount": 0.5, "claim_mult": 1.5, "monthly_bgm": 10},
-    2: {"name": "Gold VIP", "emoji": "🥇", "price": 120, "days": 30,
-        "dl_discount": 1.0, "claim_mult": 2.0, "monthly_bgm": 30},
+    1: {"name": "Premium", "emoji": "👑", "price": 0, "days": 30,
+        "dl_discount": 1.0, "claim_mult": 2.0, "monthly_bgm": 0},
+    2: {"name": "Premium+", "emoji": "👑", "price": 0, "days": 30,
+        "dl_discount": 1.0, "claim_mult": 2.0, "monthly_bgm": 0},
 }
 
 

@@ -90,6 +90,20 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Search result cap + sort-key projection; watchlist `matched:False` filter
 - ✅ Unique indexes: codes.code, code_claims(code,user_id), crypto_orders.order_id
 
+## Phase 7 — Freemium model ✅ (replaces the token economy as the access model)
+- ✅ Free vs **Premium** tier (`utils/premium.py` over vip_tier/vip_until; 👑 tier 1).
+  Premium = ₹280 / $3 per 30d (from wallet) OR **1000 BGM → 7d** (grind path).
+- ✅ 24h per-user **quotas** (`utils/quota.py`, admin-tunable, race-safe): request
+  bot 2/∞ + paid overage; admin requests 1/3 ebook, 0/3 audiobook; AI search 2/5;
+  summary 1/5; each game 2/5. Similar/By-mood + New Arrivals/Series/Challenges = Premium.
+- ✅ Real-money **wallet** (`wallet_inr`/`wallet_usd`) topped up by repurposed UPI
+  (FamPay) + crypto (OxaPay); buys Premium and the per-file overage (₹100/$2 → `dlpay:`).
+- ✅ BGM kept as the earnable reward currency (games/referrals/quests/etc.); only sink
+  now is the Premium exchange. **BCN retired** from UX (daily claim → BGM; converter
+  removed; crates drop BGM). Every upsell → `go_premium`.
+- ✅ Fixes: Challenges removed from My Library; junk archive entries (the "Game"
+  failed-delivery card) filtered from For You/Discover via `utils/files.is_bookish`.
+
 ## Status: feature-complete + hardened
 All TBC features rebuilt + modernized; crypto via OxaPay.
 Credential-gated features (AI, crypto) activate once their keys are set in the

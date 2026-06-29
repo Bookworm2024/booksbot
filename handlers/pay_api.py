@@ -77,22 +77,23 @@ async def api_pay_status(request: web.Request) -> web.Response:
     out = {
         "ok": True,
         "method": "upi" if kind == "upi" else "crypto",
+        "kind": "wallet_topup",
         "status": doc.get("status", "waiting"),
         "order_id": order_id,
-        "bgm": float(doc.get("bgm") or 0),
-        "bonus": float(doc.get("bonus") or 0),
         "expires_at": doc.get("expires_at"),
         "merchant": MERCHANT_NAME,
     }
     if kind == "upi":
         out.update({
             "upi_id": UPI_ID,
-            "total_due_inr": float(doc.get("total_due_inr") or 0),
+            "total_due_inr": float(doc.get("total_due_inr") or doc.get("topup_inr") or 0),
+            "topup_inr": float(doc.get("topup_inr") or doc.get("total_due_inr") or 0),
             "submitted_utr": doc.get("submitted_utr"),
         })
     else:
         out.update({
-            "amount_usd": float(doc.get("amount_usd") or 0),
+            "amount_usd": float(doc.get("amount_usd") or doc.get("topup_usd") or 0),
+            "topup_usd": float(doc.get("topup_usd") or doc.get("amount_usd") or 0),
             "pay_url": doc.get("pay_url") or "",
         })
     return web.json_response(out)

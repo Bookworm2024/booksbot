@@ -357,6 +357,49 @@ async def charge_bgm(user_id: int, cost: float) -> bool:
     return await _charge(user_id, cost, ("bookgem",)) is not None
 
 
+# ── real-money wallet (₹ / $) ───────────────────────────────────────────────────
+# Two stored-value buckets, separate from the BGM/BCN game economy:
+#   wallet_inr  — topped up by UPI (FamPay), spent on Premium + per-file overage
+#   wallet_usd  — topped up by crypto (OxaPay), spent on Premium + per-file overage
+# Currencies are NEVER auto-converted into each other (admin reporting aside) —
+# each is its own bucket, summed across clusters and sanitized exactly like BGM.
+MONEY_FIELDS = ("wallet_inr", "wallet_usd")
+
+
+async def get_money(user_id: int) -> tuple[float, float]:
+    """Return (inr, usd) wallet balances SUMMED across all clusters, sanitized."""
+    db = await MongoManager.get()
+    inr = usd = 0.0
+    for idx in db.healthy:
+        doc = await db.dbs[idx]["users"].find_one(
+            {"user_id": user_id}, {"wallet_inr": 1, "wallet_usd": 1})
+        if not doc:
+            continue
+        inr += sanitize_amount(doc.get("wallet_inr"))
+        usd += sanitize_amount(doc.get("wallet_usd"))
+    return sanitize_amount(inr), sanitize_amount(usd)
+
+
+async def add_money(user_id: int, field: str, amount: float) -> None:
+    """Credit a real-money wallet bucket (wallet_inr / wallet_usd). Sanitized;
+    non-positive is a no-op."""
+    if field not in MONEY_FIELDS:
+        raise ValueError(f"unknown money field {field!r}")
+    amount = sanitize_amount(amount)
+    if amount <= 0:
+        return
+    db = await MongoManager.get()
+    await db.safe_update("users", {"user_id": user_id}, {"$inc": {field: amount}})
+
+
+async def spend_money(user_id: int, field: str, amount: float) -> bool:
+    """Deduct from a real-money wallet bucket, combined across clusters and
+    race-safe (rolls back a partial debit). True on success, False if short."""
+    if field not in MONEY_FIELDS:
+        raise ValueError(f"unknown money field {field!r}")
+    return await _charge(user_id, amount, (field,)) is not None
+
+
 async def refund(user_id: int, amount: float, currency) -> None:
     """Refund a prior spend. When `currency` is a Receipt from spend(), each bucket
     is restored EXACTLY (so a failed delivery never converts BCN into BGM); else

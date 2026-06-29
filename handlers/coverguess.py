@@ -21,13 +21,14 @@ from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
 from utils.format import fmt_amount
+from utils.games import daily_limit
 from utils.keyboards import btn, kb
+from utils.premium import is_premium
 from utils.wallet import add_bgm
 
 logger = logging.getLogger(__name__)
 router = Router()
 
-_DAILY = 5
 _MAX_TRIES = 3
 
 # (emoji cover, canonical title, hint, [accepted aliases])
@@ -142,17 +143,24 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
             reply_markup=kb([btn("🔙 Back to Menu", "menu_home", style="danger")]))
         return
     db = await MongoManager.get()
+    lim = await daily_limit(uid)
     prev = await _plays_today(db, uid)
-    if prev >= _DAILY:
-        await send(
+    if prev >= lim:
+        free = not await is_premium(uid)
+        txt = (
             "🎭 <b>Cover Guess — Come Back Tomorrow</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            f"<blockquote>You've played all <code>{_DAILY}</code> rounds for today — "
-            "nicely done. Your free plays refresh at midnight, ready for another run "
+            f"<blockquote>You've played all <code>{lim}</code> rounds for today — "
+            "nicely done. Your plays refresh at midnight, ready for another run "
             "at the shelf.</blockquote>\n"
             "<i>💡 In the meantime, the other games are open — pick one from the "
-            "lounge.</i>",
-            reply_markup=kb([btn("🎮 Games Lounge", "menu_games", style="primary")]))
+            "lounge.</i>")
+        rows = []
+        if free:
+            txt += "\n<i>👑 Premium plays 5 rounds a day, every game.</i>"
+            rows.append([btn("👑 Go Premium for 5/day", "go_premium", style="success")])
+        rows.append([btn("🎮 Games Lounge", "menu_games", style="primary")])
+        await send(txt, reply_markup=kb(*rows))
         return
     await db.safe_update("users", {"user_id": uid},
                          {"$set": {"cg_day": _today(), "cg_plays": prev + 1}})

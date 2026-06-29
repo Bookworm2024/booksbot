@@ -13,12 +13,26 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
+from utils import premium
 from utils.challenges import claim as claim_challenge, status
 from utils.format import fmt_amount
 from utils.keyboards import btn, kb
 
 logger = logging.getLogger(__name__)
 router = Router()
+
+
+def _locked_card():
+    """Premium-locked card shown when a free user opens the Challenges board."""
+    return (
+        "🔒 <b>Reading Challenges</b> — <i>Premium</i>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>👑 <b>Reading Challenges</b> are a Premium perk.\n\n"
+        "Go Premium to chase monthly goals, bank the 💎 BGM rewards — "
+        "plus unlimited downloads, AI picks and more.</blockquote>",
+        kb([btn("👑 Go Premium", "go_premium", style="success")],
+           [btn("🔭 Discover", "lib_discover", style="primary"),
+            btn("🔙 Library", "menu_library", style="danger")]))
 
 
 def _bar(have: int, target: int, width: int = 10) -> str:
@@ -68,12 +82,20 @@ async def _view(uid: int):
 @router.callback_query(F.data == "menu_challenges")
 async def cb_challenges(call: CallbackQuery) -> None:
     await call.answer()
+    if not await premium.is_premium(call.from_user.id):
+        text, markup = _locked_card()
+        await call.message.edit_text(text, reply_markup=markup)
+        return
     text, markup = await _view(call.from_user.id)
     await call.message.edit_text(text, reply_markup=markup)
 
 
 @router.message(Command("challenges"))
 async def cmd_challenges(message: Message) -> None:
+    if not await premium.is_premium(message.chat.id):
+        text, markup = _locked_card()
+        await message.answer(text, reply_markup=markup)
+        return
     text, markup = await _view(message.chat.id)
     await message.answer(text, reply_markup=markup)
 

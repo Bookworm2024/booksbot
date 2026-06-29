@@ -224,11 +224,11 @@
         <div class="text-[9px] mono text-slate-500" id="rid">ID: ——</div>
       </div>
       <div class="space-y-3">
-        <div class="flex justify-between items-center"><span class="text-xs text-slate-300">💎 BookGems (BGM)</span><span class="text-xs mono text-white skeleton" id="l-bgm">—</span></div>
-        <div class="flex justify-between items-center"><span class="text-xs text-slate-300">Bonus BGM</span><span class="text-xs mono text-emerald-400 skeleton" id="l-bonus">+0</span></div>
+        <div class="flex justify-between items-center"><span class="text-xs text-slate-300">💳 Wallet top-up</span><span class="text-xs mono text-white skeleton" id="l-bgm">—</span></div>
+        <div class="flex justify-between items-center"><span class="text-xs text-slate-300">Credited to</span><span class="text-xs mono text-emerald-400 skeleton" id="l-bonus">your wallet</span></div>
       </div>
       <div class="mt-4 pt-4 border-t border-slate-700 flex justify-between items-end">
-        <span class="text-sm font-bold text-white uppercase tracking-wider">You Receive</span>
+        <span class="text-sm font-bold text-white uppercase tracking-wider">You Pay</span>
         <span id="l-total" class="text-xl font-extrabold text-emerald-400 skeleton">—</span>
       </div>
     </div>
@@ -257,7 +257,7 @@
       </div>
     </div>
     <h2 class="text-3xl font-bold text-white mb-3">Payment Confirmed</h2>
-    <p id="success-sub" class="text-sm text-slate-400 mb-8 max-w-[280px] mx-auto leading-relaxed">Your BookGems are in your wallet. Happy reading!</p>
+    <p id="success-sub" class="text-sm text-slate-400 mb-8 max-w-[280px] mx-auto leading-relaxed">Your wallet has been topped up. Tap 👑 Get Premium in the bot whenever you're ready!</p>
     <button onclick="tg.close()" class="btn">Return to Books Provider</button>
     <p class="credit mt-6">Thank you for supporting <a>@bookslibraryofficial</a> &amp; <a>@trinityXmods</a></p>
   </div>
@@ -404,13 +404,14 @@ async function poll(){
       built=true;
       const isUpi = d.method==='upi';
       document.querySelectorAll('.skeleton').forEach(el=>el.classList.remove('skeleton'));
-      const bgm=parseFloat(d.bgm||0), bonus=parseFloat(d.bonus||0);
-      document.getElementById('hero-sym').innerText = isUpi?'₹':'$';
-      document.getElementById('hero-amt').innerText = isUpi?parseFloat(d.total_due_inr||0).toFixed(2):parseFloat(d.amount_usd||0).toFixed(2);
-      document.getElementById('hero-bgm').innerText = (bgm+bonus).toLocaleString()+' BGM';
-      document.getElementById('l-bgm').innerText = bgm.toLocaleString();
-      document.getElementById('l-bonus').innerText = '+'+bonus.toLocaleString();
-      document.getElementById('l-total').innerText = (bgm+bonus).toLocaleString()+' BGM';
+      const sym = isUpi?'₹':'$';
+      const amt = isUpi?parseFloat(d.total_due_inr||d.topup_inr||0):parseFloat(d.amount_usd||d.topup_usd||0);
+      document.getElementById('hero-sym').innerText = sym;
+      document.getElementById('hero-amt').innerText = amt.toFixed(2);
+      document.getElementById('hero-bgm').innerText = sym+amt.toFixed(2)+' → your wallet';
+      document.getElementById('l-bgm').innerText = sym+amt.toFixed(2);
+      document.getElementById('l-bonus').innerText = 'Wallet top-up';
+      document.getElementById('l-total').innerText = sym+amt.toFixed(2);
 
       if(isUpi){
         document.getElementById('m-badge').innerText='FamPay / UPI';

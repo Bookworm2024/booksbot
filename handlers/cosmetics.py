@@ -99,7 +99,7 @@ async def cb_buy(call: CallbackQuery) -> None:
         await equip(call.from_user.id, fid)
         await call.answer("✨ Unlocked and equipped — it's yours to keep. Wear it with pride!")
     else:
-        await call.answer({"insufficient": "Not quite enough BGM for this one yet — top up or claim your daily BCN, then try again.",
+        await call.answer({"insufficient": "Not quite enough BGM for this one yet — earn more in games or claim your daily reward, then try again.",
                            "owned": "You already own this emblem — just tap it to equip.",
                            "free": "That one's free — no purchase needed.",
                            "unknown": "We couldn't find that emblem. Try another."}
@@ -171,7 +171,7 @@ async def on_vanity(message: Message, state: FSMContext) -> None:
             "❌ <b>Not enough BGM</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             f"<i>A vanity handle costs <code>{fmt_amount(_VANITY_COST)} BGM</code>.</i>\n\n"
-            "Top up your wallet or claim your daily BCN, then try again — your name's waiting.")
+            "Earn BGM in games and referrals or claim your daily reward, then try again — your name's waiting.")
 
 
 # ── reading DNA ──────────────────────────────────────────────────────────────

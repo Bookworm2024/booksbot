@@ -5,7 +5,11 @@ User flow:
   Request Center → 👤 Request Admin → Ebook / Audiobook
     Ebook:     title → author → format (PDF/EPUB/MOBI) → cover → confirm
     Audiobook: title → author → cover → confirm
-  On confirm: 2 tokens deducted (BCN-first), request stored, admins notified.
+  Gated by tier (no token cost):
+    • FREE  — 1 ebook request / 24h; audiobook requests are premium-only (closed).
+    • PREMIUM — 3 ebook + 3 audiobook requests / 24h.
+  On confirm: the daily quota is consumed (quota.mreq / mreq_audio), request
+  stored, admins notified. Nothing is charged.
 
 Admin flow (admin panel → 📬 Requests, or /requests):
   Cards for each pending request → Send File / Mark Completed / Cancel(+reason).
@@ -14,13 +18,12 @@ Admin flow (admin panel → 📬 Requests, or /requests):
     channel coords for robust delivery) + delivered to the user with an ⭐ Add-to-
     Favorites button, and pings any watchlist waiters. The title is then searchable,
     so the next user who requests it gets it instantly.
-  • Cancel: admin types a reason → refund (BGM-only: BCN→25%, BGM→75%) →
-    archived → user notified with the reason.
+  • Cancel: admin types a reason → archived → user notified with the reason
+    (no charge, so no refund).
 
 Request doc (`requests`):
   request_id, user_id, first_name, title, author, format, category,
-  cover_id, type="manual", currency_used, cost, status, created_at,
-  cancel_reason?, file_unique_id?
+  cover_id, type="manual", status, created_at, cancel_reason?, file_unique_id?
 """
 import logging
 import random
@@ -40,15 +43,13 @@ from utils.brand import CREDIT
 from utils.channel import get_file_channel
 from utils.logs import log_request_created, log_request_fulfilled
 from utils.files import clean_title, index_file, kind_for_ext, trigrams
-from utils.format import fmt_amount, fmt_dt
+from utils.format import fmt_dt
 from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import has
-from utils.wallet import get_balances, refund, spend
+from utils import premium, quota
 
 logger = logging.getLogger(__name__)
 router = Router()
-
-_COST = 2.0
 
 
 class ManualFSM(StatesGroup):
@@ -70,25 +71,49 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+# ── tier-gate cards ──────────────────────────────────────────────────────────
+async def _audio_locked_card(call: CallbackQuery) -> None:
+    """Audiobook concierge requests are premium-only — show the upsell."""
+    await call.message.edit_text(
+        "🔒 <b>Audiobook requests are a Premium perk</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Hand-sourced audiobooks are reserved for our Premium readers.</i>\n"
+        "<blockquote>Free members can request <b>eBooks</b> from a curator any day. "
+        "Audiobook concierge requests — <b>3 a day</b>, sourced by hand — open up the "
+        "moment you go Premium.</blockquote>\n"
+        "<i>💡 Tap below to unlock audiobooks (plus more eBook requests and a lot more).</i>",
+        reply_markup=kb([btn("👑 Go Premium", "go_premium", style="success")],
+                        [btn("📘 Request an eBook instead", "mreq_ebook", style="primary")],
+                        [btn("🔙 Back to Requests", "menu_request", style="danger")]))
+
+
+async def _limit_card(call: CallbackQuery, key: str, kind: str, label: str) -> None:
+    """Daily quota for this request kind is exhausted — show usage + upsell."""
+    used, limit = await quota.status(call.from_user.id, key, kind=kind)
+    is_prem = await premium.is_premium(call.from_user.id)
+    rows = []
+    if not is_prem:
+        rows.append([btn("👑 Go Premium", "go_premium", style="success")])
+    rows.append([btn("🔙 Back to Requests", "menu_request", style="danger")])
+    extra = ("" if is_prem else
+             "\n<i>💡 Premium readers get more requests every day — and audiobook "
+             "concierge requests too.</i>")
+    await call.message.edit_text(
+        "🛑 <b>Daily request limit reached</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>You've used today's {label} concierge requests.</i>\n"
+        "<blockquote>"
+        f"📦 <b>{label} requests today:</b> "
+        f"<code>{used}/{quota.fmt_limit(limit)}</code>\n"
+        "🕛 Your allowance refreshes at midnight (UTC).</blockquote>"
+        f"{extra}",
+        reply_markup=kb(*rows))
+
+
 # ── entry ────────────────────────────────────────────────────────────────────
 @router.callback_query(F.data == "req_manual")
 async def cb_req_manual(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
-    from utils.settings import get_float
-    cost = await get_float("request_cost")
-    bgm, bcn = await get_balances(call.from_user.id)
-    if bgm + bcn < cost:
-        await call.message.edit_text(
-            "🔒 <b>A little more in your wallet first</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "<blockquote>A concierge request is hand-fulfilled by our team and "
-            f"costs <code>{fmt_amount(cost)}</code> tokens — settled from 🪙 BCN first, "
-            "then 💎 BGM.\n"
-            f"Your wallet currently holds <code>{bgm + bcn:.2f}</code>.</blockquote>\n"
-            "<i>💡 Top up with 💎 BGM and we'll have the order desk standing by.</i>",
-            reply_markup=kb([btn("💎 Top up BGM", "acc_buy", style="success")],
-                            [btn("🔙 Back to Requests", "menu_request", style="danger")]))
-        return
     await state.set_data({})
     await call.message.edit_text(
         "👤 <b>Concierge Request</b>\n"
@@ -96,8 +121,8 @@ async def cb_req_manual(call: CallbackQuery, state: FSMContext) -> None:
         "<i>Can't find a title in the archive? Hand it to our team — we'll source it for you.</i>\n"
         "<blockquote>Tell us what you're after and we'll track it down, then deliver it "
         "straight to your chat. eBook or audiobook — your choice.\n"
-        f"💰 <b>Fulfilment fee:</b> <code>{fmt_amount(cost)}</code> 🪙 BCN / 💎 BGM, "
-        "charged only when you confirm.</blockquote>\n"
+        "🎁 <b>Free of charge</b> — no tokens spent. Just a few requests a day, "
+        "so we can give every reader our full attention.</blockquote>\n"
         "<i>👇 What shall we find for you?</i>",
         reply_markup=kb(
             [btn("📘 eBook", "mreq_ebook", style="primary"),
@@ -108,7 +133,18 @@ async def cb_req_manual(call: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data.in_({"mreq_ebook", "mreq_audio"}))
 async def cb_pick_category(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
+    uid = call.from_user.id
     category = "ebook" if call.data == "mreq_ebook" else "audiobook"
+    qkey = "mreq" if category == "ebook" else "mreq_audio"
+
+    if category == "audiobook" and not await premium.is_premium(uid):
+        await _audio_locked_card(call)
+        return
+    if not await quota.can(uid, qkey, kind=qkey):
+        await _limit_card(call, qkey, qkey,
+                          "eBook" if category == "ebook" else "Audiobook")
+        return
+
     await state.update_data(category=category)
     await state.set_state(ManualFSM.title)
     label = "📘 eBook" if category == "ebook" else "🎧 Audiobook"
@@ -184,8 +220,6 @@ async def on_cover(message: Message, state: FSMContext) -> None:
     cover_id = message.photo[-1].file_id if message.photo else message.document.file_id
     await state.update_data(cover_id=cover_id)
     data = await state.get_data()
-    from utils.settings import get_float
-    cost = await get_float("request_cost")
     fmt = f"📂 <b>Format:</b> {data.get('format')}\n" if data.get("category") == "ebook" else ""
     await message.answer_photo(
         cover_id,
@@ -197,9 +231,8 @@ async def on_cover(message: Message, state: FSMContext) -> None:
                  f"✍️ <b>Author:</b> {data.get('author')}\n"
                  f"📦 <b>Type:</b> {data.get('category').title()}\n"
                  f"{fmt}"
-                 f"💰 <b>Fee:</b> <code>{fmt_amount(cost)}</code> 🪙 BCN / 💎 BGM</blockquote>\n"
-                 "<i>💡 Tap Confirm and we'll take it from here — the fee is charged "
-                 "now and fully refunded if we can't source it.</i>"),
+                 "🎁 <b>Cost:</b> Free — counts toward today's request allowance.</blockquote>\n"
+                 "<i>💡 Tap Confirm and we'll take it from here.</i>"),
         reply_markup=kb([btn("✅ Confirm & Submit", "mreq_confirm", style="success")],
                         [btn("❌ Cancel", "mreq_cancel", style="danger")]))
 
@@ -236,28 +269,51 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
         await state.clear()
         return
     uid = call.from_user.id
-    from utils.settings import get_float
-    cost = await get_float("request_cost")
-    currency = await spend(uid, cost)
-    if not currency:
-        await call.answer("Not quite enough in your wallet — top up with BGM and try again.", show_alert=True)
+    category = data["category"]
+    qkey = "mreq" if category == "ebook" else "mreq_audio"
+
+    # Audiobook concierge requests are premium-only (re-check in case the user's
+    # tier changed mid-flow).
+    if category == "audiobook" and not await premium.is_premium(uid):
+        await call.answer()
+        await _audio_locked_card(call)
         await state.clear()
         return
+
+    # Atomically consume one of today's allowance; abort if the limit's been hit.
+    if not await quota.consume(uid, qkey, kind=qkey):
+        await call.answer()
+        await _limit_card(call, qkey, qkey,
+                          "eBook" if category == "ebook" else "Audiobook")
+        await state.clear()
+        return
+
     await call.answer("Confirmed — your request is on its way to our team.")
     rid = _rid()
     req = {
         "request_id": rid, "user_id": uid,
         "first_name": call.from_user.first_name or "User",
         "title": data["title"], "author": data.get("author", ""),
-        "format": data.get("format", ""), "category": data["category"],
+        "format": data.get("format", ""), "category": category,
         "cover_id": data.get("cover_id"), "type": "manual",
-        "currency_used": currency, "cost": cost, "status": "pending",
+        "status": "pending",
         "created_at": _now(),
     }
     db = await MongoManager.get()
-    await db.safe_insert("requests", req)
+    try:
+        await db.safe_insert("requests", req)
+    except Exception:  # noqa: BLE001 — give back the consumed allowance if storage fails
+        await quota.refund_one(uid, qkey)
+        await state.clear()
+        await call.message.answer(
+            "⚠️ <b>That didn't go through</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>We hit a snag saving your request, so nothing was filed and "
+            "your daily allowance wasn't touched.</blockquote>\n"
+            "<i>💡 Please try again in a moment.</i>")
+        return
     # per-user request counters (for /balance display)
-    field = "ebook_requests" if data["category"] == "ebook" else "audiobook_requests"
+    field = "ebook_requests" if category == "ebook" else "audiobook_requests"
     await db.safe_update("users", {"user_id": uid}, {"$inc": {field: 1}})
     # track reading taste by genre (AI classifies the title) → 🎯 For You shelf
     import asyncio
@@ -274,7 +330,7 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
         f"📖 <b>{req['title']}</b> — {req['author']}\n"
         f"🕒 <b>Requested:</b> {fmt_dt(req['created_at'])}</blockquote>\n"
         "<i>🔔 We'll ping you the moment it's ready. Follow its progress anytime "
-        "via 🚨 Track Request — and if we can't source it, your fee comes straight back.</i>")
+        "via 🚨 Track Request.</i>")
 
     # notify admins
     summary = (f"🚀 <b>New Manual {req['category'].title()} Request</b>\n"
@@ -282,7 +338,7 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
                "<blockquote>"
                f"🆔 <code>{rid}</code>\n👤 <a href='tg://user?id={uid}'>{req['first_name']}</a> "
                f"(<code>{uid}</code>)\n📖 {req['title']}\n✍️ {req['author']}\n"
-               f"📂 {req['format'] or req['category']}\n💰 Paid in {currency}\n"
+               f"📂 {req['format'] or req['category']}\n"
                f"🕒 {fmt_dt(req['created_at'])}</blockquote>")
     for admin in ADMIN_IDS:
         try:
@@ -334,7 +390,7 @@ async def _render_queue(bot, admin_id: int) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"<blockquote>🛡 <b>{len(pending)}</b> request(s) awaiting fulfilment, oldest "
         "first. Each card below has its own actions — send the file, mark it done, "
-        "or cancel with a refund.</blockquote>")
+        "or cancel with a reason.</blockquote>")
     for r in pending:
         cap = ("🛡 <b>Pending Request</b>\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
@@ -533,7 +589,7 @@ async def cb_done(call: CallbackQuery) -> None:
         pass
 
 
-# ── cancel + refund ────────────────────────────────────────────────────────────
+# ── cancel + reason ──────────────────────────────────────────────────────────
 @router.callback_query(F.data.startswith("areq_cancel:"))
 async def cb_cancel_init(call: CallbackQuery, state: FSMContext) -> None:
     if not await has(call.from_user.id, "requests"):
@@ -548,12 +604,10 @@ async def cb_cancel_init(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(AdminReqFSM.awaiting_reason)
     await state.update_data(rid=rid)
     await call.message.answer(
-        "📝 <b>Cancel &amp; Refund</b>\n"
+        "📝 <b>Cancel Request</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"<blockquote>Type a short <b>reason</b> for cancelling <code>{rid}</code>. "
-        "The reader sees this exact note, so keep it kind and clear.\n"
-        "💰 Their fee is refunded automatically in 💎 BGM the moment you "
-        "send it.</blockquote>",
+        "The reader sees this exact note, so keep it kind and clear.</blockquote>",
         reply_markup=kb(cancel_row("admin_open")))
 
 
@@ -573,33 +627,27 @@ async def on_reason(message: Message, state: FSMContext) -> None:
             "nothing further was changed.</blockquote>")
         return
 
-    # refund — always in BGM: BCN→25%, BGM→75% of cost
-    rate = 0.25 if req.get("currency_used") == "BCN" else 0.75
-    refund_amt = round(req.get("cost", _COST) * rate, 3)
-    await refund(req["user_id"], refund_amt, "BGM")
+    # Manual requests no longer cost tokens, so there's nothing to refund.
     await db.safe_update("requests", {"request_id": rid},
                          {"$set": {"status": "cancelled", "cancel_reason": reason,
-                                   "refunded": refund_amt, "cancelled_at": _now()}})
+                                   "cancelled_at": _now()}})
     await message.answer(
-        "✅ <b>Request cancelled &amp; refunded</b>\n"
+        "✅ <b>Request cancelled</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<blockquote>"
-        f"🆔 <code>{rid}</code>\n"
-        f"💰 Refunded <code>{fmt_amount(refund_amt)}</code> 💎 BGM to the reader.</blockquote>\n"
-        "<i>🛡 They've been notified with your reason.</i>")
+        f"🆔 <code>{rid}</code></blockquote>\n"
+        "<i>🛡 The reader has been notified with your reason.</i>")
     try:
         await message.bot.send_message(
             req["user_id"],
             "🔔 <b>An update on your request</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "<i>We weren't able to fulfil this one — but we've made it right.</i>\n"
+            "<i>We weren't able to fulfil this one this time.</i>\n"
             "<blockquote>"
             f"🆔 <b>Tracking ID:</b> <code>{rid}</code>\n"
             f"📖 <b>{req.get('title')}</b>\n"
             f"🕒 <b>Cancelled:</b> {fmt_dt(_now())}\n"
-            f"📝 <b>Note from our team:</b> {reason}\n"
-            f"💰 <b>Refunded:</b> <code>{fmt_amount(refund_amt)}</code> 💎 BGM, back in "
-            "your wallet now.</blockquote>\n"
+            f"📝 <b>Note from our team:</b> {reason}</blockquote>\n"
             "<i>💡 Sorry we missed this one — try another title and we'll do our best to track it down.</i>")
     except Exception:  # noqa: BLE001
         pass

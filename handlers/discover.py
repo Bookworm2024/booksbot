@@ -17,6 +17,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
+from utils import premium
 from utils.files import book_of_the_day, icon_for, popular_files, recent_files
 from utils.keyboards import btn, kb
 
@@ -24,6 +25,18 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 _PER = 8
+
+
+def _locked_card(section: str, back_cb: str = "lib_discover"):
+    """A consistent Premium-locked card for sections free users can't open."""
+    return (
+        f"🔒 <b>{section}</b> — <i>Premium</i>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<blockquote>👑 <b>{section}</b> is a Premium perk.\n\n"
+        "Unlock it — plus unlimited downloads, AI picks and more — by going Premium.</blockquote>",
+        kb([btn("👑 Go Premium", "go_premium", style="success")],
+           [btn("🔙 Discover", back_cb, style="danger")]))
+
 
 _QUOTES = [
     ("A reader lives a thousand lives before he dies.", "George R.R. Martin"),
@@ -50,18 +63,28 @@ def _day_index() -> int:
 
 @router.message(Command("discover"))
 async def cmd_discover(message: Message) -> None:
-    text, markup = _hub()
+    text, markup = _hub(await premium.is_premium(message.chat.id))
     await message.answer(text, reply_markup=markup)
 
 
 @router.callback_query(F.data == "lib_discover")
 async def cb_discover(call: CallbackQuery) -> None:
     await call.answer()
-    text, markup = _hub()
+    text, markup = _hub(await premium.is_premium(call.from_user.id))
     await call.message.edit_text(text, reply_markup=markup)
 
 
-def _hub():
+def _hub(is_prem: bool):
+    # New Arrivals, Series Finder and Challenges are Premium-only; free users see
+    # them locked (🔒 + "(Premium)") and routed to the shared go_premium upsell.
+    if is_prem:
+        new_btn = btn("🆕 New Arrivals", "disc_new:0", style="success")
+        series_btn = btn("🔗 Series Finder", "disc_series", style="primary")
+        chal_btn = btn("🎯 Challenges", "menu_challenges", style="primary")
+    else:
+        new_btn = btn("🔒 New Arrivals (Premium)", "go_premium", style="primary")
+        series_btn = btn("🔒 Series Finder (Premium)", "go_premium", style="primary")
+        chal_btn = btn("🔒 Challenges (Premium)", "go_premium", style="primary")
     return (
         "🔭 <b>Discover</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
@@ -75,12 +98,12 @@ def _hub():
             btn("🏷 Genres", "disc_genres", style="success")],
            [btn("📚 Collections", "disc_collections", style="success"),
             btn("🖊 Authors", "disc_authors", style="success")],
-           [btn("🆕 New Arrivals", "disc_new:0", style="success"),
+           [new_btn,
             btn("🔥 Popular", "disc_pop:0", style="success")],
-           [btn("🔗 Series Finder", "disc_series", style="primary"),
+           [series_btn,
             btn("📅 Book of the Day", "disc_botd", style="primary")],
            [btn("💬 Daily Quote", "disc_quote", style="primary"),
-            btn("🎯 Challenges", "menu_challenges", style="primary")],
+            chal_btn],
            [btn("🔙 Back to Library", "menu_library", style="danger")]))
 
 
@@ -125,8 +148,8 @@ async def cb_genre_files(call: CallbackQuery) -> None:
         f"🏷 <b>{genre}</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>Every title on this shelf, ready to read.</i>\n"
-        "<blockquote>💎 Each download costs just <code>1</code> token — 🪙 BCN or 💎 BGM.\n"
-        "Tap a cover to add it to your library.</blockquote>",
+        "<blockquote>📥 Tap a cover — delivered free with your daily quota.\n"
+        "👑 Premium reads unlimited; past the free limit a single file is a small wallet charge.</blockquote>",
         reply_markup=kb(*rows))
 
 
@@ -151,7 +174,7 @@ async def cb_featured(call: CallbackQuery) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>The marquee — hand-picked and sponsored standouts.</i>\n"
         "<blockquote>These are the titles worth a look first.\n"
-        "💎 Each one is just <code>1</code> token to add to your library — tap to read.</blockquote>",
+        "📥 Tap any to read — free with your daily quota.</blockquote>",
         reply_markup=kb(*rows))
 
 
@@ -216,8 +239,8 @@ async def cb_collection_files(call: CallbackQuery) -> None:
         f"{emoji} <b>{name}</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>A shelf curated around this theme — picked just for the mood.</i>\n"
-        "<blockquote>💎 Each title is <code>1</code> token — 🪙 BCN or 💎 BGM.\n"
-        "Tap any one to add it to your library.</blockquote>",
+        "<blockquote>📥 Tap any one — delivered free with your daily quota.\n"
+        "👑 Premium reads unlimited.</blockquote>",
         reply_markup=kb(*rows))
 
 
@@ -288,7 +311,7 @@ async def cb_author_files(call: CallbackQuery) -> None:
     rows.append([btn("🔙 Authors", "disc_authors", style="danger")])
     await call.message.edit_text(
         head + "<blockquote>📚 Every title from this author in our archive.\n"
-        "💎 Just <code>1</code> token each — tap to add it to your library.</blockquote>",
+        "📥 Tap any to read — free with your daily quota.</blockquote>",
         reply_markup=kb(*rows))
 
 
@@ -296,6 +319,10 @@ async def cb_author_files(call: CallbackQuery) -> None:
 @router.callback_query(F.data == "disc_series")
 async def cb_series(call: CallbackQuery) -> None:
     await call.answer()
+    if not await premium.is_premium(call.from_user.id):
+        text, markup = _locked_card("Series Finder")
+        await call.message.edit_text(text, reply_markup=markup)
+        return
     from utils.series import parse_series
     pool = (await recent_files(limit=200)) + (await popular_files(limit=200))
     # group by normalized series base; keep the lowest-volume file as representative
@@ -343,6 +370,10 @@ async def cb_series(call: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("disc_sr:"))
 async def cb_series_detail(call: CallbackQuery) -> None:
     await call.answer()
+    if not await premium.is_premium(call.from_user.id):
+        text, markup = _locked_card("Series Finder")
+        await call.message.edit_text(text, reply_markup=markup)
+        return
     from utils.files import get_file
     from utils.series import find_series, parse_series
     fuid = call.data.split(":", 1)[1]
@@ -372,7 +403,7 @@ async def cb_series_detail(call: CallbackQuery) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"<i>{len(vols)} volume(s) — the full run, in sequence.</i>\n"
         "<blockquote>📖 Tap each volume in order for the way the story was meant to unfold.\n"
-        "💎 Every volume is just <code>1</code> token to add to your library.</blockquote>",
+        "📥 Free with your daily quota.</blockquote>",
         reply_markup=kb(*rows))
 
 
@@ -395,6 +426,10 @@ def _file_rows(items, page, total, base):
 @router.callback_query(F.data.startswith("disc_new:"))
 async def cb_new(call: CallbackQuery) -> None:
     await call.answer()
+    if not await premium.is_premium(call.from_user.id):
+        text, markup = _locked_card("New Arrivals")
+        await call.message.edit_text(text, reply_markup=markup)
+        return
     page = int(call.data.split(":", 1)[1])
     items = await recent_files(limit=48)
     if not items:
@@ -410,7 +445,7 @@ async def cb_new(call: CallbackQuery) -> None:
         "🆕 <b>New Arrivals</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>Hot off the shelf — the freshest additions to the archive.</i>\n"
-        f"<blockquote>💎 Each title is just <code>1</code> token — 🪙 BCN or 💎 BGM.\n"
+        f"<blockquote>📥 Delivered free with your daily quota.\n"
         f"📄 Page <code>{page+1}</code> — tap a cover to add it to your library.</blockquote>",
         reply_markup=kb(*_file_rows(chunk, page, len(items), "disc_new")))
 
@@ -434,7 +469,7 @@ async def cb_pop(call: CallbackQuery) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>The crowd favourites — most downloaded of all time.</i>\n"
         f"<blockquote>🏆 If everyone's reading it, there's a reason.\n"
-        f"💎 Just <code>1</code> token each · 📄 Page <code>{page+1}</code> — tap to add it to your library.</blockquote>",
+        f"📥 Free with your daily quota · 📄 Page <code>{page+1}</code> — tap to add it to your library.</blockquote>",
         reply_markup=kb(*_file_rows(chunk, page, len(items), "disc_pop")))
 
 
@@ -455,8 +490,8 @@ async def cb_botd(call: CallbackQuery) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>One handpicked read, refreshed every morning — just for today.</i>\n"
         f"<blockquote>{icon_for(f.get('ext',''))} <b>{f.get('name','Untitled')}</b>\n\n"
-        "💎 Yours for a single token. Tap below and it's in your library.</blockquote>",
-        reply_markup=kb([btn("📥 Claim Today's Pick (1 token)", f"dl:{f['file_unique_id']}", style="success")],
+        "📥 Tap below and it's in your library — free with your daily quota.</blockquote>",
+        reply_markup=kb([btn("📥 Claim Today's Pick", f"dl:{f['file_unique_id']}", style="success")],
                         [btn("🔙 Discover", "lib_discover", style="danger")]))
 
 

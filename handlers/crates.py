@@ -39,7 +39,7 @@ async def _view(uid: int):
         f"Every <code>{ACTIONS_PER_KEY}</code> actions — a game played, a book "
         "downloaded, a wheel spun or a daily claimed — forges one fresh 🔑 key.\n"
         f"Possible drops range across {odds} tiers, each paying out instantly in "
-        "💎 BGM and 🪙 BCN. The rarer the tier, the sweeter the haul.\n"
+        "💎 BGM. The rarer the tier, the sweeter the haul.\n"
         "💡 <i>The more you do here, the faster your keys stack — so keep "
         "exploring your library.</i>"
         "</blockquote>")

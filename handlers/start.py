@@ -192,7 +192,7 @@ async def _deeplink_download(message: Message, uid: int, fuid: str) -> None:
         f"<i>Ready when you are.</i>\n\n"
         f"<blockquote>📄 <b>Format</b> · {icon_for(f.get('ext',''))} "
         f"<code>.{(f.get('ext') or '').upper()}</code>\n"
-        f"💸 <b>Delivery</b> · just <code>1</code> 🪙 BCN or 💎 BGM\n\n"
+        f"📥 <b>Delivery</b> · free with your daily quota — 👑 Premium for unlimited\n\n"
         "Tap below and it's yours in an instant.</blockquote>",
         reply_markup=kb([btn("📥 Download Now", f"dl:{fuid}", style="success")],
                         [btn("🏠 Dashboard", "menu_home", style="primary")]))
@@ -220,10 +220,9 @@ async def _send_dashboard(message: Message, name: str) -> None:
         "straight to your chat\n"
         "📖 <b>Your private library</b> — read, listen, bookmark and pick up right "
         "where you left off\n"
-        "🎮 <b>Play &amp; earn</b> — games, quests and daily rewards that top up your "
-        "wallet\n"
-        "💼 <b>One smart wallet</b> — 💎 BGM &amp; 🪙 BCN, redeems, gifts and VIP "
-        "perks in one place</blockquote>\n\n"
+        "🎮 <b>Play &amp; earn</b> — games, quests and daily rewards that pay out 💎 BGM\n"
+        "👑 <b>Go Premium</b> — redeem your BGM or top up a 💳 ₹/$ wallet for unlimited "
+        "access</blockquote>\n\n"
         "<i>💡 Pick a tile below to begin — your shelf is ready when you are.</i>\n\n"
         + DASHBOARD_FOOTER,
         reply_markup=await _dashboard_kb_with_ad(),
@@ -262,8 +261,8 @@ async def cb_library(call: CallbackQuery, state: FSMContext) -> None:
         "<b>AI Recommendations</b> learn your taste.\n"
         "📖 <b>Continue Reading</b> reopens your last page; ⭐ <b>Favorites</b> and "
         "📒 <b>My Shelf</b> keep it all organised.\n"
-        "🎯 Set a <b>Reading Goal</b>, track your 📊 <b>stats</b>, and take on "
-        "🎯 <b>Challenges</b> to keep the momentum going.</blockquote>",
+        "🎯 Set a <b>Reading Goal</b> and track your 📊 <b>stats</b> to keep the "
+        "momentum going.</blockquote>",
         reply_markup=kb(
             [btn("🔭 Discover", "lib_discover", style="success"),
              btn("🎯 For You", "lib_foryou", style="success")],
@@ -274,7 +273,6 @@ async def cb_library(call: CallbackQuery, state: FSMContext) -> None:
              btn("📒 My Shelf", "menu_shelf", style="primary")],
             [btn("📊 My Reading", "lib_stats", style="primary"),
              btn("🎯 Reading Goal", "lib_goal", style="primary")],
-            [btn("🎯 Challenges", "menu_challenges", style="primary")],
             [btn("🔙 Back", "menu_home", style="danger")],
         ),
     )
@@ -288,25 +286,26 @@ async def cb_account(call: CallbackQuery, state: FSMContext) -> None:
         "👤 <b>My Account</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>Your profile, wallet and rewards — all under your control.</i>\n\n"
-        "<blockquote>💼 Check your 💎 <b>BGM</b> &amp; 🪙 <b>BCN</b> balance, top up "
-        "instantly, or claim your 🎁 <b>daily reward</b>.\n"
-        "🎟 <b>Redeem</b> codes, 🎁 <b>gift</b> tokens to friends and earn more through "
-        "<b>referrals</b>, 🚀 <b>quests</b> and 🎁 <b>loot crates</b>.\n"
-        "👑 Unlock <b>VIP</b> perks, 🚨 track your requests, and tune your 🔔 alerts, "
-        "🌐 language and 🆘 support — all in one place.</blockquote>\n\n"
-        "<i>💡 New here? Claim your daily reward to start building your wallet.</i>",
+        "<blockquote>👑 Go <b>Premium</b> for unlimited downloads and the full library, "
+        "or top up your 💳 <b>wallet</b> to pay as you go.\n"
+        "💎 Earn <b>BGM</b> in games, referrals and your 🎁 <b>daily reward</b> — then "
+        "redeem it for Premium. 🎟 <b>Redeem</b> codes, 🎁 <b>gift</b> BGM and stack "
+        "<b>quests</b> &amp; 🎁 <b>loot crates</b>.\n"
+        "🚨 Track your requests and tune your 🔔 alerts, 🌐 language and 🆘 support — "
+        "all in one place.</blockquote>\n\n"
+        "<i>💡 New here? Claim your daily reward and start saving toward Premium.</i>",
         reply_markup=kb(
+            [btn("👑 Premium", "go_premium", style="success")],
             [btn("👤 Profile", "acc_profile", style="primary"),
              btn("💼 Balance", "acc_balance", style="primary")],
-            [btn("💎 Buy BGM", "acc_buy", style="success")],
-            [btn("🎁 Daily Reward", "daily_reward", style="success"),
-             btn("👑 Premium (VIP)", "acc_vip", style="success")],
-            [btn("🎟 Redeem Code", "acc_redeem", style="success"),
+            [btn("💳 Wallet / Top Up", "acc_buy", style="success"),
+             btn("🎁 Daily Reward", "daily_reward", style="success")],
+            [btn("🎟 Redeem Code", "acc_redeem", style="primary"),
              btn("🎁 Refer & Earn", "acc_refer", style="primary")],
             [btn("🎁 Loot Crates", "menu_crates", style="success"),
              btn("🚀 Quests", "menu_quests", style="success")],
             [btn("🚨 Track Request", "acc_track", style="primary"),
-             btn("🎁 Gift BGM", "acc_gift", style="success")],
+             btn("🎁 Gift BGM", "acc_gift", style="primary")],
             [btn("🔔 Notifications", "acc_notifs", style="primary"),
              btn("🌐 Language", "menu_locale", style="primary")],
             [btn("🆘 Support", "menu_support", style="primary")],
@@ -363,7 +362,7 @@ _CANCEL_DEST = {
     "menu_tools": "🛠️ Back to Tools",
     "menu_shelf": "📒 Back to My Shelf",
     "menu_support": "🆘 Support",
-    "acc_buy": "💎 Back to Top Up",
+    "acc_buy": "💳 Back to Wallet",
     "admin_open": "🛡 Back to Console",
     "admin_ai": "🤖 Back to AI Engine",
     "admin_manage": "🛡 Back to Manage Admins",
