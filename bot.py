@@ -189,16 +189,36 @@ async def _set_command_menu(bot: Bot) -> None:
         logger.warning("Could not set command menu: %s", exc)
 
 
+# Benign Telegram edit/callback races — the user re-tapped a button that doesn't
+# change the screen, or acted on a stale/old message. Nothing is broken and there's
+# nothing to fix, so we swallow these silently instead of logging them as errors or
+# polluting the 🩺 Health error feed.
+_BENIGN_TG_ERRORS = (
+    "message is not modified",
+    "message to edit not found",
+    "message can't be edited",
+    "query is too old",
+    "message to delete not found",
+)
+
+
 def _register_error_handler(dp: Dispatcher) -> None:
     """Capture any unhandled handler exception (utils.errors) instead of letting
     it surface as a bare traceback — feeds the admin 🩺 Health error feed."""
+    from aiogram.exceptions import TelegramBadRequest
+
     @dp.errors()
     async def _on_error(event: ErrorEvent) -> bool:
+        exc = event.exception
+        if isinstance(exc, TelegramBadRequest):
+            msg = str(exc).lower()
+            if any(b in msg for b in _BENIGN_TG_ERRORS):
+                return True  # harmless no-op; don't capture or log
         from utils.errors import capture
         update = getattr(event, "update", None)
         where = str(getattr(update, "event_type", "update")) if update else "update"
-        await capture(event.exception, where=where)
-        logger.exception("Unhandled handler error: %s", event.exception)
+        await capture(exc, where=where)
+        logger.exception("Unhandled handler error: %s", exc)
         return True  # mark handled so polling continues
 
 
