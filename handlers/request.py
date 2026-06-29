@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from html import escape
 
 from aiogram import F, Router
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
@@ -49,11 +50,8 @@ def _norm(text: str) -> str:
 
 
 # ── Request Center ─────────────────────────────────────────────────────────────
-@router.callback_query(F.data == "menu_request")
-async def cb_request_center(call: CallbackQuery, state: FSMContext) -> None:
-    await state.clear()
-    await call.answer()
-    await call.message.edit_text(
+def _request_center():
+    text = (
         "📚 <b>Request Center</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>Two ways to find any title — we'll take it from here.</i>\n\n"
@@ -63,14 +61,29 @@ async def cb_request_center(call: CallbackQuery, state: FSMContext) -> None:
         "👤 <b>Request Admin</b> — for the rare and out-of-print titles our "
         "archive doesn't carry yet. A curator sources it for you by hand."
         "</blockquote>\n"
-        "<i>💡 Start with the bot — it covers the vast majority of titles.</i>",
-        reply_markup=kb(
-            [btn("🤖 Request Bot", "req_auto", style="success"),
-             btn("👤 Request Admin", "req_manual", style="primary")],
-            [btn("📜 My History", "req_history", style="primary")],
-            [btn("🔙 Back", "menu_home", style="danger")],
-        ),
+        "<i>💡 Start with the bot — it covers the vast majority of titles.</i>")
+    markup = kb(
+        [btn("🤖 Request Bot", "req_auto", style="success"),
+         btn("👤 Request Admin", "req_manual", style="primary")],
+        [btn("📜 My History", "req_history", style="primary")],
+        [btn("🔙 Back", "menu_home", style="danger")],
     )
+    return text, markup
+
+
+@router.message(Command("request"))
+async def cmd_request(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    text, markup = _request_center()
+    await message.answer(text, reply_markup=markup)
+
+
+@router.callback_query(F.data == "menu_request")
+async def cb_request_center(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await call.answer()
+    text, markup = _request_center()
+    await call.message.edit_text(text, reply_markup=markup)
 
 
 @router.callback_query(F.data == "req_auto")

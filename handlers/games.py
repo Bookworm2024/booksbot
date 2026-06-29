@@ -9,8 +9,9 @@ import logging
 from html import escape
 
 from aiogram import F, Router
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 
 from config import BOT_PUBLIC_URL
 from utils.keyboards import btn, kb, webapp_btn
@@ -19,15 +20,26 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
+@router.message(Command("games"))
+async def cmd_games(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await _render_arcade(message, edit=False)
+
+
 @router.callback_query(F.data == "menu_games")
 async def cb_games(call: CallbackQuery, state: FSMContext) -> None:
     # leaving to the Games hub exits any half-finished game flow (e.g. a Cover
     # Guess round), so stray text later isn't captured as a guess.
     await state.clear()
     await call.answer()
+    await _render_arcade(call.message, edit=True)
+
+
+async def _render_arcade(message: Message, *, edit: bool) -> None:
+    send = message.edit_text if edit else message.answer
     from utils.flags import is_on
     if not await is_on("games"):
-        await call.message.edit_text(
+        await send(
             "🎮 <b>The Arcade is Resting</b>\n"
             "<i>A short intermission — we'll be back shortly.</i>\n"
             "━━━━━━━━━━━━━━━━━━\n"
@@ -38,7 +50,7 @@ async def cb_games(call: CallbackQuery, state: FSMContext) -> None:
             reply_markup=kb([btn("🔙 Back to Menu", "menu_home", style="danger")]))
         return
     if not BOT_PUBLIC_URL:
-        await call.message.edit_text(
+        await send(
             "🎮 <b>The Arcade</b>\n"
             "<i>Almost ready for you.</i>\n"
             "━━━━━━━━━━━━━━━━━━\n"
@@ -48,7 +60,7 @@ async def cb_games(call: CallbackQuery, state: FSMContext) -> None:
             "<i>💡 Check back soon — it's worth the wait.</i>",
             reply_markup=kb([btn("🔙 Back to Menu", "menu_home", style="danger")]))
         return
-    await call.message.edit_text(
+    await send(
         "🎮 <b>The Arcade</b> — Play &amp; Earn 💎\n"
         "<i>Read, guess, race the clock — and bank real BGM as you go.</i>\n"
         "━━━━━━━━━━━━━━━━━━\n"

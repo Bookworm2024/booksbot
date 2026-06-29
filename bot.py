@@ -18,7 +18,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import ErrorEvent
+from aiogram.types import BotCommand, ErrorEvent
 from aiohttp import web
 
 from config import (
@@ -162,6 +162,33 @@ def _build_dispatcher() -> Dispatcher:
     return dp
 
 
+# The public "/" command menu Telegram shows in the compose box. Every entry here
+# has a working handler (start.py / economy.py / payments.py / request.py /
+# favorites.py / games.py / stats.py); registering it in code keeps the menu and the
+# handlers in lock-step instead of relying on a manual BotFather setup.
+_COMMAND_MENU = [
+    ("start", "Start/restart the bot"),
+    ("claim", "Claim free BCN between 3 and 5"),
+    ("balance", "Check your current balance"),
+    ("buy", "Purchase BGMs"),
+    ("request", "Request Books or Audiobooks"),
+    ("favorites", "Check your favorites list"),
+    ("redeem", "Redeem your code"),
+    ("refer", "Refer and earn BGM"),
+    ("games", "Play games to earn BGM"),
+    ("stats", "Check bot's active statistics"),
+]
+
+
+async def _set_command_menu(bot: Bot) -> None:
+    try:
+        await bot.set_my_commands([BotCommand(command=c, description=d)
+                                   for c, d in _COMMAND_MENU])
+        logger.info("Command menu registered (%d commands).", len(_COMMAND_MENU))
+    except Exception as exc:  # noqa: BLE001 — a menu hiccup must never block startup
+        logger.warning("Could not set command menu: %s", exc)
+
+
 def _register_error_handler(dp: Dispatcher) -> None:
     """Capture any unhandled handler exception (utils.errors) instead of letting
     it surface as a bare traceback — feeds the admin 🩺 Health error feed."""
@@ -249,6 +276,7 @@ async def main() -> None:
     try:
         me = await bot.get_me()
         logger.info("Starting polling as @%s", me.username)
+        await _set_command_menu(bot)
         await bot.delete_webhook(drop_pending_updates=True)
         await dp.start_polling(bot)
     finally:

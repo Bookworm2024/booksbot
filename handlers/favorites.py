@@ -12,7 +12,8 @@ from datetime import datetime, timedelta, timezone
 from html import escape
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery
+from aiogram.filters import Command
+from aiogram.types import CallbackQuery, Message
 
 from config import BOT_PUBLIC_URL
 from utils.channel import get_file_channel
@@ -49,25 +50,30 @@ async def cb_fav_add(call: CallbackQuery) -> None:
     await call.answer("⭐ Saved to your Favorites — re-open it free, any time, from My Library.")
 
 
+@router.message(Command("favorites"))
+async def cmd_favorites(message: Message) -> None:
+    await _render(message, message.chat.id, 0, edit=False)
+
+
 @router.callback_query(F.data == "lib_favorites")
 async def cb_favorites(call: CallbackQuery) -> None:
     await call.answer()
-    await _render(call, 0)
+    await _render(call.message, call.from_user.id, 0, edit=True)
 
 
 @router.callback_query(F.data.startswith("fav_pg:"))
 async def cb_fav_page(call: CallbackQuery) -> None:
     await call.answer()
-    await _render(call, int(call.data.split(":", 1)[1]))
+    await _render(call.message, call.from_user.id, int(call.data.split(":", 1)[1]), edit=True)
 
 
-async def _render(call: CallbackQuery, page: int) -> None:
-    uid = call.from_user.id
+async def _render(message: Message, uid: int, page: int, *, edit: bool) -> None:
+    send = message.edit_text if edit else message.answer
     db = await MongoManager.get()
     items = await db.find_global("favorites", {"user_id": uid},
                                  sort=[("added_at", -1)])
     if not items:
-        await call.message.edit_text(
+        await send(
             "⭐ <b>Your Favorites</b>\n"
             "<i>A private shelf for the titles you love most.</i>\n"
             "━━━━━━━━━━━━━━━━━━\n"
@@ -110,7 +116,7 @@ async def _render(call: CallbackQuery, page: int) -> None:
         rows.append(nav)
     rows.append([btn("🔙 Back to Library", "menu_library", style="danger")])
 
-    await call.message.edit_text(
+    await send(
         f"⭐ <b>Your Favorites</b>\n"
         f"<i>Curated by you — open any title free, as often as you like.</i>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
@@ -242,4 +248,4 @@ async def cb_fav_del(call: CallbackQuery) -> None:
     for idx in db.healthy:
         await db.dbs[idx]["favorites"].delete_one({"user_id": uid, "file_unique_id": fuid})
     await call.answer("🗑 Removed from your Favorites. You can save it again any time.")
-    await _render(call, 0)
+    await _render(call.message, call.from_user.id, 0, edit=True)
