@@ -262,8 +262,8 @@ async def cb_library(call: CallbackQuery, state: FSMContext) -> None:
         "<b>AI Recommendations</b> learn your taste.\n"
         "📖 <b>Continue Reading</b> reopens your last page; ⭐ <b>Favorites</b> and "
         "📒 <b>My Shelf</b> keep it all organised.\n"
-        "🎯 Set a <b>Reading Goal</b>, track your 📊 <b>stats</b>, and join "
-        "👥 <b>Book Clubs</b> and 🎯 <b>Challenges</b> to read together.</blockquote>",
+        "🎯 Set a <b>Reading Goal</b>, track your 📊 <b>stats</b>, and take on "
+        "🎯 <b>Challenges</b> to keep the momentum going.</blockquote>",
         reply_markup=kb(
             [btn("🔭 Discover", "lib_discover", style="success"),
              btn("🎯 For You", "lib_foryou", style="success")],
@@ -274,8 +274,7 @@ async def cb_library(call: CallbackQuery, state: FSMContext) -> None:
              btn("📒 My Shelf", "menu_shelf", style="primary")],
             [btn("📊 My Reading", "lib_stats", style="primary"),
              btn("🎯 Reading Goal", "lib_goal", style="primary")],
-            [btn("👥 Book Clubs", "menu_clubs", style="success"),
-             btn("🎯 Challenges", "menu_challenges", style="primary")],
+            [btn("🎯 Challenges", "menu_challenges", style="primary")],
             [btn("🔙 Back", "menu_home", style="danger")],
         ),
     )
@@ -362,7 +361,6 @@ _CANCEL_DEST = {
     "menu_library": "📖 Back to Library",
     "menu_account": "👤 Back to Account",
     "menu_tools": "🛠️ Back to Tools",
-    "menu_clubs": "👥 Back to Clubs",
     "menu_shelf": "📒 Back to My Shelf",
     "menu_support": "🆘 Support",
     "acc_buy": "💎 Back to Top Up",

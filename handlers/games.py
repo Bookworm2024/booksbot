@@ -79,7 +79,7 @@ async def cb_games(call: CallbackQuery, state: FSMContext) -> None:
              btn("⚡ Speed Read", "menu_speedread", style="success")],
             [btn("🧠 Memory Match", "menu_memory", style="success")],
             [btn("🎯 Daily Missions", "menu_missions", style="primary"),
-             btn("📈 XP &amp; Levels", "xp_view", style="primary")],
+             btn("📈 XP & Levels", "xp_view", style="primary")],
             [btn("🎟️ Battle Pass", "menu_battlepass", style="success"),
              btn("🏆 Leaderboard", "game_leaderboard", style="primary")],
             [btn("🏆 Weekly Tournament", "game_tournament", style="success")],

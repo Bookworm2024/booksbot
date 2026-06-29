@@ -1,7 +1,7 @@
 """
 utils/moderation.py — lightweight auto-moderation for user content.
 
-A cheap, dependency-free filter for public user text (club posts, reviews):
+A cheap, dependency-free filter for public user text (reviews, etc.):
 a configurable banned-word list plus spam heuristics (too many links, shouting,
 character spam). Admins manage the word list + on/off live from the panel.
 

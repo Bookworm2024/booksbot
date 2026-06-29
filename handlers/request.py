@@ -486,6 +486,11 @@ async def cb_download(call: CallbackQuery) -> None:
     await bump_download(fuid)
     from utils.missions import mark
     await mark(uid, "download")
+    # track reading taste by genre (AI-driven) → powers the 🎯 For You shelf.
+    # Fire-and-forget so a possible AI classify never slows delivery.
+    import asyncio
+    from utils.foryou import record_genre_read
+    asyncio.create_task(record_genre_read(uid, f.get("name") or "", file_doc=f, fuid=fuid))
     # nudge the next volume if this title is part of a detected series
     try:
         from utils.series import next_volume

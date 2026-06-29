@@ -14,7 +14,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
-from utils.format import fmt_amount
+from utils.format import fmt_amount, fmt_dt
 from utils.keyboards import btn, kb
 from utils.permissions import has
 
@@ -82,6 +82,13 @@ async def on_track_id(message: Message, state: FSMContext) -> None:
 
 def _render_req(req: dict) -> str:
     status = _STATUS.get(req.get("status"), "❓")
+    # full UTC timeline so progress is easy to track at a glance
+    times = [f"🕒 <b>Requested:</b> {fmt_dt(req.get('created_at'))}"]
+    if req.get("status") == "fulfilled":
+        times.append(f"✅ <b>Fulfilled:</b> {fmt_dt(req.get('fulfilled_at'))}")
+    elif req.get("status") == "cancelled":
+        times.append(f"❌ <b>Cancelled:</b> {fmt_dt(req.get('cancelled_at'))}")
+    timeline = "\n".join(times)
     extra = ""
     if req.get("status") == "cancelled":
         extra = (f"\n\n<blockquote>📭 <b>Reason:</b> {req.get('cancel_reason', '—')}"
@@ -93,7 +100,8 @@ def _render_req(req: dict) -> str:
             f"<blockquote>📖 <b>Title:</b> {req.get('title')}\n"
             f"✍️ <b>Author:</b> {req.get('author')}\n"
             f"📂 <b>Format:</b> {req.get('format') or req.get('category')}\n"
-            f"📊 <b>Status:</b> {status}</blockquote>"
+            f"📊 <b>Status:</b> {status}\n"
+            f"{timeline}</blockquote>"
             f"{extra}")
 
 
@@ -133,7 +141,8 @@ async def _render_history(call: CallbackQuery, page: int) -> None:
              "<blockquote>"]
     for r in chunk:
         lines.append(f"{_STATUS.get(r.get('status'),'❓')} <code>{r['request_id']}</code> — "
-                     f"{r.get('title','?')[:30]}")
+                     f"{r.get('title','?')[:28]}")
+        lines.append(f"   🕒 {fmt_dt(r.get('created_at'))}")
     lines.append("</blockquote>")
     rows = []
     nav = []

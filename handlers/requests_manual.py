@@ -40,7 +40,7 @@ from utils.brand import CREDIT
 from utils.channel import get_file_channel
 from utils.logs import log_request_created, log_request_fulfilled
 from utils.files import clean_title, index_file, kind_for_ext, trigrams
-from utils.format import fmt_amount
+from utils.format import fmt_amount, fmt_dt
 from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import has
 from utils.wallet import get_balances, refund, spend
@@ -259,6 +259,10 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
     # per-user request counters (for /balance display)
     field = "ebook_requests" if data["category"] == "ebook" else "audiobook_requests"
     await db.safe_update("users", {"user_id": uid}, {"$inc": {field: 1}})
+    # track reading taste by genre (AI classifies the title) → 🎯 For You shelf
+    import asyncio
+    from utils.foryou import record_genre_read
+    asyncio.create_task(record_genre_read(uid, data["title"]))
     await state.clear()
 
     await call.message.answer(
@@ -267,7 +271,8 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
         "<i>Your order is in the queue and our team will take it from here.</i>\n"
         "<blockquote>"
         f"🆔 <b>Tracking ID:</b> <code>{rid}</code>\n"
-        f"📖 <b>{req['title']}</b> — {req['author']}</blockquote>\n"
+        f"📖 <b>{req['title']}</b> — {req['author']}\n"
+        f"🕒 <b>Requested:</b> {fmt_dt(req['created_at'])}</blockquote>\n"
         "<i>🔔 We'll ping you the moment it's ready. Follow its progress anytime "
         "via 🚨 Track Request — and if we can't source it, your fee comes straight back.</i>")
 
@@ -277,7 +282,8 @@ async def cb_confirm(call: CallbackQuery, state: FSMContext) -> None:
                "<blockquote>"
                f"🆔 <code>{rid}</code>\n👤 <a href='tg://user?id={uid}'>{req['first_name']}</a> "
                f"(<code>{uid}</code>)\n📖 {req['title']}\n✍️ {req['author']}\n"
-               f"📂 {req['format'] or req['category']}\n💰 Paid in {currency}</blockquote>")
+               f"📂 {req['format'] or req['category']}\n💰 Paid in {currency}\n"
+               f"🕒 {fmt_dt(req['created_at'])}</blockquote>")
     for admin in ADMIN_IDS:
         try:
             if req["cover_id"]:
@@ -335,7 +341,8 @@ async def _render_queue(bot, admin_id: int) -> None:
                "<blockquote>"
                f"🆔 <code>{r['request_id']}</code>\n👤 <code>{r['user_id']}</code>\n"
                f"📖 {r.get('title')}\n✍️ {r.get('author')}\n"
-               f"📂 {r.get('format') or r.get('category')}</blockquote>")
+               f"📂 {r.get('format') or r.get('category')}\n"
+               f"🕒 {fmt_dt(r.get('created_at'))}</blockquote>")
         try:
             if r.get("cover_id"):
                 await bot.send_photo(admin_id, r["cover_id"], caption=cap,
@@ -519,7 +526,8 @@ async def cb_done(call: CallbackQuery) -> None:
             "<i>All done — your book has been delivered.</i>\n"
             "<blockquote>"
             f"🆔 <b>Tracking ID:</b> <code>{rid}</code>\n"
-            f"📖 <b>{req.get('title')}</b></blockquote>\n"
+            f"📖 <b>{req.get('title')}</b>\n"
+            f"🕒 <b>Fulfilled:</b> {fmt_dt(_now())}</blockquote>\n"
             "<i>🔖 Find it anytime in your library. Happy reading!</i>")
     except Exception:  # noqa: BLE001
         pass
@@ -588,6 +596,7 @@ async def on_reason(message: Message, state: FSMContext) -> None:
             "<blockquote>"
             f"🆔 <b>Tracking ID:</b> <code>{rid}</code>\n"
             f"📖 <b>{req.get('title')}</b>\n"
+            f"🕒 <b>Cancelled:</b> {fmt_dt(_now())}\n"
             f"📝 <b>Note from our team:</b> {reason}\n"
             f"💰 <b>Refunded:</b> <code>{fmt_amount(refund_amt)}</code> 💎 BGM, back in "
             "your wallet now.</blockquote>\n"

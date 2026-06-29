@@ -144,8 +144,8 @@ Legend counts toward ~500 features across 14 pillars.
   variant delivery tracked) · ✅ role-based admin permissions (granular — 🔑 per-
   admin broadcast/ban/requests/users/content/moderation toggles, super-admin
   panel, default full-access so existing admins are unaffected)
-- ✅ Auto-moderation rules · spam/abuse detection (🛡 filters club posts &amp;
-  reviews — links/shouting/char-spam heuristics + admin-managed blocked-term
+- ✅ Auto-moderation rules · spam/abuse detection (🛡 filters reviews —
+  links/shouting/char-spam heuristics + admin-managed blocked-term
   list, live on/off)
 - ⬜ Canned replies · macro buttons · staff shifts
 - ⬜ Impersonate-view (see the bot as a user) · sandbox test mode
@@ -173,7 +173,10 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Comeback push reminders (hourly loop, nudges inactive users once/day)
 - ✅ Notification preferences (🔔 toggle, default ON)
 - ✅ Streak insurance (auto-saves a missed day) · comeback bonus · anniversary gift
-- ✅ Personalized weekly digest (background loop) + 🎯 "For You" feed
+- ✅ Personalized weekly digest (background loop) + 🎯 "For You" feed — AI-driven:
+  every read/request is genre-classified (file tag → AI), the most-read genre
+  becomes the reader's favourite, and For You serves fresh books from it and shows
+  how many of their reads/requests matched (`utils/foryou.py`)
 
 ## 9. Personalization & Profiles
 - ✅ Player profile — level + XP progress, earned badges, lifetime stats, share
@@ -183,10 +186,10 @@ Legend counts toward ~500 features across 14 pillars.
 
 ## 10. Social & Community
 - ✅ Leaderboards hub — Top Readers / Gamers / Referrers / Streaks (+ your rank)
-- ✅ Book clubs / reading rooms (👥 create/join clubs, async post feed, atomic
-  membership) · 🔜 group reading challenges
+- 🗑 Book clubs / reading rooms — removed from the bot entirely (handlers/clubs.py
+  & utils/clubs.py deleted, router/menu unwired, indexes dropped)
 - ✅ Comments/reactions on titles (written reviews = comments + 👍❤️🔥😂😮 one-tap
-  reactions, toggle, counts) · discussion threads via club post feeds
+  reactions, toggle, counts)
 - ⬜ Buddy reading · shared shelves · author AMAs
 
 ## 11. Content Pipeline (uploaders/admins)

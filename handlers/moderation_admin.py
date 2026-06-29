@@ -41,7 +41,7 @@ async def _panel():
     text = (f"🛡 <b>Auto-Moderation</b> — {status}\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "<i>Your always-on guardrail for community spaces.</i>\n\n"
-            "<blockquote>Every club post and review is screened automatically for spam — "
+            "<blockquote>Every review is screened automatically for spam — "
             "too many links, all-caps shouting and character flooding — alongside the "
             "blocked-term list you curate below. Clean content passes through instantly; "
             "anything flagged is quietly held back.</blockquote>\n"

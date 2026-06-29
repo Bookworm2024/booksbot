@@ -15,6 +15,7 @@ propagate into the wallet.
 from __future__ import annotations
 
 import math
+from datetime import datetime, timezone
 
 # No legitimate balance or single transaction can exceed this. Anything larger
 # is corruption (e.g. an admin typing "1e21", an overflow) and is clamped on the
@@ -103,3 +104,21 @@ def fmt_amount(x, decimals: int = 2) -> str:
     else:
         s = f"{v:,.{decimals}f}".rstrip("0").rstrip(".")
     return f"-{s}" if neg and v != 0 else s
+
+
+def fmt_dt(dt, *, with_time: bool = True) -> str:
+    """Render a datetime in UTC for at-a-glance tracking — the single source of
+    truth for every on-screen timestamp in the bot.
+
+        fmt_dt(dt)                 -> "2026-06-29 10:52 UTC"
+        fmt_dt(dt, with_time=False)-> "2026-06-29 UTC"
+        fmt_dt(None)               -> "—"
+
+    Naive datetimes (rare; Mongo is tz-aware) are assumed to already be UTC.
+    """
+    if not isinstance(dt, datetime):
+        return "—"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    dt = dt.astimezone(timezone.utc)
+    return dt.strftime("%Y-%m-%d %H:%M UTC" if with_time else "%Y-%m-%d UTC")
