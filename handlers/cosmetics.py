@@ -18,7 +18,7 @@ from aiogram.types import CallbackQuery, Message
 from database.connection import MongoManager
 from utils.cosmetics import FLAIRS, buy, equip, owned
 from utils.format import fmt_amount
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.wallet import charge_bgm
 
 logger = logging.getLogger(__name__)
@@ -134,7 +134,9 @@ async def cb_vanity(call: CallbackQuery, state: FSMContext) -> None:
         f"💎 One-time cost · <code>{fmt_amount(_VANITY_COST)} BGM</code>.\n"
         "👀 Shows on your profile and across the leaderboards."
         "</blockquote>\n"
-        "Send your new name below to claim it — or send <code>/cancel</code> to keep your current one.")
+        "Send your new name below to claim it.\n"
+        "<i>💡 Tap Cancel below to keep your current handle.</i>",
+        reply_markup=kb(cancel_row("menu_account")))
 
 
 @router.message(CosFSM.vanity, F.text)

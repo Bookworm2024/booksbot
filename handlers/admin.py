@@ -21,7 +21,7 @@ from aiogram.types import CallbackQuery, Message
 from config import ADMIN_IDS, SUPER_ADMIN_ID
 from utils.admins import add_admin, get_extra_admins, remove_admin
 from utils.audit import log_action
-from utils.keyboards import btn, kb, webapp_btn
+from utils.keyboards import btn, cancel_row, kb, webapp_btn
 from utils.permissions import is_admin, is_super, perms_for
 from utils.users import set_ban
 
@@ -275,7 +275,8 @@ async def cb_adm_add(call: CallbackQuery, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>Send the numeric User ID of the member you'd like to bring onto the team.</i>\n"
         "<blockquote>They'll gain access to the admin console and be notified. You can fine-tune exactly what they can do under 🔑 Permissions.</blockquote>\n"
-        "<i>💡 Send /cancel to stop.</i>")
+        "<i>💡 Tap Cancel below to step back.</i>",
+        reply_markup=kb(cancel_row("admin_manage")))
 
 
 @router.callback_query(F.data == "adm_remove")
@@ -290,7 +291,8 @@ async def cb_adm_remove(call: CallbackQuery, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>Send the numeric User ID of the admin you'd like to step down.</i>\n"
         "<blockquote>They'll lose console access right away. Owner and env admins are fixed in config and can't be removed here.</blockquote>\n"
-        "<i>💡 Send /cancel to stop.</i>")
+        "<i>💡 Tap Cancel below to step back.</i>",
+        reply_markup=kb(cancel_row("admin_manage")))
 
 
 @router.message(AdminFSM.awaiting_add_admin)

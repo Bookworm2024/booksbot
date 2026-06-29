@@ -15,7 +15,7 @@ from aiogram.types import CallbackQuery, Message
 from config import SUPER_ADMIN_ID
 from utils.deals import banner, clear_deal, get_deal, set_deal
 from utils.format import fmt_amount, valid_amount
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.settings import DEFAULTS, all_settings, set_setting
 
 logger = logging.getLogger(__name__)
@@ -82,8 +82,9 @@ async def cb_edit(call: CallbackQuery, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━\n"
         "<blockquote>"
         "🔢 <b>Send a number</b> and it becomes the new value — it applies the moment you send it.\n"
-        "💡 <i>Send</i> <code>/cancel</code> <i>anytime to leave this setting untouched.</i>"
-        "</blockquote>")
+        "💡 <i>Tap Cancel below to leave this setting untouched.</i>"
+        "</blockquote>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(PriceFSM.awaiting_value, F.text)
@@ -153,8 +154,9 @@ async def cb_deal_new(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>"
         "🎁 <b>Bonus percent</b> — how much extra BGM buyers receive on each purchase.\n"
         "<i>For example, send</i> <code>50</code> <i>for a +50% bonus.</i>\n"
-        "💡 <i>Send</i> <code>/cancel</code> <i>anytime to stop without launching.</i>"
-        "</blockquote>")
+        "💡 <i>Tap Cancel below to stop without launching.</i>"
+        "</blockquote>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(PriceFSM.deal_pct, F.text)

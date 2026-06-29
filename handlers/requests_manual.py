@@ -36,7 +36,7 @@ from utils.brand import CREDIT
 from utils.logs import log_request_created, log_request_fulfilled
 from utils.files import clean_title, index_file, kind_for_ext
 from utils.format import fmt_amount
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import has
 from utils.wallet import get_balances, refund, spend
 
@@ -112,7 +112,8 @@ async def cb_pick_category(call: CallbackQuery, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<blockquote>✍️ Send us the <b>title</b> of the book you'd like — exactly as "
         "it appears on the cover works best, so we match the right edition.</blockquote>\n"
-        "<i>💡 Changed your mind? Send /cancel anytime — nothing is charged until you confirm.</i>")
+        "<i>💡 Nothing is charged until you confirm. Tap Cancel anytime to back out.</i>",
+        reply_markup=kb([btn("❌ Cancel", "mreq_cancel", style="danger")]))
 
 
 @router.message(ManualFSM.title, F.text)
@@ -125,7 +126,8 @@ async def on_title(message: Message, state: FSMContext) -> None:
         "✍️ <b>Request · Step 2 of 4</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<blockquote>Now the <b>author's name</b>. This helps us pick the right "
-        "book when several share a title.</blockquote>")
+        "book when several share a title.</blockquote>",
+        reply_markup=kb([btn("❌ Cancel", "mreq_cancel", style="danger")]))
 
 
 @router.message(ManualFSM.author, F.text)
@@ -145,7 +147,8 @@ async def on_author(message: Message, state: FSMContext) -> None:
             "📙 <b>MOBI</b> — for Kindle libraries.</blockquote>",
             reply_markup=kb([btn("📑 PDF", "mfmt_PDF", style="primary"),
                              btn("📘 EPUB", "mfmt_EPUB", style="primary"),
-                             btn("📙 MOBI", "mfmt_MOBI", style="primary")]))
+                             btn("📙 MOBI", "mfmt_MOBI", style="primary")],
+                            [btn("❌ Cancel", "mreq_cancel", style="danger")]))
     else:
         await state.set_state(ManualFSM.cover)
         await message.answer(
@@ -153,7 +156,8 @@ async def on_author(message: Message, state: FSMContext) -> None:
             "━━━━━━━━━━━━━━━━━━━━\n"
             "<blockquote>Send a <b>cover image</b> (a photo or an image file) so we "
             "can confirm we've matched the exact title.\n"
-            "💡 A quick grab from Google Images is perfect.</blockquote>")
+            "💡 A quick grab from Google Images is perfect.</blockquote>",
+            reply_markup=kb([btn("❌ Cancel", "mreq_cancel", style="danger")]))
 
 
 @router.callback_query(F.data.startswith("mfmt_"))
@@ -166,7 +170,8 @@ async def cb_format(call: CallbackQuery, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<blockquote>Almost there — send a <b>cover image</b> (a photo or an image "
         "file) so we lock onto the exact edition.\n"
-        "💡 A quick grab from Google Images works perfectly.</blockquote>")
+        "💡 A quick grab from Google Images works perfectly.</blockquote>",
+        reply_markup=kb([btn("❌ Cancel", "mreq_cancel", style="danger")]))
 
 
 @router.message(ManualFSM.cover, F.photo | F.document)
@@ -201,7 +206,8 @@ async def on_cover_invalid(message: Message) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<blockquote>Send the cover as a <b>photo</b> or an <b>image file</b> and "
         "we'll lock onto the right edition. A screenshot from Google Images is "
-        "perfect.</blockquote>")
+        "perfect.</blockquote>",
+        reply_markup=kb([btn("❌ Cancel", "mreq_cancel", style="danger")]))
 
 
 @router.callback_query(F.data == "mreq_cancel")
@@ -379,7 +385,8 @@ async def cb_send_init(call: CallbackQuery, state: FSMContext) -> None:
         f"<blockquote>Upload the file for request <code>{rid}</code> now — "
         "a <b>document</b>, <b>audio</b>, or <b>video</b>.\n"
         "🛡 It's indexed into the searchable archive and delivered straight to the "
-        "reader with a one-tap Add-to-Favorites button.</blockquote>")
+        "reader with a one-tap Add-to-Favorites button.</blockquote>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(AdminReqFSM.awaiting_file, F.document | F.audio | F.video)
@@ -492,7 +499,8 @@ async def cb_cancel_init(call: CallbackQuery, state: FSMContext) -> None:
         f"<blockquote>Type a short <b>reason</b> for cancelling <code>{rid}</code>. "
         "The reader sees this exact note, so keep it kind and clear.\n"
         "💰 Their fee is refunded automatically in 💎 BGM the moment you "
-        "send it.</blockquote>")
+        "send it.</blockquote>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(AdminReqFSM.awaiting_reason, F.text)

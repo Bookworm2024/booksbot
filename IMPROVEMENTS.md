@@ -21,7 +21,9 @@ it's here, it's not done yet.
 - ⬜ Adjustable playback EQ for audiobooks · chapter markers
 
 ## 2. Book Discovery & Content
-- ⬜ TBR reminders (nudge about saved-for-later books)
+- ⬜ TBR reminders (nudge about saved-for-later books) — note: the Reading List
+  (TBR) was retired from the menu when the search-result pin was removed; revive
+  the feeder first if this is wanted
 
 ## 3. Powerful Search
 - 🔜 Author filter (needs author metadata)

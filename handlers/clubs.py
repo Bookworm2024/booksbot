@@ -17,7 +17,7 @@ from utils.clubs import (
     MAX_CLUBS_PER_USER, MAX_POST_LEN, add_post, create_club, created_count,
     get_club, is_member, join, leave, list_clubs, my_club_ids, recent_posts,
 )
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -143,7 +143,8 @@ async def cb_post(call: CallbackQuery, state: FSMContext) -> None:
         "<i>The room is listening — type your message and we'll post it to the feed.</i>\n\n"
         f"<blockquote>📚 Drop a recommendation, a hot take, or a question for fellow readers.\n"
         f"✏️ Up to <code>{MAX_POST_LEN}</code> characters.\n"
-        "↩️ Send <code>/cancel</code> any time to step back.</blockquote>")
+        "↩️ Tap Cancel below any time to step back.</blockquote>",
+        reply_markup=kb(cancel_row("menu_clubs")))
 
 
 @router.message(ClubFSM.post, F.text)
@@ -187,7 +188,8 @@ async def cb_create(call: CallbackQuery, state: FSMContext) -> None:
         "<i>Every great reading room begins with a name. What shall we call yours?</i>\n\n"
         "<blockquote>📖 Pick something that tells readers what you're here to read — a genre, "
         "an author, a vibe.\n"
-        "↩️ Send <code>/cancel</code> to step back.</blockquote>")
+        "↩️ Tap Cancel below to step back.</blockquote>",
+        reply_markup=kb(cancel_row("menu_clubs")))
 
 
 @router.message(ClubFSM.name, F.text)

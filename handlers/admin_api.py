@@ -119,6 +119,15 @@ async def api_admin_ai(request: web.Request) -> web.Response:
             await set_ai_config("anthropic_key", ak.strip())
         if isinstance(body.get("model"), str) and body["model"].strip():
             await set_ai_config("model", body["model"].strip())
+        # webhook mode: a custom AI endpoint the bot POSTs every request to
+        if isinstance(body.get("webhook_url"), str):
+            await set_ai_config("webhook_url", body["webhook_url"].strip())
+        if "webhook_enabled" in body:
+            # Mirror the chat toggle's contract: never persist webhook mode ON
+            # without a URL (a blank field would leave the panels disagreeing).
+            cur = await get_ai_config()
+            await set_ai_config("webhook_enabled",
+                                bool(body.get("webhook_enabled")) and bool(cur["webhook_url"]))
 
     cfg = await get_ai_config()
     return web.json_response({
@@ -127,6 +136,8 @@ async def api_admin_ai(request: web.Request) -> web.Response:
         "model": cfg["model"],
         "anthropic_key_masked": _mask(cfg["anthropic_key"]),
         "has_key": bool(cfg["anthropic_key"]),
+        "webhook_enabled": cfg["webhook_enabled"],
+        "webhook_url": cfg["webhook_url"],
         "can_edit": uid == SUPER_ADMIN_ID,
     })
 

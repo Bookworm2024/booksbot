@@ -18,7 +18,7 @@ from utils.ads import (
     all_ads, bump_click, create_ad, delete_ad, get_ad, set_active,
 )
 from utils.audit import log_action
-from utils.keyboards import btn, kb, url_btn
+from utils.keyboards import btn, cancel_row, kb, url_btn
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -112,7 +112,8 @@ async def cb_ad_new(call: CallbackQuery, state: FSMContext) -> None:
         "<i>Let's build a sponsored placement. We'll take it one step at a time.</i>\n\n"
         "<blockquote>✍️ Send the <b>message text</b> readers will see when they open this ad.\n"
         "Keep it inviting and to the point — this is the body of the offer.</blockquote>\n"
-        "<i>💡 Send <code>/cancel</code> anytime to back out.</i>")
+        "<i>💡 Tap Cancel below to step back.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(AdFSM.text, F.text)

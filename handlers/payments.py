@@ -37,7 +37,7 @@ from utils.oxapay import (
     verify_webhook,
 )
 from utils.format import fmt_amount
-from utils.keyboards import btn, kb, url_btn, webapp_btn
+from utils.keyboards import btn, cancel_row, kb, url_btn, webapp_btn
 from utils.settings import get_float
 from utils.wallet import add_bgm
 
@@ -151,7 +151,8 @@ async def cb_coupon(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>"
         "✍️ Send your <b>coupon code</b> in your next message and we'll attach the bonus "
         "to your following purchase.</blockquote>"
-        "<i>💡 Send /cancel any time to step back.</i>")
+        "<i>💡 Changed your mind? Tap Cancel below.</i>",
+        reply_markup=kb(cancel_row("acc_buy")))
 
 
 @router.message(PayFSM.awaiting_coupon, F.text)
@@ -196,10 +197,11 @@ async def cb_upi(call: CallbackQuery, state: FSMContext) -> None:
             "━━━━━━━━━━━━━━━━━━\n"
             "<i>Our UPI verifier is paused for the moment — your BGM are safe either way.</i>\n"
             "<blockquote>"
-            "🌐 You can pay instantly with <b>crypto</b> instead, or reach our team via "
-            "/support and we'll sort it out for you.</blockquote>"
+            "🌐 You can pay instantly with <b>crypto</b> instead, or tap <b>Support</b> "
+            "below and we'll sort it out for you.</blockquote>"
             "<i>(Admin: set IMAP_USER + IMAP_PASSWORD to re-enable UPI auto-verify.)</i>",
             reply_markup=kb([btn("🌐 Pay with Crypto", "pay_crypto", style="primary")],
+                            [btn("🆘 Support", "menu_support", style="primary")],
                             [btn("🔙 Back", "acc_buy", style="danger")]))
         return
     await state.set_state(PayFSM.awaiting_amount)
@@ -211,7 +213,8 @@ async def cb_upi(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>"
         f"💎 Enter the number of <b>BGM</b> to buy — minimum <code>{MIN_BGM_PURCHASE}</code> "
         f"(<code>₹{min_inr}</code>).</blockquote>"
-        "<i>💡 Just send a number. Send /cancel to step back.</i>")
+        "<i>💡 Just send a number, or tap Cancel below.</i>",
+        reply_markup=kb(cancel_row("acc_buy")))
 
 
 @router.message(PayFSM.awaiting_amount, F.text)
@@ -267,6 +270,7 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     rows = []
     if PAYMENT_QR_URL:
         rows.append([url_btn("📷 View QR Code", PAYMENT_QR_URL)])
+    rows.append(cancel_row("acc_buy"))
     await message.answer(
         f"💳 <b>Pay ₹{inr:.2f}</b> for <code>{bgm}</code> <b>BGM</b>\n{bonus_line}"
         "━━━━━━━━━━━━━━━━━━\n"
@@ -276,7 +280,7 @@ async def on_amount(message: Message, state: FSMContext) -> None:
         "2️⃣ Then paste your <b>UTR / transaction reference</b> back here.</blockquote>"
         "<i>💡 We verify it against your payment receipt and credit your BGM automatically — "
         "usually within 1–2 minutes.</i>",
-        reply_markup=kb(*rows) if rows else None)
+        reply_markup=kb(*rows))
 
 
 @router.message(PayFSM.awaiting_utr, F.text)
@@ -300,7 +304,8 @@ async def on_utr(message: Message, state: FSMContext) -> None:
     if await db.find_one_global("payments", {"submitted_utr": utr, "status": "paid"}):
         await message.answer(
             "❌ <b>That reference is already on file.</b>\n<i>This transaction reference has "
-            "been used for a completed payment. If something looks off, reach us via /support.</i>")
+            "been used for a completed payment. If something looks off, tap Support below.</i>",
+            reply_markup=kb([btn("🆘 Support", "menu_support", style="primary")]))
         return
     order = await db.find_one_global("payments", {"order_id": order_id})
     if not order or order.get("status") not in ("waiting", "utr_submitted"):

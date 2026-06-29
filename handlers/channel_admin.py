@@ -166,7 +166,8 @@ async def cb_change(call: CallbackQuery, state: FSMContext) -> None:
         "↪️ <b>Forward a message</b> — forward anything from the channel and I'll "
         "read its id for you.</blockquote>\n\n"
         "<i>💡 Channel ids are negative and usually begin with <code>-100</code>.</i>\n\n"
-        "Send <code>/cancel</code> anytime to step away.")
+        "<i>Tap Cancel below anytime to step away.</i>",
+        reply_markup=kb([btn("❌ Cancel", "flow_cancel:admin_open", style="danger")]))
 
 
 @router.message(ChannelFSM.awaiting_channel_id)
@@ -230,6 +231,23 @@ async def on_channel_id(message: Message, state: FSMContext) -> None:
 
 
 # ── import old files (forward-to-index) ──────────────────────────────────────
+def _import_kb():
+    """Always-present controls during the import flow — finish or back out with a
+    tap (no commands)."""
+    return kb([btn("✅ Done Importing", "import_done", style="success")],
+              [btn("❌ Cancel", "flow_cancel:admin_open", style="danger")])
+
+
+def _import_done_text(imported: int, skipped: int) -> str:
+    return (
+        "✨ <b>Import complete</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Your archive just grew. Nicely done.</i>\n\n"
+        f"<blockquote>📚 <b>Newly indexed</b> · <code>{imported}</code>\n"
+        f"⏭ <b>Already on the shelf</b> · <code>{skipped}</code></blockquote>\n\n"
+        "<i>💡 The new titles are searchable right away — try a search to see them land.</i>")
+
+
 @router.callback_query(F.data == "admin_import")
 async def cb_import(call: CallbackQuery, state: FSMContext) -> None:
     if not await has(call.from_user.id, "content"):
@@ -252,25 +270,36 @@ async def cb_import(call: CallbackQuery, state: FSMContext) -> None:
         "<b>deliver</b> on demand.\n"
         "🔁 Already-indexed files are skipped automatically, so re-forwarding is "
         "perfectly safe.</blockquote>\n\n"
-        "Send <code>/done</code> when you've finished.")
+        "<i>✅ Tap <b>Done Importing</b> below when you've finished.</i>",
+        reply_markup=_import_kb())
+
+
+@router.callback_query(F.data == "import_done")
+async def cb_import_done(call: CallbackQuery, state: FSMContext) -> None:
+    if not await has(call.from_user.id, "content"):
+        await call.answer("🔒 You don't have permission for this — ask the owner to enable it.", show_alert=True)
+        return
+    data = await state.get_data()
+    await state.clear()
+    await call.answer("Import wrapped up. ✨")
+    await call.message.answer(
+        _import_done_text(int(data.get("imported", 0)), int(data.get("skipped", 0))),
+        reply_markup=kb([btn("🗂 File Channel", "admin_filechan", style="primary")],
+                        [btn("🔙 Back to Admin", "admin_open", style="primary")]))
 
 
 @router.message(ChannelFSM.importing)
 async def on_import(message: Message, state: FSMContext) -> None:
     text = (message.text or "").strip()
-    # /done, /cancel, or any other slash-command exits the import flow (but a
-    # forwarded file with a caption starting "/" is still a file, so require no
-    # forward_origin before treating it as a command).
+    # A typed /done or /cancel (or any slash-command) still exits the import flow —
+    # but a forwarded file whose caption starts with "/" is still a file, so require
+    # no forward_origin before treating it as a command. The on-screen controls are
+    # buttons (✅ Done Importing / ❌ Cancel); typed commands stay as a silent fallback.
     if text.startswith("/") and getattr(message, "forward_origin", None) is None:
         data = await state.get_data()
         await state.clear()
         await message.answer(
-            "✨ <b>Import complete</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "<i>Your archive just grew. Nicely done.</i>\n\n"
-            f"<blockquote>📚 <b>Newly indexed</b> · <code>{data.get('imported', 0)}</code>\n"
-            f"⏭ <b>Already on the shelf</b> · <code>{data.get('skipped', 0)}</code></blockquote>\n\n"
-            "<i>💡 The new titles are searchable right away — try a search to see them land.</i>",
+            _import_done_text(int(data.get("imported", 0)), int(data.get("skipped", 0))),
             reply_markup=kb([btn("🗂 File Channel", "admin_filechan", style="primary")],
                             [btn("🔙 Back to Admin", "admin_open", style="primary")]))
         return
@@ -283,7 +312,8 @@ async def on_import(message: Message, state: FSMContext) -> None:
     if fchat is None or fmsg_id is None:
         await message.answer("⏭ <b>That wasn't a forward from a channel.</b>\n"
                              "<i>Forward the file straight from the channel — forward-privacy "
-                             "can hide the source, in which case the original sender's id is lost.</i>")
+                             "can hide the source, in which case the original sender's id is lost.</i>",
+                             reply_markup=_import_kb())
         return
 
     live = await get_file_channel()
@@ -291,7 +321,8 @@ async def on_import(message: Message, state: FSMContext) -> None:
         await message.answer(
             "⏭ <b>Skipped — wrong channel.</b>\n"
             f"<i>That file came from <code>{fchat}</code>, not your connected file "
-            f"channel <code>{live}</code>. Forward it from the right channel and I'll index it.</i>")
+            f"channel <code>{live}</code>. Forward it from the right channel and I'll index it.</i>",
+            reply_markup=_import_kb())
         return
 
     item = extract_from_message(message, msg_id=fmsg_id, chan_id=fchat)
@@ -300,7 +331,8 @@ async def on_import(message: Message, state: FSMContext) -> None:
         await state.update_data(skipped=skipped)
         await message.answer("⏭ <b>No file in that message.</b>\n"
                              f"<i>Nothing to index here — running tally: indexed <code>{imported}</code>, "
-                             f"skipped <code>{skipped}</code>.</i>")
+                             f"skipped <code>{skipped}</code>.</i>",
+                             reply_markup=_import_kb())
         return
 
     created = await index_file(item)
@@ -308,9 +340,11 @@ async def on_import(message: Message, state: FSMContext) -> None:
         imported += 1
         await state.update_data(imported=imported)
         await message.answer(f"📚 <b>Indexed</b> · {item['name'][:60]}\n"
-                             f"<i>On the shelf — total this session: <code>{imported}</code>.</i>")
+                             f"<i>On the shelf — total this session: <code>{imported}</code>.</i>",
+                             reply_markup=_import_kb())
     else:
         skipped += 1
         await state.update_data(skipped=skipped)
         await message.answer(f"⏭ <b>Already in your library</b> · {item['name'][:60]}\n"
-                             f"<i>Skipped to avoid a duplicate — skipped so far: <code>{skipped}</code>.</i>")
+                             f"<i>Skipped to avoid a duplicate — skipped so far: <code>{skipped}</code>.</i>",
+                             reply_markup=_import_kb())

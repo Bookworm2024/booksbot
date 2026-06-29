@@ -15,7 +15,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import SUPER_ADMIN_ID
 from utils.audit import log_action
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.moderation import (
     add_banned, banned_words, is_enabled, remove_banned, set_enabled,
 )
@@ -95,7 +95,8 @@ async def cb_add(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>Send the word or phrase you'd like to block. Single words match on "
         "their own; multi-word phrases match anywhere they appear. Casing doesn't matter — "
         "we normalise it for you.</blockquote>\n"
-        "<i>Send /cancel to step back.</i>")
+        "<i>💡 Tap Cancel below to step back.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(ModFSM.add_word, F.text)
@@ -127,7 +128,8 @@ async def cb_del(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>Send the exact term you'd like to lift from the list. Once removed, "
         "content using it will pass the term check again — the built-in spam heuristics "
         "stay on regardless.</blockquote>\n"
-        "<i>Send /cancel to step back.</i>")
+        "<i>💡 Tap Cancel below to step back.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(ModFSM.del_word, F.text)

@@ -15,7 +15,7 @@ from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
 from utils.format import MAX_AMOUNT, fmt_amount, valid_amount
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import is_super
 from utils.vip import badge
 from utils.wallet import add_bgm, get_balances, set_bgm
@@ -50,7 +50,8 @@ async def cb_addbgm(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>Credit 💎 BGM straight to a member's wallet — they're notified the "
         "moment it lands.\n\n"
         "Send the recipient's <b>User ID</b> to begin.</blockquote>\n"
-        "<i>Send <code>/cancel</code> anytime to step back.</i>")
+        "<i>💡 Tap Cancel below to step back.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(ToolsFSM.addbgm_user, F.text)
@@ -195,7 +196,8 @@ async def cb_setbgm(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>Use this to repair a wallet — it <b>overwrites</b> the current balance "
         "with the exact figure you send and collapses any split.\n\n"
         "Send the precise BGM balance to set.</blockquote>\n"
-        "<i>⚠️ This replaces the value rather than adding to it. Send <code>/cancel</code> to step back.</i>")
+        "<i>⚠️ This replaces the value rather than adding to it. Tap Cancel below to step back.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(ToolsFSM.setbgm_amount, F.text)
@@ -235,7 +237,8 @@ async def cb_bulk(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>Reward the whole community at once — every member receives the same "
         "💎 BGM credit. Ideal for milestones, apologies or seasonal goodwill.\n\n"
         "How much BGM should <b>every member</b> receive?</blockquote>\n"
-        "<i>You'll confirm before anything is granted. Send <code>/cancel</code> to step back.</i>")
+        "<i>You'll confirm before anything is granted. Tap Cancel below to step back.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(ToolsFSM.bulk_amount, F.text)

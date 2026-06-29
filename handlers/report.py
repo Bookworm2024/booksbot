@@ -17,7 +17,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import LOG_CHANNEL_ID
 from database.connection import MongoManager
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -52,7 +52,8 @@ async def _start(message: Message, state: FSMContext) -> None:
         "file, the wrong content, a mislabelled title, or anything abusive.\n\n"
         "Your report is <b>private</b> and goes straight to our team. The more detail "
         "you share, the faster we can put it right.</blockquote>\n\n"
-        "<i>Send your message below, or tap <code>/cancel</code> to step away.</i>")
+        "<i>Send your message below, or tap Cancel to step away.</i>",
+        reply_markup=kb(cancel_row("menu_home")))
 
 
 @router.message(ReportFSM.text, F.text)
@@ -62,8 +63,8 @@ async def on_report(message: Message, state: FSMContext) -> None:
         await state.clear()
         await message.answer(
             "❌ <b>Report cancelled</b>\n"
-            "<i>Nothing was sent. If something still isn't right, /report is here "
-            "whenever you need it.</i>")
+            "<i>Nothing was sent. If something still isn't right, we're here "
+            "whenever you need us.</i>")
         return
     await state.clear()
     db = await MongoManager.get()

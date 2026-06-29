@@ -15,7 +15,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import has
 
 logger = logging.getLogger(__name__)
@@ -107,7 +107,8 @@ async def cb_level(call: CallbackQuery, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<blockquote>Type the question exactly as players should see it. Keep it "
         "clear and self-contained — no need to number it.</blockquote>\n\n"
-        "<i>Send <code>/cancel</code> any time to step away.</i>")
+        "<i>💡 Tap Cancel below to step away.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(QAdminFSM.quiz_q, F.text)
@@ -202,7 +203,8 @@ async def cb_addtf(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>Type a single statement players will judge as true or "
         "false. Make it unambiguous — there should be one clear correct "
         "verdict.</blockquote>\n\n"
-        "<i>Send <code>/cancel</code> any time to step away.</i>")
+        "<i>💡 Tap Cancel below to step away.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(QAdminFSM.tf_q, F.text)

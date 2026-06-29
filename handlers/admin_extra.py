@@ -23,7 +23,7 @@ from utils.audit import log_action, recent
 from utils.coupons import active_coupons, create_coupon
 from utils.flags import FLAGS, all_flags, is_on, set_flag
 from utils.format import fmt_amount, valid_amount
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import is_super, has
 from utils.users import set_ban
 
@@ -94,7 +94,8 @@ async def cb_bulkban(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>📋 Paste the <b>User IDs</b> you want to ban.\n"
         "Separate them with <b>spaces, commas or new lines</b> — mix and match freely.\n"
         "🛡 The super admin is always protected and will be skipped automatically.</blockquote>\n"
-        "<i>💡 Send <code>/cancel</code> any time to back out — nothing happens until you submit.</i>")
+        "<i>💡 Tap Cancel below to back out — nothing happens until you submit.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(ExtraFSM.bulk_ban, F.text)
@@ -248,7 +249,8 @@ async def cb_gdpr(call: CallbackQuery, state: FSMContext) -> None:
         "<i>Honour a reader's data request — export everything we hold, or erase it for good.</i>\n"
         "<blockquote>📤 <b>Export</b> packages every record we store for a user into a single JSON file.\n"
         "🗑 <b>Erase</b> permanently removes all of their data across every collection.</blockquote>\n"
-        "<i>💡 Send the <b>User ID</b> to continue, or <code>/cancel</code> to step back.</i>")
+        "<i>💡 Send the <b>User ID</b> to continue, or tap Cancel below to step back.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(ExtraFSM.gdpr_uid, F.text)
@@ -403,7 +405,8 @@ async def cb_cpn_kind(call: CallbackQuery, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━\n"
         f"<i>Step 2 of 4 — set the reward size.</i>\n"
         f"<blockquote>💸 Enter the {unit}.</blockquote>\n"
-        "<i>💡 Send <code>/cancel</code> to stop here.</i>")
+        "<i>💡 Tap Cancel below to stop here.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(ExtraFSM.cpn_value, F.text)

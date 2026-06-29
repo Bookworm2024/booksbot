@@ -98,6 +98,10 @@ class MongoManager:
                 await db.files.create_index([("genre", ASCENDING)])
                 await db.requests.create_index([("request_id", ASCENDING)], unique=True)
                 await db.requests.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)])
+                # Per-user search log → paginated "Recent Requests" (last 7 days).
+                # Auto-expires after 30 days so the collection never grows unbounded.
+                await db.search_log.create_index([("user_id", ASCENDING), ("at", DESCENDING)])
+                await db.search_log.create_index([("at", ASCENDING)], expireAfterSeconds=2592000)
                 await db.favorites.create_index([("user_id", ASCENDING), ("file_unique_id", ASCENDING)], unique=True)
                 # downloaded-files library (authorizes the reader/player Mini App stream)
                 await db.library.create_index([("user_id", ASCENDING), ("file_unique_id", ASCENDING)], unique=True)

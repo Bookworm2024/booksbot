@@ -23,7 +23,7 @@ from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
 from handlers.broadcast import SEG_LABELS, _audience_filter
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -64,7 +64,8 @@ async def cb_abtest(call: CallbackQuery, state: FSMContext) -> None:
         "half see <b>Variant B</b> — and report exactly how many each reached. "
         "Compare the response and keep the version that lands.</blockquote>\n\n"
         "Send <b>Variant A</b> — the first message to test.\n"
-        "<i>Send /cancel anytime to step away.</i>")
+        "<i>💡 Tap Cancel below to step away.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(Command("abtest"))
@@ -78,7 +79,8 @@ async def cmd_abtest(message: Message, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━\n"
         "<i>Two messages, one winner — decided by real delivery.</i>\n\n"
         "Send <b>Variant A</b> to begin.\n"
-        "<i>Send /cancel anytime to step away.</i>")
+        "<i>💡 Tap Cancel below to step away.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(ABFSM.variant_a)
@@ -90,7 +92,8 @@ async def on_variant_a(message: Message, state: FSMContext) -> None:
     await message.answer(
         "✅ <b>Variant A saved.</b>\n\n"
         "Now send <b>Variant B</b> — the alternative you'd like to test against it.\n"
-        "<i>Send /cancel anytime to step away.</i>")
+        "<i>💡 Tap Cancel below to step away.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(ABFSM.variant_b)

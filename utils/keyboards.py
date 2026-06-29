@@ -70,6 +70,21 @@ def webapp_btn(label: str, page: str, *, query: str = "",
     return btn(label, fallback_cb, style=style)
 
 
+def cancel_btn(target: str = "menu_home", label: str = "❌ Cancel") -> InlineKeyboardButton:
+    """A universal Cancel button. House rule: the bot NEVER asks a user to type a
+    command like /cancel — every flow offers this button instead. Tapping it is
+    handled globally (handlers.start.cb_flow_cancel): it clears the FSM state and
+    shows a tidy 'Cancelled' card with a one-tap link back to `target`
+    (e.g. 'menu_home', 'menu_request', 'admin_open', 'admin_ai')."""
+    return btn(label, f"flow_cancel:{target}", style="danger")
+
+
+def cancel_row(target: str = "menu_home", label: str = "❌ Cancel") -> list[InlineKeyboardButton]:
+    """A single-button row holding the universal Cancel button — drop it into any
+    prompt keyboard so a flow can always be backed out of with a tap."""
+    return [cancel_btn(target, label)]
+
+
 def kb(*rows: list[InlineKeyboardButton]) -> InlineKeyboardMarkup:
     """Assemble rows into a coloured inline keyboard."""
     return InlineKeyboardMarkup(inline_keyboard=[r for r in rows if r])

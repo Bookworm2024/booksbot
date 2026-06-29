@@ -21,7 +21,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import has
 
 logger = logging.getLogger(__name__)
@@ -149,7 +149,8 @@ async def _open(message: Message, state: FSMContext) -> None:
         "You'll choose <b>who</b> receives it, then send <b>now</b> or schedule it "
         "for later — with a live delivery board you can pause or stop at any time."
         "</blockquote>\n"
-        "<i>💡 Send <code>/cancel</code> anytime to back out — nothing goes out until you confirm.</i>")
+        "<i>💡 Tap Cancel below anytime to back out — nothing goes out until you confirm.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(BroadcastFSM.awaiting_content)

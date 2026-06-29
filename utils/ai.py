@@ -4,10 +4,12 @@ utils/ai.py — AI backend for recommendations, summaries & genre tagging.
 Pluggable provider, chosen at RUNTIME (admin can switch it from /admin — no
 redeploy). Config lives in Mongo `kv` under `ai:*`:
 
-  ai:provider       "free" (default) | "anthropic" | "off"
-  ai:free_url       base URL of the free GPT API (default below)
-  ai:anthropic_key  Claude API key (falls back to env ANTHROPIC_API_KEY)
-  ai:model          Claude model id (falls back to env ANTHROPIC_MODEL)
+  ai:provider         "free" (default) | "anthropic" | "off"
+  ai:free_url         base URL of the free GPT API (default below)
+  ai:anthropic_key    Claude API key (falls back to env ANTHROPIC_API_KEY)
+  ai:model            Claude model id (falls back to env ANTHROPIC_MODEL)
+  ai:webhook_enabled  bool — when True, AI requests go to a custom webhook
+  ai:webhook_url      the webhook endpoint the AI API is reachable at
 
 Providers:
   • free      — bots.lt free GPT endpoint: GET <url>?message=<prompt> →
@@ -15,8 +17,17 @@ Providers:
   • anthropic — Claude Messages API (needs a key).
   • off       — AI features disabled.
 
+Webhook mode (a per-AI toggle, set in /admin → 🤖 AI Engine):
+  When enabled with a URL set, EVERY completion is POSTed to that webhook as
+  JSON ({"message","prompt","max_tokens"}) and the reply text is read from the
+  response (response/answer/message/result/text/content/output/data, or raw
+  body). This lets the operator point the bot at any custom AI backend / relay
+  without a redeploy. Webhook mode takes precedence over the provider (except
+  "off", which always wins and disables AI).
+
 All public helpers (recommend_titles / summarize_book / classify_genre) go
-through ai_complete(), so switching the provider switches every feature at once.
+through ai_complete(), so switching the provider — or flipping webhook mode —
+switches every feature at once.
 """
 import json
 import logging
@@ -45,14 +56,21 @@ async def get_ai_config() -> dict:
         "free_url": (await db.kv_get("ai:free_url", None)) or DEFAULT_FREE_URL,
         "anthropic_key": (await db.kv_get("ai:anthropic_key", None)) or ANTHROPIC_API_KEY,
         "model": (await db.kv_get("ai:model", None)) or ANTHROPIC_MODEL,
+        "webhook_enabled": bool(await db.kv_get("ai:webhook_enabled", False)),
+        "webhook_url": (await db.kv_get("ai:webhook_url", None)) or "",
     }
 
 
 async def set_ai_config(key: str, value) -> None:
-    if key not in ("provider", "free_url", "anthropic_key", "model"):
+    if key not in ("provider", "free_url", "anthropic_key", "model",
+                   "webhook_enabled", "webhook_url"):
         raise ValueError(f"unknown ai config key: {key}")
     db = await MongoManager.get()
     await db.kv_set(f"ai:{key}", value)
+
+
+def _webhook_active(cfg: dict) -> bool:
+    return bool(cfg.get("webhook_enabled")) and bool(cfg.get("webhook_url"))
 
 
 async def ai_enabled() -> bool:
@@ -60,6 +78,8 @@ async def ai_enabled() -> bool:
     cfg = await get_ai_config()
     if cfg["provider"] == "off":
         return False
+    if _webhook_active(cfg):
+        return True   # custom webhook takes over for every feature
     if cfg["provider"] == "anthropic":
         return bool(cfg["anthropic_key"])
     return bool(cfg["free_url"])   # free provider — always on when a URL is set
@@ -92,6 +112,48 @@ async def _free_call(prompt: str, base_url: str) -> str | None:
     return text or None
 
 
+_WEBHOOK_FIELDS = ("response", "answer", "message", "result", "text",
+                   "content", "output", "data", "reply", "completion")
+
+
+async def _webhook_call(prompt: str, url: str, max_tokens: int) -> str | None:
+    """Webhook mode: POST the prompt as JSON to a custom AI endpoint and read the
+    reply text back. Tolerant of however the endpoint shapes its response — we try
+    a list of common reply fields, then fall back to the raw body."""
+    if not url:
+        return None
+    payload = {"message": prompt, "prompt": prompt, "max_tokens": max_tokens}
+    try:
+        timeout = aiohttp.ClientTimeout(total=90)
+        async with aiohttp.ClientSession(timeout=timeout) as s:
+            async with s.post(url, json=payload) as r:
+                if r.status != 200:
+                    logger.warning("AI webhook %s: %s", r.status, (await r.text())[:200])
+                    return None
+                raw = await r.text()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("AI webhook call failed: %s", exc)
+        return None
+    try:
+        data = json.loads(raw)
+    except Exception:  # noqa: BLE001
+        return raw.strip() or None
+    if isinstance(data, str):
+        return data.strip() or None
+    if isinstance(data, dict):
+        for f in _WEBHOOK_FIELDS:
+            val = data.get(f)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+            # some relays nest the text one level deep (e.g. {"data":{"text":...}})
+            if isinstance(val, dict):
+                for g in _WEBHOOK_FIELDS:
+                    inner = val.get(g)
+                    if isinstance(inner, str) and inner.strip():
+                        return inner.strip()
+    return None
+
+
 async def _anthropic_call(prompt: str, max_tokens: int, key: str, model: str) -> str | None:
     if not key:
         return None
@@ -121,6 +183,8 @@ async def ai_complete(prompt: str, max_tokens: int = 900) -> str | None:
     provider = cfg["provider"]
     if provider == "off":
         return None
+    if _webhook_active(cfg):
+        return await _webhook_call(prompt, cfg["webhook_url"], max_tokens)
     if provider == "anthropic":
         return await _anthropic_call(prompt, max_tokens, cfg["anthropic_key"], cfg["model"])
     return await _free_call(prompt, cfg["free_url"])

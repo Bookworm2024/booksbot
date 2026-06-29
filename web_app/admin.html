@@ -137,7 +137,7 @@ async function load(){
 }
 
 function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-let ai = { provider:"free", free_url:"", model:"", has_key:false, anthropic_key_masked:"", can_edit:false };
+let ai = { provider:"free", free_url:"", model:"", has_key:false, anthropic_key_masked:"", webhook_enabled:false, webhook_url:"", can_edit:false };
 
 async function loadAI(){
   try { ai = await (await fetch(`/api/admin/ai?init_data=${encodeURIComponent(INIT)}`)).json(); }
@@ -157,12 +157,19 @@ function renderAI(msg){
       <div class="field"><label>Claude API key ${ai.has_key?'· saved ('+esc(ai.anthropic_key_masked)+')':''}</label>
         <input id="ai_key" type="password" placeholder="${ai.has_key?'Leave blank to keep current key':'sk-ant-…'}" ${ro?'disabled':''}></div>
       <div class="field"><label>Claude model</label><input id="ai_model" value="${esc(ai.model)}" ${ro?'disabled':''}></div>
+      <div class="field"><label>🪝 Webhook mode</label>
+        <div class="seg"><button data-w="on" class="${ai.webhook_enabled?'sel':''}" ${ro?'disabled':''}>🟢 ON</button><button data-w="off" class="${ai.webhook_enabled?'':'sel'}" ${ro?'disabled':''}>⚪ OFF</button></div></div>
+      <div class="field"><label>Webhook URL <span class="s">— when ON, every AI request is POSTed here (overrides provider)</span></label>
+        <input id="ai_webhook" value="${esc(ai.webhook_url)}" placeholder="https://your-api.example.com/ai" ${ro?'disabled':''}></div>
       ${ro ? '<div class="s">🔒 Read-only — only the super admin can change these settings.</div>'
            : '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn2 save" id="ai_save">💾 Save changes</button><button class="btn2 test" id="ai_test">🧪 Run test</button></div>'}
       <div class="aimsg" id="ai_msg">${esc(msg)}</div>
     </div></div>`;
-  document.querySelectorAll('#ai .seg button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#ai .seg button[data-p]').forEach(b => b.onclick = () => {
     if (ai.can_edit){ ai.provider = b.dataset.p; renderAI(""); }
+  });
+  document.querySelectorAll('#ai .seg button[data-w]').forEach(b => b.onclick = () => {
+    if (ai.can_edit){ ai.webhook_enabled = (b.dataset.w === "on"); ai.webhook_url = document.getElementById("ai_webhook").value; renderAI(""); }
   });
   if (!ro){
     document.getElementById("ai_save").onclick = saveAI;
@@ -172,7 +179,9 @@ function renderAI(msg){
 async function saveAI(){
   const body = { init_data:INIT, provider:ai.provider,
     free_url: document.getElementById("ai_url").value,
-    model: document.getElementById("ai_model").value };
+    model: document.getElementById("ai_model").value,
+    webhook_enabled: ai.webhook_enabled,
+    webhook_url: document.getElementById("ai_webhook").value };
   const key = document.getElementById("ai_key").value.trim();
   if (key) body.anthropic_key = key;
   document.getElementById("ai_msg").textContent = "Saving your changes…";

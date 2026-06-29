@@ -15,7 +15,7 @@ from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
 from utils.format import MAX_AMOUNT, fmt_amount, valid_amount
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.wallet import add_bgm, charge_bgm, get_balances
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,8 @@ async def _open(message: Message, state: FSMContext) -> None:
         "🎁 <b>Gift BGM</b>\n━━━━━━━━━━━━━━━━━━\n"
         f"Your balance: <b>{fmt_amount(bgm)} BGM</b>\n\n"
         "Send the <b>recipient's User ID</b> (they must have started the bot).\n"
-        "/cancel to abort.")
+        "<i>💡 Tap Cancel below to step back.</i>",
+        reply_markup=kb(cancel_row("menu_account")))
 
 
 @router.message(GiftFSM.awaiting_recipient, F.text)

@@ -15,7 +15,7 @@ from aiogram.types import CallbackQuery, Message
 
 from utils.featured import add_featured, featured_files, remove_featured
 from utils.files import icon_for, search
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import is_super
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,8 @@ async def cb_feat_add(call: CallbackQuery, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━\n"
         "<blockquote>Type a title and we'll pull matching entries from the archive. "
         "Pick one and it takes the spotlight straight away.</blockquote>\n"
-        "<i>Send /cancel to step back.</i>"
+        "<i>💡 Tap Cancel below to step back.</i>",
+        reply_markup=kb(cancel_row("admin_open"))
     )
 
 

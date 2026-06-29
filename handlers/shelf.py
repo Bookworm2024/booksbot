@@ -19,7 +19,7 @@ from aiogram.types import CallbackQuery, Message
 
 from utils.channel import get_file_channel
 from utils.files import get_file, icon_for
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.shelf import (
     MAX_NOTE_LEN, add_note, books_with_notes, delete_note, finished_count,
     finished_list, get_finished, is_finished, mark_finished, notes_for,
@@ -156,7 +156,8 @@ async def cb_note_add(call: CallbackQuery, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━\n"
         f"<blockquote>Send your note as a message — up to <code>{MAX_NOTE_LEN}</code> characters. "
         "It's saved privately against this book, so you can revisit it any time.</blockquote>\n"
-        "<i>💡 Send /cancel to step away without saving.</i>")
+        "<i>💡 Tap Cancel below to step away without saving.</i>",
+        reply_markup=kb(cancel_row("menu_shelf")))
 
 
 @router.message(NoteFSM.text, F.text)

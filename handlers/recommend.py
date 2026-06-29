@@ -18,7 +18,7 @@ from database.connection import MongoManager
 from utils.ai import (ai_enabled, mood_titles, recommend_titles, similar_titles,
                       summarize_book)
 from utils.format import fmt_amount
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.settings import get_float
 from utils.wallet import get_balances, refund, spend
 
@@ -110,7 +110,8 @@ async def cb_proceed(call: CallbackQuery, state: FSMContext) -> None:
         "worth your time.\n\n"
         "Try <i>fantasy</i>, <i>cyberpunk</i>, <i>self-help</i> or <i>dark academia</i> — "
         "the more specific you are, the sharper the picks.</blockquote>\n"
-        "<i>💡 Changed your mind? Send /cancel to step back.</i>")
+        "<i>💡 Changed your mind? Tap Cancel below.</i>",
+        reply_markup=kb(cancel_row("menu_library")))
 
 
 @router.message(RecFSM.awaiting_genre, F.text)
@@ -169,7 +170,8 @@ async def cb_similar(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>Name a title that stayed with you and your librarian will track "
         "down reads with the same genre, themes and feel.\n\n"
         "Add the author if you can — it helps us match the right book.</blockquote>\n"
-        "<i>💡 Changed your mind? Send /cancel to step back.</i>")
+        "<i>💡 Changed your mind? Tap Cancel below.</i>",
+        reply_markup=kb(cancel_row("menu_library")))
 
 
 @router.callback_query(F.data == "rec_mood")
@@ -189,7 +191,8 @@ async def cb_mood(call: CallbackQuery, state: FSMContext) -> None:
         "books to the vibe — no titles needed.\n\n"
         "Try <i>cozy rainy-day</i>, <i>fast-paced thriller</i> or "
         "<i>dark academia</i>.</blockquote>\n"
-        "<i>💡 Changed your mind? Send /cancel to step back.</i>")
+        "<i>💡 Changed your mind? Tap Cancel below.</i>",
+        reply_markup=kb(cancel_row("menu_library")))
 
 
 async def _deliver_or_refund(message: Message, uid: int, currency: str, label: str,
@@ -277,7 +280,10 @@ async def _send_batch(message: Message, uid: int) -> None:
     lines = "\n".join(f"<code>{sent + i + 1:>3}.</code> {escape(t)}" for i, t in enumerate(batch))
     await db.safe_update("users", {"user_id": uid}, {"$set": {"rec_sent": sent + len(batch)}})
     more = (sent + len(batch)) < len(titles)
-    rows = []
+    # Every title is a tappable button: tapping searches the archive and fetches the
+    # file (or offers a manual Request-an-Admin if it isn't stocked).
+    rows = [[btn(f"📥 {sent + i + 1}. {t[:32]}", f"rget:{sent + i}", style="success")]
+            for i, t in enumerate(batch)]
     if more:
         rows.append([btn("🔄 Get More", "rec_more", style="success")])
     rows.append([btn("🛑 End Session", "rec_end", style="danger")])
@@ -286,8 +292,28 @@ async def _send_batch(message: Message, uid: int) -> None:
         f"<i>Curated for you · picks {sent + 1}–{sent + len(batch)}</i>\n"
         "━━━━━━━━━━━━━━━━━━\n"
         f"<blockquote expandable>{lines}</blockquote>\n"
-        "<i>💡 Tap a title into search to pull it from the library.</i>",
+        "<i>💡 Tap any title below to pull it straight from the library.</i>",
         reply_markup=kb(*rows))
+
+
+@router.callback_query(F.data.startswith("rget:"))
+async def cb_rget(call: CallbackQuery, state: FSMContext) -> None:
+    """Tapped a recommended title → search the archive and fetch it (or offer a
+    manual admin request when it isn't stocked)."""
+    await call.answer()
+    try:
+        i = int(call.data.split(":", 1)[1])
+    except ValueError:
+        return
+    db = await MongoManager.get()
+    u = await db.find_one_global("users", {"user_id": call.from_user.id},
+                                 {"rec_titles": 1}) or {}
+    titles = u.get("rec_titles") or []
+    if i < 0 or i >= len(titles):
+        await call.answer("That pick has rolled off your list — start a fresh recommendation.", show_alert=True)
+        return
+    from handlers.request import find_in_library
+    await find_in_library(call.message, state, titles[i], edit=False)
 
 
 @router.callback_query(F.data == "rec_more")
@@ -384,7 +410,8 @@ async def cb_sum_proceed(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>Send the title and your librarian will prepare a spoiler-light "
         "summary in seconds.\n\n"
         "Include the author where you can — it helps us brief the right edition.</blockquote>\n"
-        "<i>💡 Changed your mind? Send /cancel to step back.</i>")
+        "<i>💡 Changed your mind? Tap Cancel below.</i>",
+        reply_markup=kb(cancel_row("menu_library")))
 
 
 @router.message(RecFSM.awaiting_summary_title, F.text)
@@ -419,12 +446,29 @@ async def on_summary_title(message: Message, state: FSMContext) -> None:
             "<i>💡 Try the exact title with the author — the precise spelling helps us "
             "find the right book.</i>")
         return
+    db = await MongoManager.get()
+    await db.safe_update("users", {"user_id": uid}, {"$set": {"sum_title": title}})
     await notice.edit_text(
         f"📘 <b>{escape(title)}</b>\n"
         "<i>Your librarian's briefing</i>\n"
         "━━━━━━━━━━━━━━━━━━\n"
         f"<blockquote expandable>{summary}</blockquote>\n"
-        "<i>💡 Sounds like your next read? Search the title to pull it from the "
-        "library.</i>",
-        reply_markup=kb([btn("📝 Another Summary", "lib_summary", style="success")],
+        "<i>💡 Sounds like your next read? Pull it straight from the library below.</i>",
+        reply_markup=kb([btn(f"📥 Find «{title[:24]}» in Library", "sum_find", style="success")],
+                        [btn("📝 Another Summary", "lib_summary", style="success")],
                         [btn("🔙 Library", "menu_library", style="danger")]))
+
+
+@router.callback_query(F.data == "sum_find")
+async def cb_sum_find(call: CallbackQuery, state: FSMContext) -> None:
+    """Fetch the just-summarised title straight from the archive."""
+    await call.answer()
+    db = await MongoManager.get()
+    u = await db.find_one_global("users", {"user_id": call.from_user.id},
+                                 {"sum_title": 1}) or {}
+    title = u.get("sum_title")
+    if not title:
+        await call.answer("Run a summary first, then I can pull that title for you.", show_alert=True)
+        return
+    from handlers.request import find_in_library
+    await find_in_library(call.message, state, title, edit=False)

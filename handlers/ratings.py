@@ -13,7 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from utils.files import get_file
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.ratings import (recent_reviews, set_rating, set_review, stars_bar,
                            summary, user_rating)
 
@@ -79,7 +79,8 @@ async def cb_rate_rev(call: CallbackQuery, state: FSMContext) -> None:
         "<i>A sentence or two is plenty.</i>\n\n"
         "<blockquote>Tell other readers what made this one worth their time — the "
         "writing, the pacing, the ending. Keep it kind and on-topic.\n\n"
-        "Send your review as a message, or tap <code>/cancel</code> to skip.</blockquote>")
+        "<i>💡 Send your review as a message, or tap Cancel below to skip.</i></blockquote>",
+        reply_markup=kb(cancel_row("menu_home")))
 
 
 @router.message(RateFSM.review, F.text)

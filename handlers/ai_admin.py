@@ -16,7 +16,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import SUPER_ADMIN_ID
 from utils.ai import DEFAULT_FREE_URL, ai_complete, get_ai_config, set_ai_config
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -28,6 +28,7 @@ class AIFSM(StatesGroup):
     free_url = State()
     key = State()
     model = State()
+    webhook_url = State()
 
 
 def _mask(s: str) -> str:
@@ -39,15 +40,22 @@ def _mask(s: str) -> str:
 async def _panel():
     cfg = await get_ai_config()
     prov = cfg["provider"]
+    wh_on = cfg["webhook_enabled"]
+    wh_url = cfg["webhook_url"] or "—"
+    active = ("🪝 Custom Webhook" if (wh_on and cfg["webhook_url"])
+              else _PROV_LABEL.get(prov, prov))
     text = (
         "🤖 <b>AI Engine</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>The intelligence behind recommendations, summaries and tagging.</i>\n\n"
         "<blockquote>"
+        f"⚡ <b>Active</b> · {active}\n"
         f"🔌 <b>Provider</b> · {_PROV_LABEL.get(prov, prov)}\n"
         f"🔗 <b>Free URL</b> · <code>{cfg['free_url']}</code>\n"
         f"🔑 <b>Claude key</b> · <code>{_mask(cfg['anthropic_key'])}</code>\n"
-        f"🧠 <b>Claude model</b> · <code>{cfg['model']}</code>"
+        f"🧠 <b>Claude model</b> · <code>{cfg['model']}</code>\n"
+        f"🪝 <b>Webhook</b> · {'🟢 ON' if wh_on else '⚪ OFF'}\n"
+        f"🌐 <b>Webhook URL</b> · <code>{wh_url}</code>"
         "</blockquote>\n"
         "<blockquote expandable>"
         "This engine powers 🤖 <b>Recommendations</b>, 📝 <b>Summaries</b> and "
@@ -55,6 +63,9 @@ async def _panel():
         "🆓 <b>Free API</b> — zero-cost, no key required, great for everyday use.\n"
         "💎 <b>Claude</b> — Anthropic's premium models for the sharpest, most "
         "natural results (needs an API key).\n"
+        "🪝 <b>Webhook mode</b> — point the bot at any custom AI endpoint. When ON, "
+        "every AI request is sent to your webhook URL and the reply is used "
+        "everywhere — overrides the provider above.\n"
         "🚫 <b>Off</b> — pauses every AI feature instantly."
         "</blockquote>\n"
         "<i>💡 Changes apply live — no redeploy, no downtime.</i>"
@@ -70,6 +81,9 @@ async def _panel():
          btn("♻️ Reset URL", "ai_reset_url", style="primary")],
         [btn("🔑 Set Claude Key", "ai_set:key", style="primary"),
          btn("🧠 Set Model", "ai_set:model", style="primary")],
+        [btn("🪝 Webhook: ON ✅" if wh_on else "🪝 Webhook: OFF",
+             "ai_webhook_toggle", style="success" if wh_on else "primary"),
+         btn("🌐 Set Webhook URL", "ai_set:webhook_url", style="primary")],
         [btn("🧪 Run Live Test", "ai_test", style="success")],
         [btn("🔙 Back", "admin_open", style="danger")],
     ]
@@ -116,6 +130,23 @@ async def cb_reset_url(call: CallbackQuery) -> None:
     await call.message.edit_text(text, reply_markup=markup)
 
 
+@router.callback_query(F.data == "ai_webhook_toggle")
+async def cb_webhook_toggle(call: CallbackQuery) -> None:
+    if not _guard(call.from_user.id):
+        await call.answer("🔒 This control is reserved for the super admin.", show_alert=True)
+        return
+    cfg = await get_ai_config()
+    new_state = not cfg["webhook_enabled"]
+    if new_state and not cfg["webhook_url"]:
+        await call.answer("🌐 Set a Webhook URL first, then turn webhook mode on.", show_alert=True)
+        return
+    await set_ai_config("webhook_enabled", new_state)
+    await call.answer("🪝 Webhook mode " + ("ON — every AI request now routes to your webhook."
+                                            if new_state else "OFF — back to the selected provider."))
+    text, markup = await _panel()
+    await call.message.edit_text(text, reply_markup=markup)
+
+
 _PROMPTS = {
     "free_url": "🔗 <b>Set Free API Endpoint</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
@@ -124,23 +155,33 @@ _PROMPTS = {
                 "<code>https://bots.lt/Apis/AI/gpt.php</code>\n\n"
                 "We'll call it as <code>URL?message=...</code> whenever AI is requested."
                 "</blockquote>\n"
-                "<i>Send <code>/cancel</code> to keep the current endpoint.</i>",
+                "<i>💡 Tap Cancel below to keep the current endpoint.</i>",
     "key": "🔑 <b>Set Claude API Key</b>\n"
            "━━━━━━━━━━━━━━━━━━━━\n"
            "<blockquote>"
            "Paste your Anthropic key (it begins with <code>sk-ant-</code>).\n\n"
            "🛡 For your security we'll delete the message the moment it's saved."
            "</blockquote>\n"
-           "<i>Send <code>/cancel</code> to keep the current key.</i>",
+           "<i>💡 Tap Cancel below to keep the current key.</i>",
     "model": "🧠 <b>Set Claude Model</b>\n"
              "━━━━━━━━━━━━━━━━━━━━\n"
              "<blockquote>"
              "Send the <b>model id</b> you'd like to run, for example:\n"
              "<code>claude-haiku-4-5-20251001</code>"
              "</blockquote>\n"
-             "<i>Send <code>/cancel</code> to keep the current model.</i>",
+             "<i>💡 Tap Cancel below to keep the current model.</i>",
+    "webhook_url": "🌐 <b>Set AI Webhook URL</b>\n"
+                   "━━━━━━━━━━━━━━━━━━━━\n"
+                   "<blockquote>"
+                   "Send the full <b>webhook endpoint</b> for your custom AI backend, e.g.\n"
+                   "<code>https://your-api.example.com/ai</code>\n\n"
+                   "We'll POST <code>{\"message\": …, \"prompt\": …}</code> there and read "
+                   "the reply from the response. Turn 🪝 <b>Webhook</b> ON to use it."
+                   "</blockquote>\n"
+                   "<i>💡 Tap Cancel below to keep the current URL.</i>",
 }
-_STATE = {"free_url": AIFSM.free_url, "key": AIFSM.key, "model": AIFSM.model}
+_STATE = {"free_url": AIFSM.free_url, "key": AIFSM.key, "model": AIFSM.model,
+          "webhook_url": AIFSM.webhook_url}
 
 
 @router.callback_query(F.data.startswith("ai_set:"))
@@ -154,14 +195,15 @@ async def cb_set(call: CallbackQuery, state: FSMContext) -> None:
         return
     await call.answer()
     await state.set_state(_STATE[field])
-    await call.message.answer(_PROMPTS[field])
+    await call.message.answer(_PROMPTS[field], reply_markup=kb(cancel_row("admin_ai")))
 
 
 async def _save_field(message: Message, state: FSMContext, cfg_key: str, friendly: str) -> None:
     raw = (message.text or "").strip()
     await state.clear()
     if raw.lower() == "/cancel":
-        await message.answer("❌ <b>No changes made.</b>\n<i>Your current setting stays exactly as it was.</i>")
+        await message.answer("❌ <b>No changes made.</b>\n<i>Your current setting stays exactly as it was.</i>",
+                             reply_markup=kb([btn("🤖 Back to AI Engine", "admin_ai", style="primary")]))
         return
     await set_ai_config(cfg_key, raw)
     await message.answer(
@@ -188,6 +230,11 @@ async def on_key(message: Message, state: FSMContext) -> None:
 @router.message(AIFSM.model, F.text)
 async def on_model(message: Message, state: FSMContext) -> None:
     await _save_field(message, state, "model", "Claude model")
+
+
+@router.message(AIFSM.webhook_url, F.text)
+async def on_webhook_url(message: Message, state: FSMContext) -> None:
+    await _save_field(message, state, "webhook_url", "AI webhook URL")
 
 
 @router.callback_query(F.data == "ai_test")

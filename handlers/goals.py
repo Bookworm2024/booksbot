@@ -16,7 +16,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from database.connection import MongoManager
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -100,7 +100,8 @@ async def cb_set(call: CallbackQuery, state: FSMContext) -> None:
         "<i>One number, and we'll track the whole year toward it.</i>\n\n"
         "<blockquote>How many books would you love to finish this year?\n\n"
         "Send any number from <code>1</code> to <code>999</code>. You can change it "
-        "anytime — send <code>/cancel</code> to step back without setting one.</blockquote>")
+        "anytime.\n\n💡 Tap Cancel below to step back without setting one.</blockquote>",
+        reply_markup=kb(cancel_row("menu_library")))
 
 
 @router.message(GoalFSM.setting, F.text)
@@ -116,7 +117,8 @@ async def on_set(message: Message, state: FSMContext) -> None:
         await message.answer("⚠️ <b>That's not quite a goal yet</b>\n\n"
                              "<blockquote>Send a whole number between <code>1</code> and "
                              "<code>999</code> — that's your target for the year. "
-                             "Try again, or send <code>/cancel</code> to step back.</blockquote>")
+                             "Try again, or tap Cancel below to step back.</blockquote>",
+                             reply_markup=kb(cancel_row("menu_library")))
         return
     db = await MongoManager.get()
     await db.safe_update("users", {"user_id": message.chat.id},

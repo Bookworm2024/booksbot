@@ -260,8 +260,8 @@ async def cb_library(call: CallbackQuery, state: FSMContext) -> None:
         "<i>Everything you read, save and continue — gathered in one place.</i>\n\n"
         "<blockquote>🔭 <b>Discover</b> finds your next read, while <b>For You</b> and "
         "<b>AI Recommendations</b> learn your taste.\n"
-        "📖 <b>Continue Reading</b> reopens your last page; ⭐ <b>Favorites</b>, "
-        "📒 <b>My Shelf</b> and 📌 <b>Reading List</b> keep it all organised.\n"
+        "📖 <b>Continue Reading</b> reopens your last page; ⭐ <b>Favorites</b> and "
+        "📒 <b>My Shelf</b> keep it all organised.\n"
         "🎯 Set a <b>Reading Goal</b>, track your 📊 <b>stats</b>, and join "
         "👥 <b>Book Clubs</b> and 🎯 <b>Challenges</b> to read together.</blockquote>",
         reply_markup=kb(
@@ -273,8 +273,7 @@ async def cb_library(call: CallbackQuery, state: FSMContext) -> None:
             [btn("⭐ Favorites", "lib_favorites", style="primary"),
              btn("📒 My Shelf", "menu_shelf", style="primary")],
             [btn("📊 My Reading", "lib_stats", style="primary"),
-             btn("📌 Reading List", "lib_tbr", style="primary")],
-            [btn("🎯 Reading Goal", "lib_goal", style="primary")],
+             btn("🎯 Reading Goal", "lib_goal", style="primary")],
             [btn("👥 Book Clubs", "menu_clubs", style="success"),
              btn("🎯 Challenges", "menu_challenges", style="primary")],
             [btn("🔙 Back", "menu_home", style="danger")],
@@ -350,6 +349,47 @@ async def cb_about(call: CallbackQuery, state: FSMContext) -> None:
         about_text(),
         reply_markup=kb([btn("🔙 Back", "menu_tools", style="danger")]),
     )
+
+
+# ── universal flow cancel ───────────────────────────────────────────────────────
+# House rule: the bot never tells a user to send a command. Every prompt that used
+# to say "send /cancel" now carries a ❌ Cancel button (utils.keyboards.cancel_btn)
+# whose callback lands here. We clear any half-finished FSM flow and show a tidy
+# card with a one-tap link back to wherever the user came from.
+_CANCEL_DEST = {
+    "menu_home": "🏠 Back to Menu",
+    "menu_request": "📚 Back to Requests",
+    "menu_library": "📖 Back to Library",
+    "menu_account": "👤 Back to Account",
+    "menu_tools": "🛠️ Back to Tools",
+    "menu_clubs": "👥 Back to Clubs",
+    "menu_shelf": "📒 Back to My Shelf",
+    "menu_support": "🆘 Support",
+    "acc_buy": "💎 Back to Top Up",
+    "admin_open": "🛡 Back to Console",
+    "admin_ai": "🤖 Back to AI Engine",
+    "admin_manage": "🛡 Back to Manage Admins",
+}
+
+
+@router.callback_query(F.data.startswith("flow_cancel:"))
+async def cb_flow_cancel(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await call.answer("Cancelled — nothing was saved.")
+    target = (call.data.split(":", 1)[1] or "menu_home").strip() or "menu_home"
+    label = _CANCEL_DEST.get(target, "🏠 Back to Menu")
+    text = ("✖️ <b>Cancelled</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>No problem — that's been called off and nothing was saved.</i>\n\n"
+            "<blockquote>Pick up wherever you like — your library, wallet and "
+            "progress are exactly as you left them.</blockquote>")
+    markup = kb([btn(label, target, style="primary")])
+    # The prompt may have been a photo/caption message (edit_text would fail) or a
+    # plain message — try to edit in place, otherwise send a fresh card.
+    try:
+        await call.message.edit_text(text, reply_markup=markup)
+    except Exception:  # noqa: BLE001
+        await call.message.answer(text, reply_markup=markup)
 
 
 # All dashboard actions now have real handlers in their own routers

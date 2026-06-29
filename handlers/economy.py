@@ -20,7 +20,7 @@ from aiogram.types import CallbackQuery, Message
 from config import BCN_EXPIRY_SECONDS
 from database.connection import MongoManager
 from utils.format import fmt_amount
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import is_super
 from utils.settings import get_float
 from utils.wallet import (
@@ -422,7 +422,8 @@ async def cb_admin_create(call: CallbackQuery, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>Step 1 of 2 — set how many members can claim it.</i>\n"
         "<blockquote>Send a whole number for the total claims (e.g. <code>20</code>).\n"
-        "Type /cancel anytime to abort.</blockquote>")
+        "💡 <i>Tap Cancel below to step back.</i></blockquote>",
+        reply_markup=kb(cancel_row("menu_account")))
 
 
 @router.message(RedeemFSM.cc_max, F.text)

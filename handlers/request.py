@@ -11,7 +11,7 @@ they arrive in the requests phase.
 """
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from html import escape
 
 from aiogram import F, Router
@@ -33,6 +33,9 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 _PER_PAGE = 8
+_RR_PER = 8            # recent-requests rows per page
+_RR_WINDOW_DAYS = 7    # show every request from the past 7 days
+_RR_MAX = 300          # safety cap on how many we materialise
 _DOWNLOAD_COST = 1.0
 _NORM_RE = re.compile(r"[^a-z0-9 ]+")
 
@@ -87,12 +90,6 @@ async def cb_req_auto(call: CallbackQuery, state: FSMContext) -> None:
             reply_markup=kb([btn("🔙 Back", "menu_request", style="danger")]))
         return
     await state.set_state(RequestFSM.awaiting_query)
-    db = await MongoManager.get()
-    u = await db.find_one_global("users", {"user_id": call.from_user.id},
-                                 {"search_history": 1}) or {}
-    rows = [[btn(f"🕘 {q[:40]}", f"sh:{i}", style="primary")]
-            for i, q in enumerate((u.get("search_history") or [])[:5])]
-    rows.append([btn("🔙 Back", "menu_request", style="danger")])
     await call.message.edit_text(
         "🔍 <b>Search the Archive</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
@@ -102,9 +99,12 @@ async def cb_req_auto(call: CallbackQuery, state: FSMContext) -> None:
         "have in mind. Our instant search reads every word, forgives the odd "
         "typo, and surfaces the closest matches in seconds.\n\n"
         "📝 Try something like <code>atomic habits</code>"
-        "</blockquote>"
-        + ("\n🕘 <i>Or tap a recent search below to run it again.</i>" if len(rows) > 1 else ""),
-        reply_markup=kb(*rows),
+        "</blockquote>\n"
+        "<i>🕘 Want a title you looked up before? Open your Recent Requests.</i>",
+        reply_markup=kb(
+            [btn("🕘 Recent Requests", "rr:0", style="primary")],
+            [btn("🔙 Back", "menu_request", style="danger")],
+        ),
     )
 
 
@@ -120,7 +120,9 @@ async def on_query(message: Message, state: FSMContext) -> None:
 
 
 async def _record_search(uid: int, query: str) -> None:
-    """Keep the user's last 8 distinct searches (most-recent first)."""
+    """Keep the user's last 8 distinct searches (for the Watchlist opt-in) AND
+    append a timestamped entry to `search_log` (powers the paginated Recent
+    Requests view of every search over the past 7 days)."""
     q = (query or "").strip()
     if not q:
         return
@@ -129,25 +131,88 @@ async def _record_search(uid: int, query: str) -> None:
     await db.safe_update("users", {"user_id": uid},
                          {"$push": {"search_history": {"$each": [q], "$position": 0, "$slice": 8}}},
                          upsert=False)
+    await db.safe_insert("search_log",
+                         {"user_id": uid, "query": q, "at": datetime.now(timezone.utc)})
 
 
-@router.callback_query(F.data.startswith("sh:"))
-async def cb_recent(call: CallbackQuery, state: FSMContext) -> None:
+async def _recent_requests(uid: int) -> list[str]:
+    """Every search this user ran in the past 7 days, newest first (capped)."""
+    db = await MongoManager.get()
+    since = datetime.now(timezone.utc) - timedelta(days=_RR_WINDOW_DAYS)
+    rows = await db.find_global("search_log", {"user_id": uid, "at": {"$gte": since}},
+                                sort=[("at", -1)], limit=_RR_MAX)
+    return [r.get("query", "") for r in rows if r.get("query")]
+
+
+# ── shared: turn a title into live archive results ───────────────────────────────
+async def find_in_library(message: Message, state: FSMContext, query: str, *,
+                          edit: bool = False) -> None:
+    """Run `query` against the archive and render the standard results view (or the
+    not-found card with a Request-from-a-Curator button). Reused by the AI
+    recommendation / summary screens so a tapped title fetches straight from the
+    library."""
+    await state.update_data(sq=query, sp=0, sf="all", ss="relevance")
+    await _render_results(message, state, query, 0, edit=edit)
+
+
+# ── Recent Requests (paginated, last 7 days) ─────────────────────────────────────
+@router.callback_query(F.data.startswith("rr:"))
+async def cb_recent_requests(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
     try:
-        i = int(call.data.split(":", 1)[1])
+        page = max(0, int(call.data.split(":", 1)[1]))
     except ValueError:
+        page = 0
+    queries = await _recent_requests(call.from_user.id)
+    if not queries:
+        await call.message.edit_text(
+            "🕘 <b>Recent Requests</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>Every title you've searched in the last 7 days lands here.</i>\n\n"
+            "<blockquote>You haven't searched anything in the past week yet. Run a "
+            "search and it'll show up here — tap any past request to instantly run "
+            "it again.</blockquote>",
+            reply_markup=kb([btn("🔍 New Search", "req_auto", style="success")],
+                            [btn("🔙 Back", "menu_request", style="danger")]))
         return
-    db = await MongoManager.get()
-    u = await db.find_one_global("users", {"user_id": call.from_user.id},
-                                 {"search_history": 1}) or {}
-    hist = u.get("search_history") or []
-    if i >= len(hist):
-        await call.answer("That recent search has rolled off your history — just type the title again.", show_alert=True)
+    pages = max(1, (len(queries) + _RR_PER - 1) // _RR_PER)
+    page = min(page, pages - 1)
+    chunk = queries[page * _RR_PER:(page + 1) * _RR_PER]
+    rows = [[btn(f"🔁 {q[:42]}", f"rrq:{page}:{i}", style="primary")]
+            for i, q in enumerate(chunk)]
+    nav = []
+    if page > 0:
+        nav.append(btn("⬅️ Newer", f"rr:{page-1}", style="primary"))
+    if page + 1 < pages:
+        nav.append(btn("Older ➡️", f"rr:{page+1}", style="primary"))
+    if nav:
+        rows.append(nav)
+    rows.append([btn("🔍 New Search", "req_auto", style="success")])
+    rows.append([btn("🔙 Back", "menu_request", style="danger")])
+    await call.message.edit_text(
+        "🕘 <b>Recent Requests</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Everything you've looked up in the past 7 days — newest first.</i>\n\n"
+        "<blockquote>Tap any past request to run it again in an instant.</blockquote>\n"
+        f"<i>📄 Page <code>{page+1}</code> of <code>{pages}</code> · "
+        f"<code>{len(queries)}</code> request(s) this week.</i>",
+        reply_markup=kb(*rows))
+
+
+@router.callback_query(F.data.startswith("rrq:"))
+async def cb_run_recent(call: CallbackQuery, state: FSMContext) -> None:
+    await call.answer()
+    try:
+        _, page_s, i_s = call.data.split(":", 2)
+        page, i = int(page_s), int(i_s)
+    except (ValueError, IndexError):
         return
-    query = hist[i]
-    await state.update_data(sq=query, sp=0, sf="all", ss="relevance")
-    await _render_results(call.message, state, query, 0, edit=True)
+    queries = await _recent_requests(call.from_user.id)
+    idx = page * _RR_PER + i
+    if idx >= len(queries):
+        await call.answer("That request has rolled off your 7-day history — just search the title again.", show_alert=True)
+        return
+    await find_in_library(call.message, state, queries[idx], edit=True)
 
 
 @router.callback_query(F.data.in_({"sr_next", "sr_prev"}))
@@ -214,20 +279,21 @@ async def _render_results(message: Message, state: FSMContext, query: str,
                     "for you by hand."
                     "</blockquote>\n"
                     "<i>💡 Check back soon — the catalogue grows daily.</i>")
-            markup = kb([btn("👤 Request from a Curator", "req_manual", style="primary")],
+            markup = kb([btn("👤 Request an Admin", "req_manual", style="success")],
                         [btn("🔙 Menu", "menu_home", style="danger")])
         else:
-            text = (f"🔍 <b>No matches yet for</b> <code>{query}</code>\n"
+            text = (f"🔍 <b>Not in the library yet</b>\n"
                     "━━━━━━━━━━━━━━━━━━━━\n"
-                    "<i>It's not in the archive — but it doesn't have to stay that way.</i>\n\n"
+                    f"<i>We couldn't find <code>{escape(query)}</code> in the archive.</i>\n\n"
                     "<blockquote>"
-                    "A quick spell-check can help — or let us do the work for you:\n\n"
-                    "🔔 <b>Get notified</b> the moment this title lands in the archive.\n"
-                    "👤 <b>Ask a curator</b> to source it for you by hand."
+                    "It's not here right now — but it doesn't have to stay that way:\n\n"
+                    "👤 <b>Request an admin</b> to source it for you by hand.\n"
+                    "🔔 <b>Get notified</b> the moment it lands in the archive.\n"
+                    "🔍 <b>Try another spelling</b> or a few keywords."
                     "</blockquote>")
-            markup = kb([btn("🔔 Notify Me When Added", "wl_last", style="success")],
-                        [btn("🔍 New Search", "req_auto", style="primary"),
-                         btn("👤 Request from a Curator", "req_manual", style="primary")],
+            markup = kb([btn("👤 Request an Admin", "req_manual", style="success")],
+                        [btn("🔔 Notify Me When Added", "wl_last", style="primary")],
+                        [btn("🔍 New Search", "req_auto", style="primary")],
                         [btn("🔙 Menu", "menu_home", style="danger")])
         await (message.edit_text if edit else message.answer)(text, reply_markup=markup)
         return
@@ -242,9 +308,8 @@ async def _render_results(message: Message, state: FSMContext, query: str,
                          style="success" if v == ss else "primary") for v, lbl in _SORTS])
     for f in results:
         fuid = f["file_unique_id"]
-        label = f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:34]}"
-        rows.append([btn(label, f"dl:{fuid}", style="success"),
-                     btn("📌", f"tbr_add:{fuid}", style="primary")])
+        label = f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:38]}"
+        rows.append([btn(label, f"dl:{fuid}", style="success")])
 
     nav = []
     if page > 0:
@@ -257,14 +322,14 @@ async def _render_results(message: Message, state: FSMContext, query: str,
                  btn("🔙 Menu", "menu_home", style="danger")])
 
     pages = max(1, (total + _PER_PAGE - 1) // _PER_PAGE)
-    head = (f"🔎 <b>Closest matches for</b> <code>{query}</code>" if fuzzy
-            else f"🔍 <b>Results for</b> <code>{query}</code>")
+    head = (f"🔎 <b>Closest matches for</b> <code>{escape(query)}</code>" if fuzzy
+            else f"🔍 <b>Results for</b> <code>{escape(query)}</code>")
     hint = "\n<i>No exact title — here are the nearest reads we found.</i>" if fuzzy else ""
     text = (f"{head}\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             f"📊 <code>{total}</code> match(es) · page <code>{page + 1}/{pages}</code>{hint}\n\n"
             "<blockquote>"
-            "Tap a title to receive it instantly, or 📌 to save it for later.\n\n"
+            "📥 Tap any title below and it's delivered to your chat instantly.\n\n"
             "💸 <b>Delivery</b> — from <code>1</code> 🪙 BCN / 💎 BGM per title "
             "<i>(less with VIP and during Happy Hour; more during surge).</i>"
             "</blockquote>")

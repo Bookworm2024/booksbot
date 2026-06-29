@@ -13,7 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from utils.audit import log_action
-from utils.keyboards import btn, kb
+from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import has
 from utils.risk import flag_user, flagged_users, is_flagged, unflag_user
 
@@ -91,7 +91,8 @@ async def cb_flag(call: CallbackQuery, state: FSMContext) -> None:
         "<blockquote>Send the <b>User ID</b> you'd like to flag. "
         "While flagged, the account <b>can't gift tokens</b> — everything else "
         "keeps working, and you can clear them the moment things check out.</blockquote>\n"
-        "<i>Send /cancel to step away.</i>")
+        "<i>💡 Tap Cancel below to step away.</i>",
+        reply_markup=kb(cancel_row("admin_open")))
 
 
 @router.message(RiskFSM.flag_id, F.text)

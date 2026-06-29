@@ -50,7 +50,7 @@ async def _open(message: Message, state: FSMContext) -> None:
         "<blockquote>📝 Describe what's happening in <b>one message</b>. "
         "Add a screenshot if it helps us see the same screen you do.\n"
         "💬 We reply right here in chat, usually within a few hours.\n"
-        "🛑 Changed your mind? Send <code>/cancel</code> anytime.</blockquote>\n"
+        "🛑 Changed your mind? Tap <b>Cancel</b> below anytime.</blockquote>\n"
         "<i>💡 The more detail you share — a book title, a code, what you tapped — the faster we can fix it.</i>",
         reply_markup=kb([btn("❌ Cancel", "menu_account", style="danger")]))
 
@@ -63,7 +63,7 @@ async def on_support_msg(message: Message, state: FSMContext) -> None:
             "🆘 <b>Support Cancelled</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "<i>No message was sent — your inbox is clear.</i>\n\n"
-            "<i>💡 Need us again? Just open <b>Support</b> or send <code>/support</code> whenever you're ready.</i>")
+            "<i>💡 Need us again? Just open <b>Support</b> whenever you're ready.</i>")
         return
     await state.clear()
     uid = message.chat.id
@@ -123,7 +123,7 @@ async def on_reply(message: Message, state: FSMContext) -> None:
             "━━━━━━━━━━━━━━━━━━━━\n"
             "<i>Our team got back to you — here's their note.</i>\n\n"
             f"<blockquote>💬 {message.text}</blockquote>\n"
-            "<i>💡 Still need a hand? Send <code>/support</code> to keep the conversation going.</i>")
+            "<i>💡 Still need a hand? Open <b>Support</b> to keep the conversation going.</i>")
         await message.answer(
             "✅ <b>Reply Delivered</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"

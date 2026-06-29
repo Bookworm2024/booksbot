@@ -31,7 +31,8 @@ Legend counts toward ~500 features across 14 pillars.
 - ⬜ Adjustable playback EQ for audiobooks · chapter markers
 
 ## 2. Book Discovery & Content
-- ✅ AI recommendations (genre → 100 titles)
+- ✅ AI recommendations (genre → 100 titles) — every title is a tappable button
+  that fetches it straight from the library (or offers a manual admin request)
 - ✅ AI book summaries (overview, themes, takeaways)
 - ✅ Discover hub: 🆕 New Arrivals · 🔥 Popular (download-ranked)
 - ✅ Book of the Day (deterministic daily) · 💬 Daily literary Quote
@@ -43,7 +44,10 @@ Legend counts toward ~500 features across 14 pillars.
   shelves) · ✅ reading challenges (🎯 monthly goals, progress bars, claimable BGM)
 - ✅ Ratings &amp; reviews per title (⭐ 1–5 + written reviews, average shown)
 - ✅ Personal reading goal + yearly wrap-up (progress bar, days read, top genres)
-- ✅ Wishlist / Reading List (📌 save from search; downloading clears it)
+- 🗑 Reading List / Wishlist retired — the "📌 save from search" pin was removed
+  so search results are clean one-tap downloads; saving is covered by ⭐ Favorites
+  (downloaded) and 🔔 Watchlist (notify-when-added). `handlers/tbr.py` is kept but
+  no longer wired into the menu/router.
 
 ## 3. Powerful Search
 - ✅ All-words archive search, paginated
@@ -52,7 +56,9 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Fuzzy/typo-tolerant search (trigram candidate pool + similarity re-rank;
   auto-fallback when exact returns nothing — handles typos/reorder/partial)
 - ✅ Sort options in results (🎯 Best / 🆕 Newest / 🔥 Popular)
-- ✅ Saved searches + recent-search history (last 8, re-run with one tap)
+- ✅ Recent Requests — paginated view of EVERY search from the last 7 days, one-tap
+  re-run (replaced the inline recent-search list); search results are link-style
+  download buttons (pin/save-for-later removed); no-match → prominent Request-an-Admin
 - 🔜 Author filter (needs author metadata)
 - ⬜ Semantic (embedding) search
 
@@ -126,6 +132,8 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Manage admins live (add/remove at runtime, no redeploy; env/super fixed)
 - ✅ Interactive redeem-code creator (🎟️ Create Code panel) + /create command
 - ✅ AI provider config from /admin (free bots.lt / Claude / off, URL+key, live test)
+  + 🪝 webhook mode — point the bot at any custom AI endpoint (POST), applies to
+  recommendations/summaries/tagging at once; toggle + URL in chat panel & Mini-App
   — dashboard + chat write-ops
 - ✅ Scheduled broadcasts (send in +1/+6/+24h, background worker fires them) +
   audience segments (👥 all / 👑 VIP / 🟢 active 7d / 😴 inactive / 📦 legacy)
@@ -185,7 +193,9 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Telethon backfill (30k archive) · real-time indexer (live channel id —
   indexes ANY file type: document/audio/voice/video/animation/video-note/photo,
   on both new posts AND edits) · forward-import for old files · watchlist
-- ✅ AI genre auto-tagging (admin batch) → 🏷 Browse-by-Genre in Discover
+- ✅ AI genre auto-tagging — one-tap WHOLE-ARCHIVE background sweep (logs the total
+  file count, then tags every untagged title via the AI engine and writes it to the
+  DB, with a live progress card) → 🏷 Browse-by-Genre in Discover
 - ✅ Duplicate detection (🧹 admin tool — title-duplicate groups, one-tap keep-best
   cleanup) · 🔜 metadata enrichment · cover fetch · OCR for scans
 - 🔜 Uploader rewards/leaderboard · bounty requests
@@ -218,6 +228,9 @@ Legend counts toward ~500 features across 14 pillars.
   English, core greeting surfaces translated; deeper coverage grows by adding keys)
 - ✅ Currency localization (💱 9 currencies, BGM price shown in your currency,
   display-only) · ✅ RTL flagged (is_rtl for Arabic)
+- ✅ Zero-command UX — no flow ever tells a user to type a slash command; every
+  prompt carries a ❌ Cancel button (universal `flow_cancel` handler clears the
+  flow and routes home/back); typed /cancel still works as a silent fallback
 - ⬜ Dyslexia font · high-contrast · screen-reader friendly captions
 
 ---
