@@ -193,6 +193,10 @@ Legend counts toward ~500 features across 14 pillars.
 - ✅ Telethon backfill (30k archive) · real-time indexer (live channel id —
   indexes ANY file type: document/audio/voice/video/animation/video-note/photo,
   on both new posts AND edits) · forward-import for old files · watchlist
+- ✅ Admin-fulfilled requests auto-archive: when an admin sends a file to a user,
+  the bot saves a permanent copy to the database (file) channel, indexes it under
+  the requested title with the channel coords, and pings any watchlist waiters — so
+  the next user to search that title gets it instantly
 - ✅ AI genre auto-tagging — one-tap WHOLE-ARCHIVE background sweep (logs the total
   file count, then tags every untagged title via the AI engine and writes it to the
   DB, with a live progress card) → 🏷 Browse-by-Genre in Discover

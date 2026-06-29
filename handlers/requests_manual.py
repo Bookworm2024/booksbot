@@ -9,8 +9,11 @@ User flow:
 
 Admin flow (admin panel → 📬 Requests, or /requests):
   Cards for each pending request → Send File / Mark Completed / Cancel(+reason).
-  • Send File: admin uploads a doc → indexed into `files` + delivered to the
-    user with an ⭐ Add-to-Favorites button.
+  • Send File: admin uploads a doc → bot saves a permanent copy to the database
+    (file) channel, indexes it into `files` under the requested title (with the
+    channel coords for robust delivery) + delivered to the user with an ⭐ Add-to-
+    Favorites button, and pings any watchlist waiters. The title is then searchable,
+    so the next user who requests it gets it instantly.
   • Cancel: admin types a reason → refund (BGM-only: BCN→25%, BGM→75%) →
     archived → user notified with the reason.
 
@@ -23,6 +26,7 @@ import logging
 import random
 import string
 from datetime import datetime, timezone
+from html import escape
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -33,8 +37,9 @@ from aiogram.types import CallbackQuery, Message
 from config import ADMIN_IDS
 from database.connection import MongoManager
 from utils.brand import CREDIT
+from utils.channel import get_file_channel
 from utils.logs import log_request_created, log_request_fulfilled
-from utils.files import clean_title, index_file, kind_for_ext
+from utils.files import clean_title, index_file, kind_for_ext, trigrams
 from utils.format import fmt_amount
 from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import has
@@ -384,8 +389,9 @@ async def cb_send_init(call: CallbackQuery, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"<blockquote>Upload the file for request <code>{rid}</code> now — "
         "a <b>document</b>, <b>audio</b>, or <b>video</b>.\n"
-        "🛡 It's indexed into the searchable archive and delivered straight to the "
-        "reader with a one-tap Add-to-Favorites button.</blockquote>",
+        "🛡 It's saved to the database channel, indexed into the searchable archive "
+        "under this title, and delivered straight to the reader — so the next person "
+        "who searches it gets it instantly.</blockquote>",
         reply_markup=kb(cancel_row("admin_open")))
 
 
@@ -408,14 +414,39 @@ async def on_admin_file(message: Message, state: FSMContext) -> None:
     fuid = getattr(obj, "file_unique_id", None) or rid
     fname = getattr(obj, "file_name", None) or req.get("title", "file")
     ext = fname.rsplit(".", 1)[-1].lower() if "." in fname else (req.get("format", "") or "").lower()
+    title = clean_title(req.get("title") or fname)
+    kind = "audio" if message.audio else ("video" if message.video else kind_for_ext(ext))
 
-    # enrich the searchable archive with the fulfilled file
-    await index_file({
-        "file_unique_id": fuid, "name": clean_title(req.get("title", fname)),
-        "name_lc": clean_title(req.get("title", fname)).lower(), "ext": ext,
-        "kind": "audio" if message.audio else ("video" if message.video else kind_for_ext(ext)),
-        "msg_id": None, "file_id": file_id,
-    })
+    # 1) Save a permanent copy into the bot's database (file) channel so the title
+    #    physically lives in the archive — not just a fragile file_id reference.
+    #    Stamp the request title as the channel caption so it stays recognisable.
+    file_channel = await get_file_channel()
+    chan_id = chan_msg_id = None
+    if file_channel:
+        try:
+            sent = await message.bot.copy_message(
+                chat_id=file_channel, from_chat_id=message.chat.id,
+                message_id=message.message_id, caption=f"📖 {escape(title)}")
+            chan_id, chan_msg_id = file_channel, sent.message_id
+        except Exception as exc:  # noqa: BLE001 — bot may lack post rights; index by file_id
+            logger.warning("Couldn't save fulfilled file to the file channel %s: %s",
+                           file_channel, exc)
+
+    # 2) Record it in the searchable archive keyed to the requested title, with the
+    #    channel coordinates for robust copy_message delivery (falls back to file_id).
+    name_lc = title.lower()
+    doc = {"file_unique_id": fuid, "name": title, "name_lc": name_lc,
+           "name_tg": trigrams(name_lc), "ext": ext, "kind": kind,
+           "chan_id": chan_id, "msg_id": chan_msg_id, "file_id": file_id}
+    await index_file(doc)
+    # Force the requested title + channel coords to stick even if the live channel-post
+    # indexer raced us and inserted a filename-named doc for the same message first.
+    db = await MongoManager.get()
+    await db.safe_update("files", {"file_unique_id": fuid},
+                         {"$set": {"name": title, "name_lc": name_lc,
+                                   "name_tg": trigrams(name_lc), "ext": ext, "kind": kind,
+                                   "chan_id": chan_id, "msg_id": chan_msg_id,
+                                   "file_id": file_id}})
 
     caption = ("🎁 <b>Your book has arrived</b>\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
@@ -437,11 +468,26 @@ async def on_admin_file(message: Message, state: FSMContext) -> None:
             f"{exc}</blockquote>\n"
             "<i>💡 The ticket is still open — try sending the file again.</i>")
         return
+
+    # 3) Now that the title is in the archive, notify anyone who searched for it while
+    #    it was missing (the same watchlist the live channel indexer services).
+    try:
+        from handlers.indexer import _service_watchlist
+        await _service_watchlist(message.bot, title)
+    except Exception:  # noqa: BLE001 — a courtesy ping must never break fulfilment
+        pass
+
+    saved_note = ("it's saved to the database channel and indexed in the searchable "
+                  "archive" if chan_id else
+                  "it's indexed in the searchable archive (no file channel is connected "
+                  "yet, so it's stored by file reference — connect one via 🗂 File Channel "
+                  "for a permanent copy)")
     await message.answer(
         "✨ <b>File delivered</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "<blockquote>The reader has their book and it's now indexed in the searchable "
-        "archive. 🛡 Tap below to close out the ticket.</blockquote>",
+        f"<blockquote>The reader has their book and {saved_note}. From now on, anyone "
+        "who searches this title gets it instantly. 🛡 Tap below to close out the "
+        "ticket.</blockquote>",
         reply_markup=kb([btn("✅ Mark Completed", f"areq_done:{rid}",
                              style="primary")]))
 
