@@ -25,6 +25,7 @@ from config import (
     BOT_TOKEN,
     PORT,
     TELEGRAM_API_BASE,
+    set_bot_username,
     validate_runtime_config,
 )
 from database.connection import MongoManager
@@ -301,6 +302,9 @@ async def main() -> None:
 
     try:
         me = await bot.get_me()
+        # Pin every deep-link to the bot's REAL @handle, ignoring any stale
+        # BOT_USERNAME env var (prevents links to a wrong/old bot username).
+        set_bot_username(me.username)
         logger.info("Starting polling as @%s", me.username)
         await _set_command_menu(bot)
         await bot.delete_webhook(drop_pending_updates=True)

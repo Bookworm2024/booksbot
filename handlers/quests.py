@@ -12,7 +12,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from config import BOT_USERNAME
+from config import bot_username
 from utils.format import fmt_amount
 from utils.keyboards import btn, kb, url_btn
 from utils.quests import claim as claim_quest, mark_shared, status
@@ -27,13 +27,14 @@ def _bar(have: int, target: int, width: int = 10) -> str:
 
 
 def _share_url(uid: int) -> str:
-    msg = (f"📚 Free books, audiobooks & games on @{BOT_USERNAME}! "
+    un = bot_username()
+    msg = (f"📚 Free books, audiobooks & games on @{un}! "
            "Read, play and earn rewards. Join me:")
     # The invite URL carries a ?start={uid} referral payload, so it MUST be
     # url-encoded before going into share/url's own `url=` param — otherwise the
     # raw `?start={uid}` is parsed as a separate query arg of share/url and the
     # referral payload is dropped (friend joins unattributed).
-    invite = quote(f"https://t.me/{BOT_USERNAME}?start={uid}", safe="")
+    invite = quote(f"https://t.me/{un}?start={uid}", safe="")
     return f"https://t.me/share/url?url={invite}&text={quote(msg)}"
 
 

@@ -60,8 +60,31 @@ def _bool(name: str, default: bool = False) -> bool:
 
 # ── core ─────────────────────────────────────────────────────────────────────
 BOT_TOKEN: str       = os.getenv("BOT_TOKEN", "")
+# BOT_USERNAME is only a SEED / fallback. The authoritative @handle is resolved
+# once at startup from bot.get_me() (set_bot_username, called in bot.py), so a
+# stale BOT_USERNAME env var can never make the bot hand out deep-links to the
+# wrong bot. Every deep-link MUST go through bot_username(), never this constant.
 BOT_USERNAME: str    = os.getenv("BOT_USERNAME", "getfreebooksbot").lstrip("@")
+_resolved_username: str = BOT_USERNAME
 SUPER_ADMIN_ID: int  = _int("SUPER_ADMIN_ID", 6011680723)
+
+
+def bot_username() -> str:
+    """The bot's real @handle (no leading @). Resolved from bot.get_me() at
+    startup; before that it falls back to the BOT_USERNAME env var / the
+    'getfreebooksbot' default. Read deep-links through this — never the raw
+    BOT_USERNAME constant — so links always point at the actually-running bot."""
+    return _resolved_username
+
+
+def set_bot_username(name: str) -> None:
+    """Pin the username from bot.get_me().username at startup — the single source
+    of truth for every deep-link. Ignores empty/None so a transient get_me()
+    hiccup keeps the seed rather than blanking the links."""
+    global _resolved_username
+    name = (name or "").lstrip("@")
+    if name:
+        _resolved_username = name
 # Normal admins (super admin is always implicitly an admin too).
 ADMIN_IDS: list[int] = sorted(set(_csv_ints(os.getenv("ADMIN_IDS", "")) + [SUPER_ADMIN_ID]))
 

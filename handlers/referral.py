@@ -12,7 +12,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from config import BOT_USERNAME
+from config import bot_username
 from database.connection import MongoManager
 from utils.keyboards import btn, kb
 
@@ -24,7 +24,7 @@ async def _refer_view(uid: int):
     db = await MongoManager.get()
     doc = await db.find_one_global("users", {"user_id": uid}, {"ref_count": 1}) or {}
     count = int(doc.get("ref_count") or 0)
-    link = f"https://t.me/{BOT_USERNAME}?start={uid}"
+    link = f"https://t.me/{bot_username()}?start={uid}"
     text = (
         "🎁 <b>Refer &amp; Earn</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"

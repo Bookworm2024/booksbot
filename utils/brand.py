@@ -13,7 +13,7 @@ This module also exposes the shared "premium look" primitives — a divider rule
 a tagline and section-header / footer builders — so the same polished visual
 language is reused everywhere instead of being re-invented per handler.
 """
-from config import BOT_USERNAME
+from config import bot_username
 
 # Public display name (matches the BotFather title shown on the bot's profile).
 BOT_NAME = "Books Provider"
@@ -66,7 +66,7 @@ def about_text() -> str:
         f"ℹ️ <b>About {BOT_NAME}</b>\n"
         f"{DIVIDER}\n"
         f"<i>{TAGLINE}</i>\n\n"
-        f"<b>{BOT_NAME}</b> (@{BOT_USERNAME}) is a complete reading universe living "
+        f"<b>{BOT_NAME}</b> (@{bot_username()}) is a complete reading universe living "
         "inside Telegram — a vast archive of eBooks and audiobooks, a built-in "
         "reader &amp; player, AI-powered discovery, brain games and daily rewards.\n\n"
         "<blockquote>📚 <b>A boundless library</b> — tens of thousands of titles, "

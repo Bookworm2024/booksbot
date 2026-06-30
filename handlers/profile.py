@@ -12,7 +12,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from config import BOT_USERNAME
+from config import bot_username
 from database.connection import MongoManager
 from utils.keyboards import btn, kb, url_btn
 from utils.vip import badge as vip_badge
@@ -70,9 +70,10 @@ async def _view(uid: int, name: str):
         "</blockquote>\n"
         "<i>💡 Share your profile to invite friends — you both earn BGM when they join.</i>"
     )
-    share = (f"I'm Level {level} on @{BOT_USERNAME} 📚 — free books, audiobooks & "
+    un = bot_username()
+    share = (f"I'm Level {level} on @{un} 📚 — free books, audiobooks & "
              f"games. Join me!")
-    share_url = f"https://t.me/share/url?url=https://t.me/{BOT_USERNAME}&text={quote(share)}"
+    share_url = f"https://t.me/share/url?url=https://t.me/{un}&text={quote(share)}"
     return text, kb([url_btn("📤 Share My Profile", share_url, style="success")],
                     [btn("📈 XP & Levels", "xp_view", style="primary"),
                      btn("🏅 Achievements", "acc_achievements", style="primary")],

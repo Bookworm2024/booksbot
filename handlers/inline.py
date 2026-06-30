@@ -20,7 +20,7 @@ from aiogram.types import (
     InputTextMessageContent,
 )
 
-from config import BOT_USERNAME
+from config import bot_username
 from utils.brand import BOT_NAME
 from utils.files import icon_for, search
 
@@ -32,12 +32,13 @@ router = Router()
 async def inline_search(iq: InlineQuery) -> None:
     q = (iq.query or "").strip()
     results, _ = await search(q, limit=20)
+    un = bot_username()
     articles = []
     for i, f in enumerate(results):
         fuid = f["file_unique_id"]
         name = f.get("name", "Untitled")
         ext = (f.get("ext") or "").upper()
-        link = f"https://t.me/{BOT_USERNAME}?start=dl_{fuid}"
+        link = f"https://t.me/{un}?start=dl_{fuid}"
         articles.append(InlineQueryResultArticle(
             id=str(i),
             title=f"{icon_for(f.get('ext',''))} {name[:60]}",
@@ -45,7 +46,7 @@ async def inline_search(iq: InlineQuery) -> None:
             input_message_content=InputTextMessageContent(
                 message_text=f"📚 <b>{escape(name)}</b>\n"
                              f"<i>Found in the {BOT_NAME} library.</i>\n\n"
-                             f"📥 Tap below to get your copy on @{BOT_USERNAME}.",
+                             f"📥 Tap below to get your copy on @{un}.",
                 parse_mode="HTML"),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
                 InlineKeyboardButton(text="📥 Get this book", url=link)]]),

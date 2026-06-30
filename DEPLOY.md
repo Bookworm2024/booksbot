@@ -19,11 +19,13 @@ background workers — email monitor & reminders).
 ## 2. Environment variables
 ### Required (bot won't boot without these)
 ```
-BOT_TOKEN=<@hugahugabotbot token from @BotFather>
+BOT_TOKEN=<@getfreebooksbot token from @BotFather>
 MONGO_URL=<mongodb+srv://… Atlas string, Network Access 0.0.0.0/0>
 SUPER_ADMIN_ID=6011680723
-BOT_USERNAME=hugahugabotbot
 ```
+> `BOT_USERNAME` is **optional** — the bot auto-detects its real @handle from the
+> token via `get_me()` at startup, so every deep-link always points at the live
+> bot. Only set `BOT_USERNAME` if you want an explicit pre-startup fallback.
 ### Strongly recommended
 ```
 FILE_CHANNEL_ID=-100…        # the file channel (bot must be admin there)
@@ -50,11 +52,11 @@ Optional tuning: `COLORED_BUTTONS`, `CAPTCHA_ENABLED`, `BGM_PRICE_INR/USD`,
 `MIN_BGM_PURCHASE`, `MONGO_DB_NAME`, `TELEGRAM_API_BASE`. Full list in `.env.example`.
 
 ## 3. First deploy → wire the URL (the one two-step)
-1. Deploy. Watch logs for: `MongoDB ready.` → `Starting polling as @hugahugabotbot`.
+1. Deploy. Watch logs for: `MongoDB ready.` → `Starting polling as @getfreebooksbot`.
 2. Copy the Koyeb URL, set `BOT_PUBLIC_URL` to it, **redeploy** (Mini Apps need it).
 
 ## 4. Post-deploy
-- Add **@hugahugabotbot as admin** to the file channel (needed for delivery + live indexing).
+- Add **@getfreebooksbot as admin** to the file channel (needed for delivery + live indexing).
 - @BotFather → `/setinline` to enable inline-mode search.
 - Index the 30k archive (one time, local):
   `python tools/generate_session.py` → put `TELETHON_SESSION` in env → `python tools/backfill.py`
