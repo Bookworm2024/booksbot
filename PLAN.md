@@ -106,22 +106,35 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 
 ## Phase 8 — Auto-harvest (public-domain archive) ✅
 - ✅ Background harvester (`utils/harvester.py`) pulls latest arrivals + back-fills
-  books not yet in the DB from **public-domain** sources — Project Gutenberg
-  (Gutendex JSON API) + Standard Ebooks (atom new-releases feed). Pluggable source
-  layer for adding more **legal** feeds later.
-- ✅ Light + capped: one file/tick, paced (`harvest_interval_sec` ~75s), hard
-  weekly cap (`harvest_weekly_cap` 10k), idles when caught up. Dedupes by source
-  id AND normalized title (never duplicates the legacy archive).
-- ✅ Downloads best format (epub→mobi→txt, size-capped) → uploads to the file
-  channel via `send_document` → indexes via the existing `extract_from_message`/
+  titles not yet in the DB from the **biggest public-domain** archives, visited
+  **round-robin** so ebooks, PDFs and audiobooks all flow:
+  - **Project Gutenberg** (Gutendex JSON API) → EPUB
+  - **Standard Ebooks** (atom new-releases feed) → EPUB
+  - **Internet Archive** (advancedsearch, `possible-copyright-status:NOT_IN_COPYRIGHT`,
+    `format:(EPUB OR PDF)`, ~1M PD items) → EPUB + **PDF**
+  - **LibriVox** (audiobooks API, archive.org-hosted) → **audiobooks**
+- ✅ **Format policy — PDF / EPUB / audiobooks ONLY.** Never txt, mobi, html or
+  anything else (`_ALLOWED_EXT` gate enforces it at ingest regardless of source).
+  Gutenberg is EPUB-only (it offers no PDF); PDF comes from the Internet Archive.
+- ✅ **No upper limit.** `harvest_weekly_cap` defaults to **0 = unlimited**; the loop
+  only throttles if an operator sets a positive cap. One file/tick, paced
+  (`harvest_interval_sec` ~75s), idles when caught up. Dedupes by source id AND
+  normalized title (never duplicates the legacy archive).
+- ✅ **Audiobooks per chapter:** LibriVox recordings are multi-hour, so a whole book
+  can't be one Telegram upload — the harvester ingests **one file per chapter**
+  ("<Title> — Part NN"), each a complete streamable file ≤ size cap (or a single
+  whole-book `.m4b` when it fits). MP3 preferred over OGG for webview playback.
+- ✅ Downloads (size-capped) → uploads to the file channel via `send_document`
+  (cover thumbnail baked on) → indexes via the existing `extract_from_message`/
   `index_file` so search + `dl:` delivery + watchlist auto-notify all just work.
-- ✅ Genre free from Gutenberg subjects, AI fallback only when unclear.
+- ✅ Genre free from each source's subject tags, AI fallback only when unclear.
 - ✅ Weekly admin digest (7-day timer); 🧰 More Tools → 📚 Harvester panel
   (status/toggle/report-now); cap/pace/size tunable in ⚙️ Live Pricing.
-- ⛔ Scope note: **public-domain / legally-redistributable sources ONLY**. No
-  shadow-library/piracy sources and no auto-scraping of in-copyright releases —
-  recent in-copyright titles come via the operator (manual request fulfilment,
-  forward-import, Telethon backfill), never an automated piracy pipeline.
+- ⛔ Scope note: **public-domain / legally-redistributable sources ONLY** (IA is
+  filtered to `NOT_IN_COPYRIGHT`; LibriVox is 100% PD). No shadow-library/piracy
+  sources and no auto-scraping of in-copyright releases — recent in-copyright titles
+  come via the operator (manual request fulfilment, forward-import, Telethon
+  backfill), never an automated piracy pipeline.
 
 ## Phase 9 — File preparation & branding (the "renamer" layer) ✅
 - ✅ Central `utils/prepare.py` — EVERY file the bot hands a user routes through it
@@ -156,8 +169,17 @@ Legend: ✅ done · 🔜 next · ⬜ planned
   bots/commands).
 - ✅ Match → topic reply "Found N" + a deep-link that, in DM, runs the join/force-sub
   gate then delivers (premium unlimited; free daily quota → per-file overage/Premium
-  upsell shown in the topic when the limit's used up). Single match auto-delivers;
-  many → a pick list. "Buy this file" deep-link → wallet overage charge.
+  upsell shown in the topic when the limit's used up). **Single match auto-delivers;
+  many → a PICK LIST** (multi-match tickets carry no pinned `fuid`, so the deep-link
+  renders `dl:` buttons and the requester chooses — never an arbitrary auto-send).
+  "Buy this file" deep-link → wallet overage charge.
+- ✅ **Matching is strict** (`_ARENA_FUZZY_MIN` 0.62 via `fuzzy_search(min_score=…)`),
+  so gibberish no longer returns a flood of weak "matches" — it falls through to the
+  not-found path.
+- ✅ **Button ownership:** only the reader who posted a request may use its buttons.
+  A non-owner tapping "Notify me" (callback) gets a `show_alert`; a non-owner opening
+  someone else's deep-link is denied and routed to normal onboarding. Tickets store
+  the requester's `uid`; act only when the tapper matches.
 - ✅ No match → 🔔 Notify me (watchlist auto-DM when added; if the user never started
   the bot, a Start deep-link subscribes them + shows the dashboard + a confirm) and
   👤 Request from admins (concierge prefilled with the title; ebook quota + audiobook-

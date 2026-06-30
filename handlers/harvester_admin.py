@@ -25,7 +25,7 @@ async def _panel() -> tuple[str, object]:
     st = await harvester.status()
     on = st["enabled"]
     chan = await __chan()
-    cap = st["cap"]
+    cap = harvester.fmt_cap(st["cap"])
     week = st["week_count"]
     last = st.get("last_report") or "—"
     if isinstance(last, str) and "T" in last:
@@ -35,8 +35,9 @@ async def _panel() -> tuple[str, object]:
     text = (
         "📚 <b>Archive Harvester</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "<i>Grows the library on autopilot from public-domain archives "
-        "(Project Gutenberg + Standard Ebooks). Fully background; you get a weekly digest.</i>\n"
+        "<i>Grows the library on autopilot from the biggest public-domain archives — "
+        "Project Gutenberg + Standard Ebooks + Internet Archive (EPUB/PDF) and "
+        "LibriVox (audiobooks). Fully background; you get a weekly digest.</i>\n"
         "<blockquote>"
         f"⚙️ <b>Status:</b> {'🟢 ON' if on else '🔴 OFF'}\n"
         f"📥 <b>This week:</b> <code>{week}</code> / <code>{cap}</code>\n"

@@ -37,7 +37,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import BOT_USERNAME
+from config import bot_username
 from database.connection import MongoManager
 from utils.keyboards import btn, cancel_row, kb, url_btn
 from utils.permissions import is_super
@@ -49,12 +49,16 @@ _DEFAULT_CHAT = "free_novellas"
 _DEFAULT_TOPIC = 33
 _COOLDOWN_SEC = 8          # per-user anti-spam in the arena
 _TICKET_TTL_DAYS = 7
+# The Arena is a public free-for-all, so a loose fuzzy match (random syllables
+# overlapping a title) is worse than an honest "not found". Hold matches to a
+# stricter similarity bar than in-bot search so gibberish doesn't return a flood.
+_ARENA_FUZZY_MIN = 0.62
 
 _last_req: dict[int, float] = {}   # uid → monotonic ts of last arena request
 
 
 def _bot_un() -> str:
-    return (BOT_USERNAME or "").lstrip("@")
+    return bot_username()
 
 
 def _now():
@@ -176,23 +180,42 @@ async def _reply(message: Message, text: str, markup) -> None:
 async def _handle_request(message: Message, uid: int, query: str) -> None:
     from utils.files import search, fuzzy_search
     from utils import premium, quota
-    results, total = await search(query, limit=5)
+    results, total = await search(query, limit=8)
     if total == 0:
-        results, total = await fuzzy_search(query, limit=5)
+        results, total = await fuzzy_search(query, limit=8, min_score=_ARENA_FUZZY_MIN)
     disp = escape(query[:60])
     un = _bot_un()
 
     if total > 0:
         top = results[0]
-        token = await _new_ticket("get", query, uid, fuid=top.get("file_unique_id"))
-        get_url = f"https://t.me/{un}?start=ar_{token}"
+        multi = total > 1
         n_lbl = "match" if total == 1 else "matches"
+        # SINGLE match → pin the file so a tap delivers it straight away. MANY →
+        # carry NO fuid, so the deep-link opens a PICK LIST in DM and the requester
+        # chooses which file they actually want (never an arbitrary auto-send).
+        get_tok = await _new_ticket(
+            "get", query, uid, fuid=(None if multi else top.get("file_unique_id")))
+        get_url = f"https://t.me/{un}?start=ar_{get_tok}"
         if await premium.is_premium(uid) or await quota.can(uid, "dl"):
+            cta = f"📚 See all {total} matches" if multi else "📥 Get the file"
+            tail = ("pick the one you want and I'll send it to your DM. ✨" if multi
+                    else "I'll prepare it and send it to your DM. ✨")
             await _reply(
                 message,
                 f"📚 <b>Found {total} {n_lbl}</b> for <i>{disp}</i>.\n"
-                "<blockquote>Tap below — I'll prepare it and send it to your DM. ✨</blockquote>",
-                kb([url_btn("📥 Get the file" if total == 1 else f"📚 See {total} matches", get_url)]))
+                f"<blockquote>Tap below — {tail}</blockquote>",
+                kb([url_btn(cta, get_url)]))
+        elif multi:
+            used, lim = await quota.status(uid, "dl")
+            await _reply(
+                message,
+                f"📚 <b>Found {total} {n_lbl}</b> for <i>{disp}</i>.\n"
+                f"⚠️ <b>You've used today's free downloads</b> "
+                f"(<code>{used}/{quota.fmt_limit(lim)}</code>).\n"
+                "<blockquote>Browse all the matches and grab one with a per-file pass, "
+                "or go 👑 <b>Premium</b> for unlimited downloads.</blockquote>",
+                kb([url_btn(f"📚 See all {total} matches", get_url)],
+                   [url_btn("👑 Go Premium", f"https://t.me/{un}?start=go_premium")]))
         else:
             used, lim = await quota.status(uid, "dl")
             buy_tok = await _new_ticket("buy", query, uid, fuid=top.get("file_unique_id"))
@@ -226,6 +249,13 @@ async def cb_notify(call: CallbackQuery) -> None:
         await call.answer("This request expired — post the title again in the Arena.", show_alert=True)
         return
     uid = call.from_user.id
+    # Ownership: only the reader who posted this request may use its buttons. Anyone
+    # else is told (via the alert) to make their own request.
+    if t.get("uid") and uid != t["uid"]:
+        await call.answer(
+            "🙋 This isn't your request — post the book's name in the Arena yourself "
+            "and you'll get your own buttons.", show_alert=True)
+        return
     query = t.get("query") or ""
     if await _has_started(uid):
         from handlers.request import _add_watchlist
@@ -239,6 +269,25 @@ async def cb_notify(call: CallbackQuery) -> None:
             kb([url_btn("▶️ Start the bot", _start_url(token))]))
 
 
+async def _deny_foreign_ticket(message: Message) -> None:
+    """Someone tapped a deep-link for a request that isn't theirs. Explain it, point
+    them at the Arena, and still drop them onto the normal dashboard (never a dead end)."""
+    url = await topic_url()
+    rows = [[url_btn("📣 Open the Request Arena", url)]] if url else []
+    await message.answer(
+        "🙋 <b>That request belongs to another reader</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>Those buttons were created for whoever asked for this title in the "
+        "Request Arena. To get your own copy, just post the book or audiobook name in the "
+        "Arena yourself — I'll line it up and send it straight to you.</blockquote>",
+        reply_markup=(kb(*rows) if rows else None))
+    try:
+        from handlers.start import _render_gate_or_dashboard
+        await _render_gate_or_dashboard(message)
+    except Exception:  # noqa: BLE001 — onboarding is best-effort here
+        pass
+
+
 # ── deep-link dispatcher (called from handlers/start.cmd_start) ──────────────────────
 async def handle_ticket(message: Message, state: FSMContext, uid: int, token: str) -> None:
     """Run a ticket's action in the user's DM, behind the join/force-sub gate."""
@@ -249,6 +298,12 @@ async def handle_ticket(message: Message, state: FSMContext, uid: int, token: st
             "━━━━━━━━━━━━━━━━━━━━\n"
             "<blockquote>No worries — just post the title again in the Request Arena and "
             "I'll line it up fresh.</blockquote>")
+        return
+    # Ownership: this ticket belongs to whoever placed the request in the Arena. If a
+    # DIFFERENT user opened the deep-link, never act on their behalf — onboard them and
+    # point them to make their own request.
+    if t.get("uid") and uid != t["uid"]:
+        await _deny_foreign_ticket(message)
         return
     # force-sub / join gate (reuse start.py) — user re-taps the link after joining
     from handlers.start import _not_joined, _join_kb
@@ -304,7 +359,7 @@ async def _fulfil_query(message: Message, uid: int, query: str, fuid: str | None
             return
     results, total = await search(query, limit=8)
     if total == 0:
-        results, total = await fuzzy_search(query, limit=8)
+        results, total = await fuzzy_search(query, limit=8, min_score=_ARENA_FUZZY_MIN)
     if total == 0:
         await message.answer(
             f"🔭 <b>“{escape(query[:60])}” has moved on</b>\n"
@@ -319,10 +374,14 @@ async def _fulfil_query(message: Message, uid: int, query: str, fuid: str | None
     cm = await prepare.clean_names_for(results)
     rows = [[btn(f"{icon_for(r.get('ext', ''))} {(cm.get(r['file_unique_id']) or r.get('name', 'Untitled'))[:38]}",
                  f"dl:{r['file_unique_id']}", style="success")] for r in results]
+    shown = len(results)
+    more = (f"\n<i>Showing the closest {shown} — add a few more words to your title in "
+            "the Arena to narrow it down.</i>") if total > shown else ""
     await message.answer(
         f"📚 <b>{total} matches for</b> <i>{escape(query[:60])}</i>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "<blockquote>Tap the one you want and I'll send it over.</blockquote>",
+        "<blockquote>Tap the one you want and I'll send it over.</blockquote>"
+        f"{more}",
         reply_markup=kb(*rows))
 
 

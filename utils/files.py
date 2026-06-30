@@ -28,8 +28,13 @@ from database.connection import MongoManager
 
 logger = logging.getLogger(__name__)
 
-_AUDIO_EXT = {"mp3", "m4b", "m4a", "wav", "ogg", "flac", "aac"}
+_AUDIO_EXT = {"mp3", "m4b", "m4a", "wav", "ogg", "flac", "aac", "opus"}
 _MAX_SCAN = 500  # cap matches materialised per search (memory bound)
+# Default similarity floor for fuzzy matches. Below this a "match" is usually
+# trigram coincidence (random syllables overlapping), not a real near-miss —
+# callers that need a stricter bar (e.g. the public Request Arena) pass a higher
+# min_score so gibberish doesn't return a flood of weak hits.
+_FUZZY_MIN = 0.5
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _SEARCH_PROJ = {"name": 1, "name_lc": 1, "ext": 1, "kind": 1, "msg_id": 1,
                 "file_id": 1, "file_unique_id": 1, "indexed_at": 1, "dl_count": 1,
@@ -70,8 +75,10 @@ def icon_for(ext: str) -> str:
 # unfiltered — a user who searches "game" may genuinely want it — but where the
 # bot picks FOR the user, a dead non-book entry (e.g. a bare "Game.zip" that fails
 # to deliver) must never surface. This is the fix for the "🎮 Game" junk card.
+# txt is treated as non-book here too: the archive carries only pdf / epub /
+# audiobooks, so a bare .txt never surfaces in recommendation/discovery shelves.
 _NONBOOK_EXT = {"zip", "rar", "7z", "gz", "tar", "exe", "apk", "app", "dmg",
-                "iso", "bin", "msi", "xapk", "apkm", "txt0"}
+                "iso", "bin", "msi", "xapk", "apkm", "txt0", "txt"}
 _JUNK_NAMES = {"game", "games", "test", "sample", "file", "files", "video",
                "videos", "photo", "photos", "image", "images", "document",
                "documents", "audio", "untitled", "null", "none", "new", "temp"}
@@ -282,10 +289,12 @@ def _fuzzy_score(qn: str, name_lc: str, words: list[str]) -> float:
 
 
 async def fuzzy_search(query: str, *, skip: int = 0, limit: int = 10,
-                       ftype: str | None = None) -> tuple[list[dict], int]:
+                       ftype: str | None = None,
+                       min_score: float = _FUZZY_MIN) -> tuple[list[dict], int]:
     """Typo-tolerant fallback. Builds a candidate pool (any query word, or a
     word-prefix, appears in the title) then re-ranks by fuzzy similarity.
-    Used when exact search returns nothing."""
+    Used when exact search returns nothing. `min_score` is the similarity floor
+    (0..1); raise it for surfaces where a loose match is worse than no match."""
     words = _norm_words(query)
     if not words:
         return [], 0
@@ -308,7 +317,7 @@ async def fuzzy_search(query: str, *, skip: int = 0, limit: int = 10,
     scored = []
     for d in rows:
         score = _fuzzy_score(qn, (d.get("name_lc") or d.get("name", "").lower()), words)
-        if score >= 0.45:
+        if score >= min_score:
             scored.append((score, d))
     scored.sort(key=lambda x: x[0], reverse=True)
     ranked = [d for _, d in scored]

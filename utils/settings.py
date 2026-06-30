@@ -38,7 +38,7 @@ DEFAULTS: dict[str, tuple] = {
     "q_game_free":       (2.0, "Free: plays per game / 24h", "float", "Quotas"),
     "q_game_premium":    (5.0, "Premium: plays per game / 24h", "float", "Quotas"),
     # Harvester — automated public-domain book ingestion (utils/harvester.py)
-    "harvest_weekly_cap":   (10000.0, "Harvester: max files / week", "float", "Harvester"),
+    "harvest_weekly_cap":   (0.0, "Harvester: max files / week (0 = unlimited)", "float", "Harvester"),
     "harvest_interval_sec": (75.0, "Harvester: seconds between files", "float", "Harvester"),
     "harvest_max_mb":       (45.0, "Harvester: max file size (MB)", "float", "Harvester"),
     # Rewards — what users earn (BGM is the earnable reward currency)
