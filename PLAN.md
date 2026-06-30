@@ -104,6 +104,25 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Fixes: Challenges removed from My Library; junk archive entries (the "Game"
   failed-delivery card) filtered from For You/Discover via `utils/files.is_bookish`.
 
+## Phase 8 — Auto-harvest (public-domain archive) ✅
+- ✅ Background harvester (`utils/harvester.py`) pulls latest arrivals + back-fills
+  books not yet in the DB from **public-domain** sources — Project Gutenberg
+  (Gutendex JSON API) + Standard Ebooks (atom new-releases feed). Pluggable source
+  layer for adding more **legal** feeds later.
+- ✅ Light + capped: one file/tick, paced (`harvest_interval_sec` ~75s), hard
+  weekly cap (`harvest_weekly_cap` 10k), idles when caught up. Dedupes by source
+  id AND normalized title (never duplicates the legacy archive).
+- ✅ Downloads best format (epub→mobi→txt, size-capped) → uploads to the file
+  channel via `send_document` → indexes via the existing `extract_from_message`/
+  `index_file` so search + `dl:` delivery + watchlist auto-notify all just work.
+- ✅ Genre free from Gutenberg subjects, AI fallback only when unclear.
+- ✅ Weekly admin digest (7-day timer); 🧰 More Tools → 📚 Harvester panel
+  (status/toggle/report-now); cap/pace/size tunable in ⚙️ Live Pricing.
+- ⛔ Scope note: **public-domain / legally-redistributable sources ONLY**. No
+  shadow-library/piracy sources and no auto-scraping of in-copyright releases —
+  recent in-copyright titles come via the operator (manual request fulfilment,
+  forward-import, Telethon backfill), never an automated piracy pipeline.
+
 ## Status: feature-complete + hardened
 All TBC features rebuilt + modernized; crypto via OxaPay.
 Credential-gated features (AI, crypto) activate once their keys are set in the

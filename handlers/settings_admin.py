@@ -24,7 +24,7 @@ router = Router()
 _KEYS = list(DEFAULTS.keys())
 # Must list every category present in DEFAULTS, or those levers become
 # unreachable in the editor. The freemium migration added "Premium" and "Quotas".
-_CATS = ["Pricing", "Premium", "Quotas", "Rewards", "Economy", "Safety"]
+_CATS = ["Pricing", "Premium", "Quotas", "Harvester", "Rewards", "Economy", "Safety"]
 
 
 class PriceFSM(StatesGroup):

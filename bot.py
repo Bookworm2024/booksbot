@@ -36,7 +36,7 @@ from handlers import (
     inline, invite, hangman, payments, qadmin, leaderboards, missions, notifs, profile,
     quests, rate, ratings, recommend, referral, report, request, requests_manual, revenue,
     settings_admin, shelf, speedread, spin, start, stats, support, tagger, track, vip,
-    pricing_admin, risk_admin,
+    pricing_admin, risk_admin, harvester_admin,
 )
 from handlers.payments import oxapay_webhook
 from handlers.pay_api import api_pay_cancel, api_pay_ipaid, api_pay_status
@@ -151,6 +151,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(moderation_admin.router)
     dp.include_router(perms_admin.router)
     dp.include_router(dedupe_admin.router)
+    dp.include_router(harvester_admin.router)
     dp.include_router(risk_admin.router)
     dp.include_router(admin.router)
     _register_error_handler(dp)
@@ -278,6 +279,7 @@ async def main() -> None:
     from utils.metrics import mark_start
     from utils.backup import run_backup_loop
     from utils.nudges import run_nudge_loop
+    from utils.harvester import run_harvest_loop
     mark_start()
 
     bot = _build_bot()
@@ -292,6 +294,7 @@ async def main() -> None:
     digest_task = asyncio.create_task(run_weekly_digest(bot))
     backup_task = asyncio.create_task(run_backup_loop(bot))
     nudge_task = asyncio.create_task(run_nudge_loop(bot))
+    harvest_task = asyncio.create_task(run_harvest_loop(bot))
 
     try:
         me = await bot.get_me()
@@ -306,6 +309,7 @@ async def main() -> None:
         digest_task.cancel()
         backup_task.cancel()
         nudge_task.cancel()
+        harvest_task.cancel()
         await runner.cleanup()
         await bot.session.close()
 
