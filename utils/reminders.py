@@ -2,9 +2,10 @@
 utils/reminders.py — re-engagement push reminders (retention).
 
 Background loop: once an hour, nudge users who have been INACTIVE for a while
-(so we don't ping active users) to come back for their free daily reward/spin.
-Respects the per-user notif toggle and sends at most one reminder per user per
-day. Rate-limited so it never trips Telegram's flood limits.
+(so we don't ping active users) to come back to their library — new arrivals and
+the book they were reading. Respects the per-user notif toggle and sends at most
+one reminder per user per day. Rate-limited so it never trips Telegram's flood
+limits.
 """
 import asyncio
 import logging
@@ -20,18 +21,18 @@ _PER_TICK = 200           # cap users handled per tick (memory/flood safety)
 _SLEEP = 0.05             # ~20 msgs/sec
 
 _TEXT = ("📖 <b>Your library missed you</b>\n"
-         "<i>A few rewards have been saved up while you were away.</i>\n"
+         "<i>Fresh titles landed while you were away.</i>\n"
          "<blockquote>"
-         "🎁 <b>Daily bonus</b> — claim your free 💎 BGM, refreshed and ready.\n"
-         "🎡 <b>Free spin</b> — one turn for a shot at bonus rewards and perks.\n"
-         "📚 <b>Continue reading</b> — your shelf is right where you left it."
+         "🆕 <b>New arrivals</b> — brand-new books and audiobooks just hit the shelves.\n"
+         "📚 <b>Continue reading</b> — your shelf is right where you left it.\n"
+         "🎮 <b>Play &amp; earn</b> — a few quick games pay out 💎 BGM toward Premium."
          "</blockquote>"
-         "<i>💡 Tap below to claim your reward — it only takes a moment.</i>")
+         "<i>💡 Tap below to dive back in — your next great read is waiting.</i>")
 
 
 def _kb():
     from utils.keyboards import btn, kb
-    return kb([btn("🎁 Claim Daily Reward", "daily_reward", style="success")],
+    return kb([btn("🔭 Explore Discover", "lib_discover", style="success")],
               [btn("🏠 Open Menu", "menu_home", style="primary")])
 
 

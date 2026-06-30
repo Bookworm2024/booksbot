@@ -112,6 +112,14 @@ async def cb_prem_buy(call: CallbackQuery) -> None:
         return
     await call.answer("👑 Welcome to Premium — enjoy every perk!")
     await _premium_success(call, until)
+    from utils.settings import get_float
+    from utils.invoice import send_invoice
+    days = int(await get_float("premium_days"))
+    price = await (premium.price_inr() if cur == "inr" else premium.price_usd())
+    await send_invoice(
+        call.bot, call.from_user.id, item=f"Premium membership · {days} days",
+        amount=price, currency=("INR" if cur == "inr" else "USD"),
+        method="Wallet · " + ("INR (₹)" if cur == "inr" else "USD ($)"), prefix="PREM")
 
 
 # ── redeem with BGM (the grind-to-premium path) ───────────────────────────────
@@ -129,6 +137,10 @@ async def cb_prem_bgm(call: CallbackQuery) -> None:
         return
     await call.answer(f"👑 {days} days of Premium unlocked with BGM — nice!")
     await _premium_success(call, until)
+    from utils.invoice import send_invoice
+    await send_invoice(
+        call.bot, call.from_user.id, item=f"Premium membership · {int(days)} days",
+        amount=cost, currency="BGM", method="BGM redemption", prefix="PREM")
 
 
 async def _premium_success(call: CallbackQuery, until) -> None:

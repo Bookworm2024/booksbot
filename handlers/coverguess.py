@@ -112,7 +112,8 @@ def _matches(guess: str, accepts: set[str]) -> bool:
 
 def _kbd():
     return kb([btn("💡 Reveal Hint", "cg_hint", style="primary"),
-               btn("⏭ Skip & Reveal", "cg_skip", style="danger")])
+               btn("⏭ Skip & Reveal", "cg_skip", style="danger")],
+              [btn("🚪 Quit Game", "game_quit", style="danger")])
 
 
 def _again_kb():
@@ -275,7 +276,7 @@ async def on_answer(message: Message, state: FSMContext) -> None:
             "users", {"user_id": message.chat.id, "cg_solved_token": {"$ne": rt}},
             {"$set": {"cg_solved_token": rt}})
         if won is not None:
-            await add_bgm(message.chat.id, rwd)
+            await add_bgm(message.chat.id, rwd, source="game")
             await db.safe_update("users", {"user_id": message.chat.id},
                                  {"$inc": {"games_played": 1, "game_bgm": rwd}})
             from utils.missions import mark

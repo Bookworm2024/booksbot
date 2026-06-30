@@ -76,6 +76,7 @@ def _board(word: str, guessed: list, wrong: int, status: str) -> tuple[str, list
         remaining = [c for c in _ALPHA if c not in guessed]
         for i in range(0, len(remaining), 7):
             rows.append([btn(c, f"hm:{c}", style="primary") for c in remaining[i:i + 7]])
+        rows.append([btn("🚪 Quit Game", "game_quit", style="danger")])
         head += "\n\n👇 <i>Tap a letter to make your guess.</i>"
     else:
         won = status == "won"
@@ -212,7 +213,7 @@ async def cb_guess(call: CallbackQuery) -> None:
             {"$set": {"guessed": guessed, "wrong": wrong, "status": status}})
         if claimed and status == "won":
             rwd = _reward(wrong)
-            await add_bgm(uid, rwd)
+            await add_bgm(uid, rwd, source="game")
             await db.safe_update("users", {"user_id": uid},
                                  {"$inc": {"games_played": 1, "game_bgm": rwd}})
             from utils.missions import mark

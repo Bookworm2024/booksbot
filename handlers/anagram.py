@@ -62,7 +62,8 @@ def _reward(tries: int) -> float:
 
 def _kbd():
     return kb([btn("💡 Reveal First Letter", "anag_hint", style="primary"),
-               btn("⏭ Skip & Reveal", "anag_skip", style="danger")])
+               btn("⏭ Skip & Reveal", "anag_skip", style="danger")],
+              [btn("🚪 Quit Game", "game_quit", style="danger")])
 
 
 async def _plays_today(db, uid: int) -> int:
@@ -205,7 +206,7 @@ async def on_answer(message: Message, state: FSMContext) -> None:
             "users", {"user_id": message.chat.id, "anag_solved_token": {"$ne": rt}},
             {"$set": {"anag_solved_token": rt}})
         if won is not None:
-            await add_bgm(message.chat.id, rwd)
+            await add_bgm(message.chat.id, rwd, source="game")
             await db.safe_update("users", {"user_id": message.chat.id},
                                  {"$inc": {"games_played": 1, "game_bgm": rwd}})
             from utils.missions import mark

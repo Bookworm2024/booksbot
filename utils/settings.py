@@ -42,8 +42,6 @@ DEFAULTS: dict[str, tuple] = {
     "harvest_interval_sec": (75.0, "Harvester: seconds between files", "float", "Harvester"),
     "harvest_max_mb":       (45.0, "Harvester: max file size (MB)", "float", "Harvester"),
     # Rewards — what users earn (BGM is the earnable reward currency)
-    "claim_min":       (3.0, "Daily claim min (BGM)", "float", "Rewards"),
-    "claim_max":       (5.0, "Daily claim max (BGM)", "float", "Rewards"),
     "referrer_bonus":  (0.5, "Referrer bonus (BGM)", "float", "Rewards"),
     "referee_bonus":   (0.25, "New-user referral bonus (BGM)", "float", "Rewards"),
     "first_purchase_pct": (20.0, "First-purchase bonus (%)", "float", "Rewards"),

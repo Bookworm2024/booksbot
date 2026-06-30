@@ -115,6 +115,6 @@ async def buy_premium(uid: int) -> str:
         {"$set": {"bp_premium_season": s}})
     if not claimed:
         # already premium this season (e.g. a double-tap) → refund the extra charge
-        await add_bgm(uid, PREMIUM_PRICE)
+        await add_bgm(uid, PREMIUM_PRICE, source="refund")
         return "already"
     return "ok"

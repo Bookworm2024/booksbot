@@ -231,12 +231,14 @@ async def _handle_request(message: Message, uid: int, query: str) -> None:
     else:
         ntok = await _new_ticket("notify", query, uid)
         rtok = await _new_ticket("reqadmin", query, uid)
+        ptok = await _new_ticket("pubsearch", query, uid)
         await _reply(
             message,
             f"😔 <b>“{disp}” isn't in our library yet.</b>\n"
-            "<blockquote>I can ping you the moment it's added, or our admins can source "
-            "it for you by hand.</blockquote>",
-            kb([btn("🔔 Notify me", f"arn_{ntok}", style="success")],
+            "<blockquote>I can hunt the free public archives for a copy right now, ping you "
+            "the moment it's added, or our admins can source it for you by hand.</blockquote>",
+            kb([url_btn("🌍 Find a free copy now", f"https://t.me/{un}?start=ar_{ptok}")],
+               [btn("🔔 Notify me", f"arn_{ntok}", style="success")],
                [url_btn("👤 Request from admins", f"https://t.me/{un}?start=ar_{rtok}")]))
 
 
@@ -343,6 +345,9 @@ async def handle_ticket(message: Message, state: FSMContext, uid: int, token: st
     elif kind == "reqadmin":
         from handlers.requests_manual import begin_concierge
         await begin_concierge(message, state, prefill_title=query)
+    elif kind == "pubsearch":
+        from handlers.request import public_search_in_dm
+        await public_search_in_dm(message, uid, query)
     else:
         await message.answer("This request link is no longer valid — post the title again.")
 

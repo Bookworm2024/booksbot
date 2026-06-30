@@ -311,6 +311,11 @@ async def _confirm_payment(doc: dict, bot, *, email_txn_id: str = "",
                             [btn("💳 My Wallet", "acc_buy", style="primary")]))
     except Exception:  # noqa: BLE001
         pass
+    from utils.invoice import send_invoice
+    await send_invoice(
+        bot, flipped["user_id"], item="Wallet Top-Up", amount=amount, currency="INR",
+        method="UPI · FamPay", reference=(email_txn_id or flipped.get("submitted_utr", "")),
+        order_id=flipped.get("order_id", ""), when=flipped.get("paid_at"))
 
 
 # ── crypto (OxaPay) ──────────────────────────────────────────────────────────
@@ -450,4 +455,11 @@ async def oxapay_webhook(request: web.Request) -> web.Response:
                             [btn("💳 My Wallet", "acc_buy", style="primary")]))
     except Exception:  # noqa: BLE001
         pass
+    coin = str(data.get("currency") or data.get("coin") or data.get("pay_currency") or "").upper()
+    from utils.invoice import send_invoice
+    await send_invoice(
+        bot, order["user_id"], item="Wallet Top-Up", amount=usd, currency="USD",
+        method="Crypto · OxaPay" + (f" · {coin}" if coin else ""),
+        reference=str(order.get("track_id") or ""), order_id=order.get("order_id", ""),
+        when=order.get("paid_at"))
     return web.Response(text="ok")

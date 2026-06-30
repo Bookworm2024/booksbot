@@ -112,7 +112,7 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     if not await charge_bgm(sender, amount):
         await message.answer("❌ Insufficient BGM balance.")
         return
-    await add_bgm(target, amount)
+    await add_bgm(target, amount, source="gift")
     await record(sender, "gift")  # velocity check → auto-flag on abuse
     await message.answer(f"✅ Sent <b>{fmt_amount(amount)} BGM</b> to <code>{target}</code>. 🎁",
                          reply_markup=kb([btn("💼 Balance", "acc_balance", style="primary")]))

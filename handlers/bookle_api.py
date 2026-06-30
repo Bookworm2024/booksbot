@@ -5,7 +5,7 @@ import logging
 
 from aiohttp import web
 
-from utils.bookle import get_or_create, guess
+from utils.bookle import forfeit, get_or_create, guess
 from utils.webapp_auth import user_id_from
 
 logger = logging.getLogger(__name__)
@@ -32,3 +32,11 @@ async def api_bookle_guess(request: web.Request) -> web.Response:
     if not uid:
         return web.json_response({"error": "auth_failed"}, status=401)
     return web.json_response(await guess(uid, body.get("guess", "")))
+
+
+async def api_bookle_cancel(request: web.Request) -> web.Response:
+    body = await _json(request)
+    uid = user_id_from(body.get("init_data", ""))
+    if not uid:
+        return web.json_response({"error": "auth_failed"}, status=401)
+    return web.json_response(await forfeit(uid))

@@ -8,7 +8,7 @@ import logging
 
 from aiohttp import web
 
-from utils.games import VALID_GAMES, new_session, submit
+from utils.games import VALID_GAMES, cancel_session, new_session, submit
 from utils.webapp_auth import user_id_from
 
 logger = logging.getLogger(__name__)
@@ -47,3 +47,12 @@ async def api_game_submit(request: web.Request) -> web.Response:
         answers = []
     result = await submit(uid, sid, answers)
     return web.json_response(result)
+
+
+async def api_game_cancel(request: web.Request) -> web.Response:
+    body = await _json(request)
+    uid = user_id_from(body.get("init_data", ""))
+    if not uid:
+        return web.json_response({"error": "auth_failed"}, status=401)
+    sid = body.get("session_id", "")
+    return web.json_response(await cancel_session(uid, sid))

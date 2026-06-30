@@ -65,7 +65,6 @@ async def _view(uid: int, name: str):
         f"🎮 Games played · <code>{int(d.get('games_played') or 0)}</code>    "
         f"🎁 Friends invited · <code>{int(d.get('ref_count') or 0)}</code>\n"
         f"⭐ Favourites saved · <code>{favs}</code>    "
-        f"🔥 Login streak · <code>{int(d.get('login_streak') or 0)}d</code>    "
         f"🎮 Game streak · <code>{int(d.get('game_streak') or 0)}d</code>"
         "</blockquote>\n"
         "<i>💡 Share your profile to invite friends — you both earn BGM when they join.</i>"

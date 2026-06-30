@@ -78,9 +78,10 @@ async def open_crate(uid: int) -> dict | None:
     if not used:
         return None
     tier, bgm, bcn, _w = random.choice(_BAG)
+    # crates_opened + any BCN are written raw; the BGM portion goes through
+    # wallet.add_bgm so the non-game per-session BGM cap applies (crates are a
+    # free, semi-farmable source).
     inc: dict = {"crates_opened": 1}
-    if bgm > 0:
-        inc["bookgem"] = sanitize_amount(bgm)
     if bcn > 0:
         inc["bookcoin"] = sanitize_amount(bcn)
     update: dict = {"$inc": inc}
@@ -96,4 +97,11 @@ async def open_crate(uid: int) -> dict | None:
         except Exception:  # noqa: BLE001
             logger.error("failed to restore crate key for %s", uid, exc_info=True)
         return None
+    if bgm > 0:
+        try:
+            from utils.wallet import add_bgm
+            bgm = await add_bgm(uid, bgm, source="other")   # capped non-game BGM
+        except Exception:  # noqa: BLE001 — BCN/opened already committed; don't fail the open
+            logger.warning("crate BGM credit failed for %s", uid, exc_info=True)
+            bgm = 0
     return {"tier": tier, "bgm": bgm, "bcn": bcn}

@@ -22,7 +22,6 @@ _BOARDS = {
     "dl":     ("📥 Top Readers", "downloads", "downloads", False),
     "game":   ("🎮 Top Gamers", "game_bgm", "BGM", True),
     "ref":    ("🎁 Top Referrers", "ref_count", "referrals", False),
-    "streak": ("🔥 Top Streaks", "login_streak", "day streak", False),
 }
 _MEDALS = ["🥇", "🥈", "🥉"] + ["🏅"] * 7
 
@@ -33,8 +32,7 @@ _HUB_TEXT = (
     "<blockquote>"
     "📥 <b>Top Readers</b> — the shelves that never sleep.\n"
     "🎮 <b>Top Gamers</b> — sharpest minds, biggest 💎 BGM hauls.\n"
-    "🎁 <b>Top Referrers</b> — the ones who brought the crowd.\n"
-    "🔥 <b>Top Streaks</b> — perfect daily attendance, day after day."
+    "🎁 <b>Top Referrers</b> — the ones who brought the crowd."
     "</blockquote>\n"
     "<i>💡 Pick a board to see the top 10 — and exactly where you stand.</i>"
 )

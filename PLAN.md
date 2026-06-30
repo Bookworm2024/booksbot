@@ -191,6 +191,28 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ⚙️ Operational: the bot must be a group ADMIN (or have BotFather privacy mode OFF)
   to read the topic's messages.
 
+## Phase 11 — Economy tightening, invoices, on-demand sourcing & game polish ✅
+- ✅ **Daily BGM claim removed** — the whole faucet is gone (handlers/daily.py deleted,
+  economy `/claim` removed, dashboard button / reminders / digest / settings / "claim"
+  mission+challenge / dead login-streak surfaces all stripped). BGM is earned only from
+  referrals, games and the other reward features now.
+- ✅ **Non-game BGM cap** — `wallet.add_bgm(uid, amount, source=…)` caps free non-game
+  BGM at **3 / session** (inactivity window); games/refunds/admin/redeem/gift/purchase
+  are exempt and credited in full.
+- ✅ **Professional invoices** (`utils/invoice.py`) on EVERY payment — UPI, crypto,
+  Premium (₹/$ + BGM), per-file overage — with amount, currency, mode, date/time, name,
+  reference, PAID; mirrored to the admin log.
+- ✅ **Owner-branding footer** removed from the dashboard (kept only in About Us).
+- ✅ **On-demand public search** — a requested title not in the DB triggers a LIVE
+  search of Gutenberg + Internet Archive + LibriVox; matches are shown as a pick list,
+  and the chosen file is fetched into the library and delivered (Request Bot + Arena
+  deep-link). The background harvester is **paused** (`on_demand()` gate) while sourcing.
+- ✅ **Series completion** — once the harvester lands Part 1 of a numbered work it chases
+  Part 2, 3… until the set is complete or a volume can't be found.
+- ✅ **"Files are being prepared, please wait"** now shows on the FIRST request render.
+- ✅ **Cancel mid-game** for every game (chat + Mini-App + Bookle) — forfeits the day's
+  turn with zero reward even if winning. **True/False & Guess → 15 questions.**
+
 ## Status: feature-complete + hardened
 All TBC features rebuilt + modernized; crypto via OxaPay.
 Credential-gated features (AI, crypto) activate once their keys are set in the

@@ -35,6 +35,34 @@ async def cb_games(call: CallbackQuery, state: FSMContext) -> None:
     await _render_arcade(call.message, edit=True)
 
 
+@router.callback_query(F.data == "game_quit")
+async def cb_game_quit(call: CallbackQuery, state: FSMContext) -> None:
+    """Forfeit the chat game in progress. The daily play was consumed at the
+    START of the round, so quitting keeps it used and grants NO reward — even if
+    the player was ahead or about to win. Clears the FSM round and ends any
+    persistent (Hangman) session so it can never pay out afterwards."""
+    await state.clear()
+    from database.connection import MongoManager
+    db = await MongoManager.get()
+    try:
+        await db.find_one_and_update_global(
+            "hangman_games", {"uid": call.from_user.id, "status": "active"},
+            {"$set": {"status": "forfeited"}})
+    except Exception:  # noqa: BLE001 — never let cleanup break the forfeit
+        pass
+    await call.answer("Game forfeited — today's play is used, no reward earned.", show_alert=True)
+    try:
+        await call.message.edit_text(
+            "🚪 <b>Game forfeited</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>You bowed out mid-round, so this play counts as used and no "
+            "reward was earned — even if you were ahead.</blockquote>\n"
+            "<i>💡 Fresh rounds are always waiting in the Arcade.</i>",
+            reply_markup=kb([btn("🎮 Games Hub", "menu_games", style="primary")]))
+    except Exception:  # noqa: BLE001
+        pass
+
+
 async def _render_arcade(message: Message, *, edit: bool) -> None:
     send = message.edit_text if edit else message.answer
     from utils.flags import is_on
@@ -66,7 +94,7 @@ async def _render_arcade(message: Message, *, edit: bool) -> None:
         "━━━━━━━━━━━━━━━━━━\n"
         "<blockquote expandable>🧠 <b>Brain Quiz</b> — choose your level; earn up to "
         "<b>0.125</b> 💎 BGM per correct answer, with a <b>+0.5</b> speed bonus for the swift.\n"
-        "⚡ <b>True/False</b> — twenty rapid-fire calls; trust your instincts.\n"
+        "⚡ <b>True/False</b> — fifteen rapid-fire calls; trust your instincts.\n"
         "📚 <b>Guess the Book</b> — name the title from its blurb alone.\n"
         "✍️ <b>First Line</b> — one opening sentence, one chance to place it.\n"
         "🖋️ <b>Author Match</b> — pair the masterpiece to its maker.\n"

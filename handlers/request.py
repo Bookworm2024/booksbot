@@ -331,33 +331,71 @@ async def _render_results(message: Message, state: FSMContext, query: str,
                     "<i>💡 Check back soon — the catalogue grows daily.</i>")
             markup = kb([btn("👤 Request an Admin", "req_manual", style="success")],
                         [btn("🔙 Menu", "menu_home", style="danger")])
-        else:
-            text = (f"🔍 <b>Not in the library yet</b>\n"
-                    "━━━━━━━━━━━━━━━━━━━━\n"
-                    f"<i>We couldn't find <code>{escape(query)}</code> in the archive.</i>\n\n"
-                    "<blockquote>"
-                    "It's not here right now — but it doesn't have to stay that way:\n\n"
-                    "👤 <b>Request an admin</b> to source it for you by hand.\n"
-                    "🔔 <b>Get notified</b> the moment it lands in the archive.\n"
-                    "🔍 <b>Try another spelling</b> or a few keywords."
-                    "</blockquote>")
-            markup = kb([btn("👤 Request an Admin", "req_manual", style="success")],
-                        [btn("🔔 Notify Me When Added", "wl_last", style="primary")],
-                        [btn("🔍 New Search", "req_auto", style="primary")],
-                        [btn("🔙 Menu", "menu_home", style="danger")])
-        await (message.edit_text if edit else message.answer)(text, reply_markup=markup)
+            await (message.edit_text if edit else message.answer)(text, reply_markup=markup)
+            return
+        # Not in OUR archive → search the PUBLIC archives live and let the user pick.
+        uid = message.chat.id
+        searching = ("🌍 <b>Searching the public archives…</b>\n"
+                     "━━━━━━━━━━━━━━━━━━━━\n"
+                     f"<i>“{escape(query)}” isn't in our library — checking Project Gutenberg, "
+                     "the Internet Archive and LibriVox for a free copy. One moment…</i>")
+        try:
+            if edit:
+                await message.edit_text(searching); sm = message
+            else:
+                sm = await message.answer(searching)
+        except Exception:  # noqa: BLE001
+            sm = message
+        from utils.harvester import search_public, on_demand
+        pub = []
+        try:
+            async with on_demand():
+                pub = await search_public(query, limit=8)
+        except Exception:  # noqa: BLE001
+            pub = []
+        if pub:
+            await _show_public_matches(sm, uid, query, pub)
+            return
+        text = (f"🔍 <b>Not in the library yet</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                f"<i>We couldn't find <code>{escape(query)}</code> in our archive or the "
+                "public sources.</i>\n\n"
+                "<blockquote>"
+                "It's not here right now — but it doesn't have to stay that way:\n\n"
+                "👤 <b>Request an admin</b> to source it for you by hand.\n"
+                "🔔 <b>Get notified</b> the moment it lands in the archive.\n"
+                "🔍 <b>Try another spelling</b> or a few keywords."
+                "</blockquote>")
+        markup = kb([btn("👤 Request an Admin", "req_manual", style="success")],
+                    [btn("🔔 Notify Me When Added", "wl_last", style="primary")],
+                    [btn("🔍 New Search", "req_auto", style="primary")],
+                    [btn("🔙 Menu", "menu_home", style="danger")])
+        try:
+            await sm.edit_text(text, reply_markup=markup)
+        except Exception:  # noqa: BLE001
+            await message.answer(text, reply_markup=markup)
         return
 
     # Clean up messy archive titles for the button labels (cached; one batched AI
-    # call for any uncached titles on this page). Show a brief "Preparing…" card
-    # while we tidy the first-seen titles.
+    # call for any uncached titles on this page). Show a "preparing" card the FIRST
+    # time too (not only on edits) — first-seen titles get tidied and a cover baked,
+    # which takes a moment, so the user is told to wait instead of staring at silence.
     from utils import prepare
-    if edit and prepare.has_uncached(results):
-        try:
-            await message.edit_text("🔄 <b>Preparing your results…</b>\n"
-                                    "<i>Tidying up the titles for you.</i>")
-        except Exception:  # noqa: BLE001
-            pass
+    prep_msg = None
+    if prepare.has_uncached(results):
+        _prep = ("🔄 <b>Preparing your files…</b>\n"
+                 "<i>Tidying up the titles and covers for you — this only takes a moment, "
+                 "please wait.</i>")
+        if edit:
+            try:
+                await message.edit_text(_prep)
+            except Exception:  # noqa: BLE001
+                pass
+        else:
+            try:
+                prep_msg = await message.answer(_prep)
+            except Exception:  # noqa: BLE001
+                prep_msg = None
     clean_map = await prepare.clean_names_for(results)
 
     rows = []
@@ -399,7 +437,130 @@ async def _render_results(message: Message, state: FSMContext, query: str,
             "💸 <b>Delivery</b> — free with your daily quota. "
             "<i>👑 Premium reads unlimited; past the free limit a single file is a small wallet charge.</i>"
             "</blockquote>")
-    await (message.edit_text if edit else message.answer)(text, reply_markup=kb(*rows))
+    if prep_msg is not None:
+        try:
+            await prep_msg.edit_text(text, reply_markup=kb(*rows))
+        except Exception:  # noqa: BLE001
+            await message.answer(text, reply_markup=kb(*rows))
+    else:
+        await (message.edit_text if edit else message.answer)(text, reply_markup=kb(*rows))
+
+
+# ── on-demand public-archive picks ───────────────────────────────────────────────
+async def public_search_in_dm(message: Message, uid: int, query: str) -> None:
+    """Run an on-demand public-archive search in the user's DM and show pickable
+    matches. Used by the Request Arena deep-link when a title isn't in the library."""
+    sm = await message.answer(
+        "🌍 <b>Searching the public archives…</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Checking Project Gutenberg, the Internet Archive and LibriVox for "
+        f"“{escape(query[:60])}”. One moment…</i>")
+    from utils.harvester import search_public, on_demand
+    pub = []
+    try:
+        async with on_demand():
+            pub = await search_public(query, limit=8)
+    except Exception:  # noqa: BLE001
+        pub = []
+    if pub:
+        await _show_public_matches(sm, uid, query, pub)
+        return
+    try:
+        await sm.edit_text(
+            "🔍 <b>No free copy found</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>We couldn't find a free public-domain copy of "
+            f"“{escape(query[:60])}”. An admin can try to source it for you.</blockquote>",
+            reply_markup=kb([btn("👤 Request an Admin", "req_manual", style="success")],
+                            [btn("🔙 Menu", "menu_home", style="danger")]))
+    except Exception:  # noqa: BLE001
+        pass
+
+
+async def _show_public_matches(msg: Message, uid: int, query: str, cands: list) -> None:
+    """Render a pick list of live public-archive matches. Each pick is stored under a
+    short token so tapping it can fetch THAT exact file (callback data can't carry a
+    URL). On pick → cb_public_pick downloads + indexes + delivers it."""
+    import secrets
+    from utils.harvester import _SRC_NAME
+    db = await MongoManager.get()
+    token = secrets.token_urlsafe(8)[:12]
+    slim = [{"src": c["src"], "src_id": c["src_id"], "title": c["title"],
+             "name_lc": c["name_lc"], "author": c.get("author", ""), "url": c.get("url"),
+             "ext": c.get("ext"), "ia_id": c.get("ia_id"), "resolve": c.get("resolve"),
+             "subjects": c.get("subjects", []), "bookshelves": c.get("bookshelves", [])}
+            for c in cands]
+    await db.safe_insert("public_picks", {"token": token, "uid": uid, "query": query,
+                                          "cands": slim,
+                                          "created_at": datetime.now(timezone.utc)})
+    rows = []
+    for i, c in enumerate(cands):
+        src = _SRC_NAME.get(c["src"], "public archive")
+        rows.append([btn(f"{icon_for(c.get('ext', ''))} {c['title'][:30]} · {src}",
+                         f"pbk:{token}:{i}", style="success")])
+    rows.append([btn("👤 Request an Admin", "req_manual", style="primary")])
+    rows.append([btn("🔙 Menu", "menu_home", style="danger")])
+    text = ("🌍 <b>Found in the public archives</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"<i>“{escape(query)}” isn't in our library yet — but here are free, "
+            "public-domain copies you can grab right now:</i>\n"
+            "<blockquote>📥 Tap one and I'll fetch it into your library and deliver it "
+            "here. It may take a moment to download &amp; prepare.</blockquote>")
+    try:
+        await msg.edit_text(text, reply_markup=kb(*rows))
+    except Exception:  # noqa: BLE001
+        await msg.answer(text, reply_markup=kb(*rows))
+
+
+@router.callback_query(F.data.startswith("pbk:"))
+async def cb_public_pick(call: CallbackQuery) -> None:
+    parts = call.data.split(":")
+    if len(parts) != 3:
+        return
+    token = parts[1]
+    try:
+        idx = int(parts[2])
+    except ValueError:
+        return
+    db = await MongoManager.get()
+    doc = await db.find_one_global("public_picks", {"token": token})
+    cands = (doc or {}).get("cands") or []
+    if idx >= len(cands):
+        await call.answer("That result has expired — search the title again.", show_alert=True)
+        return
+    cand = dict(cands[idx])
+    uid = call.from_user.id
+    await call.answer("📥 Fetching from the public archive…")
+    prep = await call.message.answer(
+        "📥 <b>Fetching &amp; preparing your file…</b>\n"
+        "<i>Downloading it from the public archive and tidying it up — one moment, please wait.</i>")
+    from utils.harvester import ingest_one, on_demand
+    fuid = None
+    try:
+        async with on_demand():
+            fuid = await ingest_one(cand, call.bot)
+    except Exception:  # noqa: BLE001
+        fuid = None
+    if not fuid:
+        try:
+            await prep.edit_text(
+                "⚠️ <b>That copy wouldn't download</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "<blockquote>Try another match, or ask an admin to source it for you.</blockquote>",
+                reply_markup=kb([btn("👤 Request an Admin", "req_manual", style="success")],
+                                [btn("🔙 Menu", "menu_home", style="danger")]))
+        except Exception:  # noqa: BLE001
+            pass
+        return
+    f = await get_file(fuid)
+    try:
+        await prep.delete()
+    except Exception:  # noqa: BLE001
+        pass
+    if f:
+        await fulfil_download(call.bot, call.message, uid, f)
+    else:
+        await call.message.answer("✅ Added to the library — search the title to grab it.")
 
 
 async def _add_watchlist(user_id: int, query: str) -> None:
@@ -619,6 +780,12 @@ async def fulfil_paid(bot, msg: Message, uid: int, f: dict) -> None:
         f"✅ <b>{sym}{fmt_amount(price)} charged</b> from your wallet for this file — enjoy!\n"
         "<i>💡 👑 Premium makes downloads unlimited, no per-file charge.</i>",
         reply_markup=kb([btn("👑 Go Premium", "go_premium", style="primary")]))
+    from utils.invoice import send_invoice
+    await send_invoice(
+        bot, uid, item=f"File · {(f.get('name') or 'Book')[:60]}", amount=price,
+        currency=("INR" if bucket == "wallet_inr" else "USD"),
+        method="Wallet · " + ("INR (₹)" if bucket == "wallet_inr" else "USD ($)"),
+        reference=fuid, prefix="DL")
 
 
 @router.callback_query(F.data.startswith("dlpay:"))

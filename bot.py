@@ -31,7 +31,7 @@ from config import (
 from database.connection import MongoManager
 from handlers import (
     abtest, admin, admin_extra, admin_tools, ai_admin, anagram, arena, broadcast, captcha,
-    ads, battlepass, challenges, channel_admin, cosmetics, coverguess, crates, daily,
+    ads, battlepass, challenges, channel_admin, cosmetics, coverguess, crates,
     dedupe_admin, discover, economy, fallback, favorites, featured_admin, feed, games, gift,
     goals, health_admin, indexer, locale, memory, moderation_admin, perms_admin,
     inline, invite, hangman, payments, qadmin, leaderboards, missions, notifs, profile,
@@ -43,8 +43,8 @@ from handlers.payments import oxapay_webhook
 from handlers.pay_api import api_pay_cancel, api_pay_ipaid, api_pay_status
 from handlers.admin_api import api_admin_overview, api_admin_ai, api_admin_ai_test
 from handlers.broadcast import run_scheduled_broadcasts
-from handlers.bookle_api import api_bookle_new, api_bookle_guess
-from handlers.games_api import api_game_new, api_game_submit
+from handlers.bookle_api import api_bookle_new, api_bookle_guess, api_bookle_cancel
+from handlers.games_api import api_game_new, api_game_submit, api_game_cancel
 from handlers.reader_api import (
     api_file, api_reader_state_get, api_reader_state_set,
 )
@@ -117,7 +117,6 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(speedread.router)
     dp.include_router(memory.router)
     dp.include_router(spin.router)
-    dp.include_router(daily.router)
     dp.include_router(crates.router)
     dp.include_router(quests.router)
     dp.include_router(battlepass.router)
@@ -173,7 +172,6 @@ def _build_dispatcher() -> Dispatcher:
 # handlers in lock-step instead of relying on a manual BotFather setup.
 _COMMAND_MENU = [
     ("start", "Start/restart the bot"),
-    ("claim", "Claim your free daily BGM"),
     ("balance", "Check your current balance"),
     ("buy", "Purchase BGMs"),
     ("request", "Request Books or Audiobooks"),
@@ -240,8 +238,10 @@ async def _start_web(bot: Bot) -> web.AppRunner:
     # Mini-App game API
     app.router.add_post("/api/game/new", api_game_new)
     app.router.add_post("/api/game/submit", api_game_submit)
+    app.router.add_post("/api/game/cancel", api_game_cancel)
     app.router.add_post("/api/bookle/new", api_bookle_new)
     app.router.add_post("/api/bookle/guess", api_bookle_guess)
+    app.router.add_post("/api/bookle/cancel", api_bookle_cancel)
     app.router.add_get("/api/admin/overview", api_admin_overview)
     app.router.add_get("/api/admin/ai", api_admin_ai)
     app.router.add_post("/api/admin/ai", api_admin_ai)

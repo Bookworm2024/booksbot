@@ -40,6 +40,7 @@ safe). Requires the file channel to be set (Admin → 🗂 File Channel) and the
 to be an admin of it; otherwise it simply idles.
 """
 import asyncio
+import contextlib
 import logging
 import re
 import xml.etree.ElementTree as ET
@@ -115,6 +116,38 @@ _SUBJECT_MAP = [
 # per-source in-process buffers of NORMALIZED candidates (single loop owner)
 _buffers: dict[str, list[dict]] = {}
 _MAX_SCAN_PER_TICK = 250   # cap dedupe-skips per source per tick so a tick stays light
+
+# ── on-demand preemption ──────────────────────────────────────────────────────────
+# A user request that searches the public archives PAUSES the background harvest so
+# the user's title is sourced FIRST. _harvest_gate is set while the background loop
+# may run; on-demand work clears it (ref-counted) and the loop waits on it.
+_harvest_gate = asyncio.Event()
+_harvest_gate.set()
+_pause_count = 0
+
+
+def _pause_background() -> None:
+    global _pause_count
+    _pause_count += 1
+    _harvest_gate.clear()
+
+
+def _resume_background() -> None:
+    global _pause_count
+    _pause_count = max(0, _pause_count - 1)
+    if _pause_count == 0:
+        _harvest_gate.set()
+
+
+@contextlib.asynccontextmanager
+async def on_demand():
+    """Pause the background harvester for the duration of an on-demand request, so a
+    user's live search / fetch runs before the steady-state back-fill."""
+    _pause_background()
+    try:
+        yield
+    finally:
+        _resume_background()
 
 
 def _now() -> datetime:
@@ -759,6 +792,11 @@ async def _ingest(cand: dict, bot) -> bool:
     except Exception:  # noqa: BLE001
         pass
     logger.info("Harvested: %s (%s)", cand["title"], cand["ext"])
+    # if this was a numbered series volume, queue the NEXT volume to chase next.
+    try:
+        await _queue_next_volume(cand)
+    except Exception:  # noqa: BLE001 — never let series logic break an ingest
+        pass
     return True
 
 
@@ -833,6 +871,171 @@ async def report_now(bot) -> None:
     await _send_report(bot)
 
 
+# ── on-demand public search + single-file ingest (request flow) ─────────────────────
+def _norm_base(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+async def _search_gutenberg(title: str, langs: set[str]) -> list[dict]:
+    data = await _get_json(f"{GUTENDEX}?search={quote(title)}")
+    out = []
+    for raw in ((data or {}).get("results") or [])[:16]:
+        c = _normalize(raw, langs)
+        if c:
+            out.append(c)
+    return out
+
+
+async def _search_ia(title: str, langs: set[str], max_bytes: int) -> list[dict]:
+    safe = re.sub(r'["()]', " ", title).strip()
+    if not safe:
+        return []
+    q = (f'title:("{safe}") AND mediatype:texts AND '
+         f'possible-copyright-status:NOT_IN_COPYRIGHT AND format:(EPUB OR PDF)'
+         + _ia_lang_clause(langs))
+    url = (f"{IA_SEARCH}?q={quote(q)}&fl[]=identifier&fl[]=title&fl[]=creator"
+           f"&rows=8&page=1&output=json")
+    data = await _get_json(url)
+    docs = ((data or {}).get("response") or {}).get("docs") or []
+    out = []
+    for d in docs:
+        ident = d.get("identifier")
+        if not ident:
+            continue
+        t = clean_title(_first_str(d.get("title")))
+        if len(t) < 2:
+            continue
+        cand = {"src": "internetarchive", "src_id": str(ident), "ia_id": str(ident),
+                "title": t, "name_lc": t.lower(), "author": _first_str(d.get("creator")),
+                "subjects": [], "bookshelves": [], "resolve": "ia"}
+        if await _resolve_ia(cand, max_bytes):
+            out.append(cand)
+        if len(out) >= 5:
+            break
+    return out
+
+
+async def _search_librivox(title: str, max_bytes: int) -> list[dict]:
+    data = await _get_json(f"{LV_FEED}?format=json&title={quote(title)}&limit=3")
+    books = (data or {}).get("books") or []
+    out: list[dict] = []
+    for b in books:
+        bid = b.get("id")
+        t = clean_title(b.get("title") or "")
+        if bid is None or len(t) < 2:
+            continue
+        m = re.search(r"/compress/([^/]+)/", b.get("url_zip_file") or "")
+        if not m:
+            continue
+        authors = b.get("authors") or []
+        a0 = authors[0] if authors else {}
+        author = " ".join(x for x in [a0.get("first_name"), a0.get("last_name")] if x).strip()
+        genres = b.get("genres") or []
+        book = {"src": "librivox", "src_id": str(bid), "ia_id": m.group(1),
+                "title": t, "name_lc": t.lower(), "author": author,
+                "subjects": [g.get("name") for g in genres if isinstance(g, dict) and g.get("name")],
+                "bookshelves": [], "lv_book": True}
+        sections = await _expand_librivox(book, max_bytes)
+        out.extend(sections[:6])
+        if out:
+            break   # one matching audiobook is plenty for a pick list
+    return out
+
+
+async def search_public(title: str, langs: set[str] | None = None, *, limit: int = 8) -> list[dict]:
+    """Live title search across the public-domain sources (Project Gutenberg,
+    Internet Archive, LibriVox). Returns RESOLVED, ready-to-ingest candidates (each
+    carries a url + ext), deduped by normalized title and excluding anything already
+    in the archive. Used when a user requests a title we don't have yet."""
+    title = (title or "").strip()
+    if len(title) < 2:
+        return []
+    if langs is None:
+        langs = {x.strip() for x in (await _kv("harvest_langs", "en") or "en").split(",") if x.strip()}
+    max_bytes = int(max(1.0, await get_float("harvest_max_mb")) * 1024 * 1024)
+    groups = await asyncio.gather(
+        _search_gutenberg(title, langs),
+        _search_ia(title, langs, max_bytes),
+        _search_librivox(title, max_bytes),
+        return_exceptions=True)
+    out, seen = [], set()
+    for g in groups:
+        if not isinstance(g, list):
+            continue
+        for c in g:
+            key = c.get("name_lc") or ""
+            if (not key or key in seen or c.get("ext") not in _ALLOWED_EXT
+                    or not c.get("url")):
+                continue
+            if await _seen(c["src"], c["src_id"], c["name_lc"]):  # already archived
+                continue
+            seen.add(key)
+            out.append(c)
+            if len(out) >= limit:
+                return out
+    return out
+
+
+async def ingest_one(cand: dict, bot) -> str | None:
+    """Download + index ONE public candidate and return the indexed file's
+    file_unique_id (so the caller can deliver it), or None on failure."""
+    if not cand.get("url") and cand.get("resolve") == "ia":
+        max_bytes = int(max(1.0, await get_float("harvest_max_mb")) * 1024 * 1024)
+        if not await _resolve_ia(cand, max_bytes):
+            return None
+    if not cand.get("url") or cand.get("ext") not in _ALLOWED_EXT:
+        return None
+    if not await _ingest(cand, bot):
+        return None
+    db = await MongoManager.get()
+    doc = await db.find_one_global(
+        "files", {"src": cand["src"], "src_id": cand["src_id"]}, {"file_unique_id": 1})
+    return doc.get("file_unique_id") if doc else None
+
+
+# ── series completion (auto-pull the next volume once a part lands) ──────────────────
+async def _queue_next_volume(cand: dict) -> None:
+    """After ingesting a series volume N, remember to chase volume N+1 next."""
+    from utils.series import parse_series
+    parsed = parse_series(cand.get("title", ""))
+    if not parsed:
+        return
+    base, vol = parsed
+    if not base or vol >= 99:
+        return
+    q = await _kv("harvest_series_queue", []) or []
+    nb = _norm_base(base)
+    if any(_norm_base(e.get("base", "")) == nb and int(e.get("vol") or 0) == vol + 1 for e in q):
+        return
+    q.append({"base": base, "vol": vol + 1})
+    await _kv_set("harvest_series_queue", q[-100:])
+
+
+async def _next_series_candidate() -> dict | None:
+    """The next series volume to chase: once Part 1 lands, pull Part 2, 3, … until
+    the collection is complete or a volume can't be found (then the chain stops)."""
+    from utils.series import parse_series
+    q = await _kv("harvest_series_queue", []) or []
+    if not q:
+        return None
+    tried = 0
+    found = None
+    while q and tried < 3 and found is None:
+        entry = q.pop(0)
+        tried += 1
+        base, vol = str(entry.get("base") or ""), int(entry.get("vol") or 0)
+        if not base or vol < 1:
+            continue
+        nb = _norm_base(base)
+        for c in await search_public(f"{base} {vol}", limit=6):
+            p = parse_series(c.get("title", ""))
+            if p and p[1] == vol and _norm_base(p[0]) == nb:
+                found = c
+                break
+    await _kv_set("harvest_series_queue", q)
+    return found
+
+
 # ── background loop ────────────────────────────────────────────────────────────────
 async def run_harvest_loop(bot) -> None:
     logger.info("Archive harvester started.")
@@ -848,6 +1051,7 @@ async def run_harvest_loop(bot) -> None:
         try:
             interval = max(15.0, await get_float("harvest_interval_sec"))
             await asyncio.sleep(interval)
+            await _harvest_gate.wait()     # yield while an on-demand request is sourcing
             await _maybe_report(bot)
             if not await enabled():
                 continue
@@ -857,7 +1061,9 @@ async def run_harvest_loop(bot) -> None:
             if cap > 0 and await week_count() >= cap:
                 continue   # optional throttle reached → idle until next ISO week
                            # (cap 0 = unlimited, the default)
-            cand = await _next_candidate()
+            # series completion takes priority over the steady-state back-fill, so a
+            # part-1 we just added pulls its sequels before anything else.
+            cand = await _next_series_candidate() or await _next_candidate()
             if not cand:
                 await asyncio.sleep(1800)   # caught up / API down → idle ~30 min
                 continue

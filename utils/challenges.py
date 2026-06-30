@@ -25,12 +25,11 @@ CHALLENGES = [
     ("read20",  "📖", "Devourer",      "Collect 20 books this month",            "chal_downloads", 20, 3.0),
     ("game10",  "🎮", "Game On",       "Play 10 games this month",               "chal_games",     10, 1.0),
     ("spin10",  "🎡", "Lucky Spinner", "Take 10 spins of the wheel",             "chal_spins",     10, 1.0),
-    ("claim15", "🪙", "Daily Devotee", "Claim your daily BCN on 15 days",        "chal_claims",    15, 1.5),
 ]
 
 _FIELDS = {"download": "chal_downloads", "play_game": "chal_games",
-           "spin": "chal_spins", "claim": "chal_claims"}
-_ALL_FIELDS = ["chal_downloads", "chal_games", "chal_spins", "chal_claims"]
+           "spin": "chal_spins"}
+_ALL_FIELDS = ["chal_downloads", "chal_games", "chal_spins"]
 
 
 def _month() -> str:

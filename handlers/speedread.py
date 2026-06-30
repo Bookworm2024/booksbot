@@ -188,7 +188,8 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool) -
         "<blockquote>⏱ The clock is running. As soon as you reach the end, tap "
         "<b>✅ Done Reading</b> and a short comprehension check unlocks your reward — "
         "the faster you read with full understanding, the more 💎 BGM you earn.</blockquote>",
-        reply_markup=kb([btn("✅ Done Reading", "sr_done", style="success")]))
+        reply_markup=kb([btn("✅ Done Reading", "sr_done", style="success")],
+                        [btn("🚪 Quit Game", "game_quit", style="danger")]))
 
 
 @router.message(Command("speedread"))
@@ -221,6 +222,7 @@ async def cb_done(call: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(wpm=wpm)
     rows = [[btn(f"{chr(65 + i)}. {opt}", f"sr:{i}", style="primary")]
             for i, opt in enumerate(options)]
+    rows.append([btn("🚪 Quit Game", "game_quit", style="danger")])
     await call.message.edit_text(
         "⏱ <b>Timed!</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
@@ -261,7 +263,7 @@ async def cb_answer(call: CallbackQuery, state: FSMContext) -> None:
             "users", {"user_id": call.from_user.id, "sr_solved_token": {"$ne": rt}},
             {"$set": {"sr_solved_token": rt}})
         if won is not None:
-            await add_bgm(call.from_user.id, rwd)
+            await add_bgm(call.from_user.id, rwd, source="game")
             await db.safe_update("users", {"user_id": call.from_user.id},
                                  {"$inc": {"games_played": 1, "game_bgm": rwd}})
             from utils.missions import mark

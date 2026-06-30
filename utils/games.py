@@ -22,8 +22,8 @@ Economy (kept from the locked spec, minus the skip tax):
         beginner +0.0625/-0.03125, moderate +0.09375/-0.046875,
         advanced +0.125/-0.0625. Speed bonus +0.5 BGM if a full clear < 2 min
         (once/day).
-  TF:   20 Q, 2/day. correct +0.05, wrong -0.01.
-  Book games (guess / firstline / author): 6 Q, 3/day, fixed rewards.
+  TF:   15 Q, 2/day. correct +0.05, wrong -0.01.
+  Book games (guess: 15 Q · firstline / author: 6 Q): 3/day, fixed rewards.
 """
 import hashlib
 import json
@@ -50,9 +50,9 @@ QUIZ_REWARD = {
 CONFIG = {
     "quiz": {"count": 8, "daily": 2, "time_limit": 900,
              "speed_bonus": 0.5, "speed_secs": 120, "levels": True, "mcq": True},
-    "tf":   {"count": 20, "daily": 2, "time_limit": 900,
+    "tf":   {"count": 15, "daily": 2, "time_limit": 900,
              "correct": 0.05, "wrong": 0.01, "levels": False, "mcq": False},
-    "guess":     {"count": 6, "daily": 3, "time_limit": 900,
+    "guess":     {"count": 15, "daily": 3, "time_limit": 900,
                   "correct": 0.08, "wrong": 0.04, "levels": False, "mcq": True},
     "firstline": {"count": 6, "daily": 3, "time_limit": 900,
                   "correct": 0.08, "wrong": 0.04, "levels": False, "mcq": True},
@@ -138,6 +138,13 @@ _SEED_TF = [
     ("'The Catcher in the Rye' is by J.D. Salinger.", True),
     ("Homer wrote 'The Divine Comedy'.", False),
     ("'Hamlet' is a comedy.", False),
+    ("'The Adventures of Huckleberry Finn' was written by Mark Twain.", True),
+    ("Charles Dickens wrote 'Great Expectations'.", True),
+    ("'Pride and Prejudice' was written by Charlotte Bronte.", False),
+    ("J.R.R. Tolkien wrote 'The Lord of the Rings'.", True),
+    ("'The Great Gatsby' is set in the 1960s.", False),
+    ("Leo Tolstoy wrote 'Anna Karenina'.", True),
+    ("'Fahrenheit 451' was written by Ray Bradbury.", True),
 ]
 _SEED_GUESS = [
     ("A young wizard discovers he's famous and attends a school of magic.",
@@ -152,6 +159,26 @@ _SEED_GUESS = [
      {"A": "The Great Gatsby", "B": "Wuthering Heights", "C": "Atonement", "D": "Rebecca"}, "A"),
     ("Four siblings enter a magical land through a wardrobe.",
      {"A": "The Golden Compass", "B": "Narnia", "C": "Inkheart", "D": "Stardust"}, "B"),
+    ("A hobbit journeys with dwarves to reclaim a treasure guarded by a dragon.",
+     {"A": "The Hobbit", "B": "Eragon", "C": "Beowulf", "D": "The Magician's Nephew"}, "A"),
+    ("A young girl keeps a diary while hiding from the Nazis in Amsterdam.",
+     {"A": "Number the Stars", "B": "The Diary of a Young Girl", "C": "The Book Thief", "D": "Maus"}, "B"),
+    ("A man is shipwrecked and survives alone on a desert island for years.",
+     {"A": "Life of Pi", "B": "Gulliver's Travels", "C": "Robinson Crusoe", "D": "Swiss Family Robinson"}, "C"),
+    ("Two star-crossed lovers from feuding families meet a tragic end in Verona.",
+     {"A": "Othello", "B": "Romeo and Juliet", "C": "Wuthering Heights", "D": "Doctor Zhivago"}, "B"),
+    ("A scientist builds a living creature from dead body parts and comes to regret it.",
+     {"A": "Dr Jekyll and Mr Hyde", "B": "The Island of Doctor Moreau", "C": "Frankenstein", "D": "Dracula"}, "C"),
+    ("A boy and an escaped slave raft down the Mississippi River.",
+     {"A": "Tom Sawyer", "B": "Huckleberry Finn", "C": "The Call of the Wild", "D": "Treasure Island"}, "B"),
+    ("Rabbits flee their warren to find a new home, guided by visions.",
+     {"A": "Watership Down", "B": "Animal Farm", "C": "The Wind in the Willows", "D": "Redwall"}, "A"),
+    ("An orphan becomes a governess and falls for her brooding employer, Mr Rochester.",
+     {"A": "Emma", "B": "Jane Eyre", "C": "Rebecca", "D": "Villette"}, "B"),
+    ("A girl sent to a Yorkshire manor discovers a hidden, locked garden.",
+     {"A": "A Little Princess", "B": "The Secret Garden", "C": "Heidi", "D": "Anne of Green Gables"}, "B"),
+    ("A future society burns books, and a fireman begins to question his job.",
+     {"A": "1984", "B": "Brave New World", "C": "Fahrenheit 451", "D": "The Giver"}, "C"),
 ]
 _SEED_FIRSTLINE = [
     ("\"Call me Ishmael.\"",
@@ -453,7 +480,7 @@ async def submit(uid: int, session_id: str, client_answers: list) -> dict:
 
     total_delta = round(net + bonus, 5)
     if total_delta >= 0:
-        await add_bgm(uid, total_delta)
+        await add_bgm(uid, total_delta, source="game")
     else:
         # never let a wrong-answer penalty push the balance below zero.
         # cut_bgm (a real deduction) — add_bgm sanitizes negatives to a no-op.
@@ -477,3 +504,15 @@ async def submit(uid: int, session_id: str, client_answers: list) -> dict:
         "earned": earned, "net": round(net, 4), "speed_bonus": bonus,
         "total": total_delta, "timed_out": timed_out, "review": review,
     }
+
+
+async def cancel_session(uid: int, session_id: str) -> dict:
+    """Forfeit an active game session: flip it to 'forfeited' so it can never be
+    submitted for a reward. The daily play was already consumed when the session
+    was created (it counts toward plays_today regardless of status), so quitting
+    keeps the turn used and pays nothing — even mid-game with a perfect score."""
+    db = await MongoManager.get()
+    await db.find_one_and_update_global(
+        "game_sessions", {"session_id": session_id, "uid": uid, "status": "active"},
+        {"$set": {"status": "forfeited", "finished_at": _now()}})
+    return {"ok": True}

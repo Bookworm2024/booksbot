@@ -54,7 +54,7 @@ def _feedback(guess: str, word: str) -> str:
 
 
 def _public(sess: dict) -> dict:
-    done = sess.get("status") in ("won", "lost")
+    done = sess.get("status") in ("won", "lost", "forfeited")
     out = {"length": LEN, "max": MAX_TRIES, "guesses": sess.get("guesses", []),
            "status": sess.get("status", "active")}
     if done:
@@ -111,7 +111,7 @@ async def guess(uid: int, raw: str) -> dict:
         return _public(await db.find_one_global("bookle_sessions", {"uid": uid, "day": day}) or sess)
 
     if reward > 0:
-        await add_bgm(uid, reward)
+        await add_bgm(uid, reward, source="game")
         await db.safe_update("users", {"user_id": uid},
                              {"$inc": {"games_played": 1, "game_bgm": reward}})
         from utils.missions import mark
@@ -119,3 +119,15 @@ async def guess(uid: int, raw: str) -> dict:
 
     sess.update(update)
     return _public(sess)
+
+
+async def forfeit(uid: int) -> dict:
+    """Quit today's Bookle: end the round with no reward. Bookle is one puzzle per
+    day, so forfeiting uses up today's attempt (the user can't retry until tomorrow)."""
+    db = await MongoManager.get()
+    day = _today()
+    await db.find_one_and_update_global(
+        "bookle_sessions", {"uid": uid, "day": day, "status": "active"},
+        {"$set": {"status": "forfeited"}})
+    cur = await db.find_one_global("bookle_sessions", {"uid": uid, "day": day})
+    return _public(cur or {"status": "forfeited"})

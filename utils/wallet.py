@@ -149,14 +149,53 @@ async def get_balances(user_id: int) -> tuple[float, float]:
     return sanitize_amount(bgm), sanitize_amount(bcn)
 
 
-async def add_bgm(user_id: int, amount: float) -> None:
-    """Credit BGM. Amount is sanitized (finite, ≤ MAX_AMOUNT); a non-positive
-    amount is a no-op — to DEDUCT use cut_bgm/charge_bgm, never a negative here."""
+# Free BGM from NON-game sources is capped per session, so it can't be farmed.
+# Game wins, refunds, admin grants, redeem codes, gifts and purchases are EXEMPT
+# (credited in full). Everything else (missions, quests, challenges, referrals,
+# crates, spin, level-ups, …) shares one cap per "session" — a window that resets
+# after NG_SESSION_GAP seconds with no non-game earning.
+NONGAME_BGM_CAP = 3.0
+NG_SESSION_GAP = 1800   # 30 min of no non-game BGM starts a fresh session
+_UNCAPPED_BGM_SOURCES = frozenset(
+    {"game", "refund", "admin", "redeem", "gift", "purchase"})
+
+
+async def add_bgm(user_id: int, amount: float, source: str = "other") -> float:
+    """Credit BGM; return the amount ACTUALLY credited (may be less than asked).
+
+    `source` categorizes the credit. Game wins / refunds / admin grants / redeem
+    codes / gifts / purchases are credited in full. Every OTHER (free, non-game)
+    source is capped at NONGAME_BGM_CAP per session so free BGM can't be farmed.
+    Amount is sanitized; a non-positive amount is a no-op — to DEDUCT use
+    cut_bgm/charge_bgm, never a negative here."""
     amount = sanitize_amount(amount)
     if amount <= 0:
-        return
+        return 0.0
     db = await MongoManager.get()
-    await db.safe_update("users", {"user_id": user_id}, {"$inc": {"bookgem": amount}})
+    if source in _UNCAPPED_BGM_SOURCES:
+        await db.safe_update("users", {"user_id": user_id}, {"$inc": {"bookgem": amount}})
+        return amount
+    # capped (non-game) path — single-writer-ish read-modify-write; the cap is a
+    # soft anti-farm guard, so a rare cross-event race over-crediting slightly is fine.
+    now = _now()
+    doc = await db.find_one_global("users", {"user_id": user_id},
+                                   {"ng_bgm_sess": 1, "ng_bgm_last": 1}) or {}
+    last = doc.get("ng_bgm_last")
+    if isinstance(last, datetime):
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        fresh = (now - last).total_seconds() > NG_SESSION_GAP
+    else:
+        fresh = True
+    sess = 0.0 if fresh else sanitize_amount(doc.get("ng_bgm_sess"))
+    credited = min(amount, max(0.0, NONGAME_BGM_CAP - sess))
+    if credited <= 0:
+        return 0.0
+    await db.safe_update(
+        "users", {"user_id": user_id},
+        {"$inc": {"bookgem": credited},
+         "$set": {"ng_bgm_sess": round(sess + credited, 4), "ng_bgm_last": now}})
+    return credited
 
 
 async def cut_bgm(user_id: int, amount: float) -> None:

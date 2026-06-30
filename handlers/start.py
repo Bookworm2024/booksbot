@@ -25,7 +25,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS, REQUIRED_CHANNELS
-from utils.brand import DASHBOARD_FOOTER, about_text
+from utils.brand import about_text
 from utils.keyboards import btn, kb, url_btn
 from utils.logs import log_new_user
 from utils.referral import grant_referral, remember_referrer
@@ -232,11 +232,10 @@ async def _send_dashboard(message: Message, name: str) -> None:
         "straight to your chat\n"
         "📖 <b>Your private library</b> — read, listen, bookmark and pick up right "
         "where you left off\n"
-        "🎮 <b>Play &amp; earn</b> — games, quests and daily rewards that pay out 💎 BGM\n"
+        "🎮 <b>Play &amp; earn</b> — games, quests and referrals that pay out 💎 BGM\n"
         "👑 <b>Go Premium</b> — redeem your BGM or top up a 💳 ₹/$ wallet for unlimited "
         "access</blockquote>\n\n"
-        "<i>💡 Pick a tile below to begin — your shelf is ready when you are.</i>\n\n"
-        + DASHBOARD_FOOTER,
+        "<i>💡 Pick a tile below to begin — your shelf is ready when you are.</i>",
         reply_markup=await _dashboard_kb_with_ad(),
     )
 
@@ -300,18 +299,17 @@ async def cb_account(call: CallbackQuery, state: FSMContext) -> None:
         "<i>Your profile, wallet and rewards — all under your control.</i>\n\n"
         "<blockquote>👑 Go <b>Premium</b> for unlimited downloads and the full library, "
         "or top up your 💳 <b>wallet</b> to pay as you go.\n"
-        "💎 Earn <b>BGM</b> in games, referrals and your 🎁 <b>daily reward</b> — then "
-        "redeem it for Premium. 🎟 <b>Redeem</b> codes, 🎁 <b>gift</b> BGM and stack "
+        "💎 Earn <b>BGM</b> in games and referrals — then redeem it for Premium. "
+        "🎟 <b>Redeem</b> codes, 🎁 <b>gift</b> BGM and stack "
         "<b>quests</b> &amp; 🎁 <b>loot crates</b>.\n"
         "🚨 Track your requests and tune your 🔔 alerts, 🌐 language and 🆘 support — "
         "all in one place.</blockquote>\n\n"
-        "<i>💡 New here? Claim your daily reward and start saving toward Premium.</i>",
+        "<i>💡 New here? Win BGM in the arcade and invite friends to save toward Premium.</i>",
         reply_markup=kb(
             [btn("👑 Premium", "go_premium", style="success")],
             [btn("👤 Profile", "acc_profile", style="primary"),
              btn("💼 Balance", "acc_balance", style="primary")],
-            [btn("💳 Wallet / Top Up", "acc_buy", style="success"),
-             btn("🎁 Daily Reward", "daily_reward", style="success")],
+            [btn("💳 Wallet / Top Up", "acc_buy", style="success")],
             [btn("🎟 Redeem Code", "acc_redeem", style="primary"),
              btn("🎁 Refer & Earn", "acc_refer", style="primary")],
             [btn("🎁 Loot Crates", "menu_crates", style="success"),

@@ -83,7 +83,7 @@ async def on_addbgm_amount(message: Message, state: FSMContext) -> None:
             "<code>1e21</code> or <code>inf</code> values.</i>")
         return
     target = data.get("target")
-    await add_bgm(target, amount)
+    await add_bgm(target, amount, source="admin")
     await message.answer(
         "✨ <b>Grant complete</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"

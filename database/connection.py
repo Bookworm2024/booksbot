@@ -129,6 +129,9 @@ class MongoManager:
                 # Request Arena tickets: unique token + auto-expire after 7 days
                 await db.arena_tickets.create_index([("token", ASCENDING)], unique=True)
                 await db.arena_tickets.create_index([("created_at", ASCENDING)], expireAfterSeconds=604800)
+                # On-demand public-archive pick lists: token lookup + auto-expire (7d)
+                await db.public_picks.create_index([("token", ASCENDING)])
+                await db.public_picks.create_index([("created_at", ASCENDING)], expireAfterSeconds=604800)
                 # one reaction per (file, user)
                 await db.reactions.create_index(
                     [("file_unique_id", ASCENDING), ("user_id", ASCENDING)], unique=True)

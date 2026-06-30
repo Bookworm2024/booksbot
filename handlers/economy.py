@@ -1,7 +1,6 @@
 """
-handlers/economy.py — wallet, daily claim, redeem codes.
+handlers/economy.py — wallet & redeem codes.
 
-  /claim   — free daily BCN (random 3–5), expires in 24h
   /balance — wallet view (also the "Balance" dashboard button)
   /redeem  — enter a code → credit BGM (one claim per user, limited supply)
   /create  — (admin) mint a redeem code: /create <max_claims> <total_bgm>
@@ -9,7 +8,7 @@ handlers/economy.py — wallet, daily claim, redeem codes.
 import logging
 import random
 import string
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
@@ -17,13 +16,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from config import BCN_EXPIRY_SECONDS
 from database.connection import MongoManager
 from utils.format import fmt_amount
 from utils.keyboards import btn, cancel_row, kb
 from utils.permissions import is_super
-from utils.settings import get_float
-from utils.wallet import add_bgm, get_balances, get_money, seconds_until_claim
+from utils.wallet import add_bgm, get_balances, get_money
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -47,16 +44,10 @@ async def _mint_code(max_claims: int, total: float, created_by: int) -> tuple[st
     return code, per
 
 
-def _fmt_dur(seconds: int) -> str:
-    h, m = seconds // 3600, (seconds % 3600) // 60
-    return f"{h}h {m}m" if h else f"{m}m {seconds % 60}s"
-
-
 # ── /balance ─────────────────────────────────────────────────────────────────
 async def _balance_view(uid: int):
     bgm, _ = await get_balances(uid)
     inr, usd = await get_money(uid)
-    left = await seconds_until_claim(uid)
     db = await MongoManager.get()
     u = await db.find_one_global("users", {"user_id": uid},
                                  {"ebook_requests": 1, "audiobook_requests": 1,
@@ -65,8 +56,6 @@ async def _balance_view(uid: int):
     ab = int(u.get("audiobook_requests") or 0)
     from utils.vip import badge
     vip = await badge(uid)
-    claim_line = ("🎁 <b>Daily reward:</b> <i>ready now</i> — tap below to collect"
-                  if left == 0 else f"🎁 <b>Daily reward:</b> <i>unlocks in {_fmt_dur(left)}</i>")
     text = (
         "💼 <b>Your Wallet</b>\n"
         + (f"{vip} member\n" if vip else "")
@@ -82,15 +71,14 @@ async def _balance_view(uid: int):
         f"🎧 Audiobook requests  <code>{ab}</code>\n"
         f"📈 Lifetime requests  <code>{eb + ab}</code>"
         "</blockquote>\n"
-        f"{claim_line}"
+        "<i>💎 Earn BGM in games &amp; referrals — then redeem it for Premium.</i>"
     )
-    rows = []
-    if left == 0:
-        rows.append([btn("⚡ Claim Daily BGM", "do_claim", style="success")])
-    rows.append([btn("👑 Get Premium", "go_premium", style="success")])
-    rows.append([btn("💳 Top Up Wallet", "acc_buy", style="primary"),
-                 btn("🎟 Redeem a Code", "acc_redeem", style="primary")])
-    rows.append([btn("🔙 Back to Account", "menu_account", style="danger")])
+    rows = [
+        [btn("👑 Get Premium", "go_premium", style="success")],
+        [btn("💳 Top Up Wallet", "acc_buy", style="primary"),
+         btn("🎟 Redeem a Code", "acc_redeem", style="primary")],
+        [btn("🔙 Back to Account", "menu_account", style="danger")],
+    ]
     return text, kb(*rows)
 
 
@@ -104,72 +92,6 @@ async def cmd_balance(message: Message) -> None:
 async def cb_balance(call: CallbackQuery) -> None:
     await call.answer()
     text, markup = await _balance_view(call.from_user.id)
-    await call.message.edit_text(text, reply_markup=markup)
-
-
-# ── /claim ───────────────────────────────────────────────────────────────────
-def _resting_card(left: int):
-    return ("⏳ <b>Daily Reward Resting</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "<blockquote>You have already collected today's BGM. The reward "
-            f"recharges once a day — your next claim unlocks in <b>{_fmt_dur(left)}</b>.</blockquote>\n"
-            "💡 <i>Premium members earn 2× the daily reward.</i>",
-            kb([btn("👑 Get Premium", "go_premium", style="success")],
-               [btn("🔙 Back to Account", "menu_account", style="danger")]))
-
-
-async def _do_claim(uid: int, bot) -> tuple[str, object]:
-    left = await seconds_until_claim(uid)
-    if left > 0:
-        return _resting_card(left)
-    from utils.settings import get_float
-    from utils.vip import claim_multiplier
-    # Atomically claim the cooldown FIRST: only the op that flips last_claim_at past
-    # the 24h window proceeds to credit, so a double-tap can't double-claim.
-    db = await MongoManager.get()
-    now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(seconds=BCN_EXPIRY_SECONDS)
-    claimed = await db.find_one_and_update_global(
-        "users",
-        {"user_id": uid, "$or": [{"last_claim_at": {"$lt": cutoff}},
-                                 {"last_claim_at": None},
-                                 {"last_claim_at": {"$exists": False}}]},
-        {"$set": {"last_claim_at": now}})
-    if not claimed:
-        return _resting_card(await seconds_until_claim(uid) or BCN_EXPIRY_SECONDS)
-    lo = await get_float("claim_min")
-    hi = await get_float("claim_max")
-    mult = await claim_multiplier(uid)
-    bonus = round(random.uniform(min(lo, hi), max(lo, hi)) * mult, 2)
-    await add_bgm(uid, bonus)
-    from utils.missions import mark
-    await mark(uid, "claim")
-    try:
-        from utils.logs import log_bcn_claim
-        await log_bcn_claim(bot, uid, bonus)
-    except Exception:  # noqa: BLE001
-        pass
-    return ("✨ <b>Daily Reward Collected</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "<blockquote>"
-            f"💎 <b>+{bonus:.2f} BGM</b> credited to your wallet\n"
-            "♾️ <i>BGM never expires — save it up to redeem Premium</i>"
-            "</blockquote>\n"
-            "💡 <i>Come back tomorrow to keep your daily streak alive.</i>",
-            kb([btn("💼 View My Wallet", "acc_balance", style="primary")],
-               [btn("🔙 Back to Account", "menu_account", style="danger")]))
-
-
-@router.message(Command("claim"))
-async def cmd_claim(message: Message) -> None:
-    text, markup = await _do_claim(message.chat.id, message.bot)
-    await message.answer(text, reply_markup=markup)
-
-
-@router.callback_query(F.data == "do_claim")
-async def cb_claim(call: CallbackQuery) -> None:
-    await call.answer()
-    text, markup = await _do_claim(call.from_user.id, call.bot)
     await call.message.edit_text(text, reply_markup=markup)
 
 
@@ -249,7 +171,7 @@ async def on_code(message: Message, state: FSMContext) -> None:
             "💡 <i>Watch for our next giveaway to grab the next batch.</i>")
         return
 
-    await add_bgm(uid, amount)
+    await add_bgm(uid, amount, source="redeem")
     await message.answer(
         "✨ <b>Code Redeemed</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"

@@ -47,7 +47,7 @@ async def run_weekly_digest(bot) -> None:
                 {"notif": {"$ne": False}, "is_banned": {"$ne": True},
                  "last_active": {"$gte": month_ago},
                  "last_digest": {"$not": {"$gte": week_ago}}},
-                limit=_PER_TICK, proj={"user_id": 1, "login_streak": 1})
+                limit=_PER_TICK, proj={"user_id": 1})
             sent = 0
             for u in targets:
                 uid = u["user_id"]
@@ -63,17 +63,14 @@ async def run_weekly_digest(bot) -> None:
                 if botd_name:
                     lines.append(f"📖 Today's <b>Book of the Day</b>: "
                                  f"<i>{escape(botd_name[:50])}</i>")
-                lines.append(f"🔥 Your reading streak: <b>{int(u.get('login_streak') or 0)} "
-                             "day(s)</b> — claim today and keep the run alive.")
-                lines.append("\n🎁 <b>Waiting for you:</b> your free daily reward "
-                             "and a spin of the wheel.")
+                lines.append("\n📚 <b>Pick up where you left off</b> — your shelf is "
+                             "right where you left it, and new arrivals are waiting.")
                 lines.append("<i>💡 Open Discover for curated shelves, popular "
                              "picks and what readers are loving now.</i>")
                 try:
                     await bot.send_message(
                         uid, "\n".join(lines),
-                        reply_markup=kb([btn("🎁 Claim Daily Reward", "daily_reward", style="success"),
-                                         btn("🔭 Explore Discover", "lib_discover", style="primary")]))
+                        reply_markup=kb([btn("🔭 Explore Discover", "lib_discover", style="success")]))
                     sent += 1
                 except Exception:  # noqa: BLE001 — blocked/deactivated
                     pass

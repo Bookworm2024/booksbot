@@ -87,6 +87,7 @@
 <div id="grid"></div>
 <div id="msg"></div>
 <div id="kb"></div>
+<button class="btn ghost" id="quitbtn" style="display:none;margin:10px auto 0;max-width:260px;color:#ff8a8a">🚪 Quit (forfeit today)</button>
 <div class="result" id="result"></div>
 <div class="credit">Books Provider — curated &amp; operated by<br><b>@bookslibraryofficial</b> &amp; <b>@trinityXmods</b></div>
 <canvas id="confetti"></canvas>
@@ -152,6 +153,7 @@ function apply(r, animateLast){
   buildGrid();
   const revealRow = (animateLast && guesses.length>prevLen) ? guesses.length-1 : -1;
   paint(revealRow);
+  const qb=document.getElementById("quitbtn"); if(qb) qb.style.display = status==="active" ? "block" : "none";
   if(status==="active"){
     if(guesses.length===0) msg.textContent="Type any 5-letter word to begin 👇";
     else msg.textContent=`${MAX-guesses.length} ${MAX-guesses.length===1?"guess":"guesses"} left`;
@@ -159,6 +161,15 @@ function apply(r, animateLast){
     setTimeout(showResult, revealRow>=0 ? 700 : 0);
   }
 }
+
+async function quitGame(){
+  if(status!=="active") return;
+  const go=async()=>{ try{ const r=await api("/api/bookle/cancel",{}); apply(r,false); hapN("warning"); }
+                      catch(e){ msg.textContent="Couldn't quit — please try again."; } };
+  if(tg?.showConfirm){ tg.showConfirm("Quit today's Bookle? You'll forfeit today's puzzle and earn no reward.",(ok)=>{ if(ok) go(); }); }
+  else go();
+}
+document.getElementById("quitbtn").onclick=quitGame;
 
 const GRADES_WIN=[ [2,"🏆","Legendary!","#ffd24b"], [4,"🌟","Brilliant solve!","#43e08a"], [6,"😅","Phew — nailed it!","#4bc9ff"] ];
 function showResult(){

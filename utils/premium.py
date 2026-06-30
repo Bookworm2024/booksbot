@@ -113,5 +113,5 @@ async def redeem_with_bgm(uid: int) -> tuple[bool, Optional[datetime]]:
     try:
         return True, await grant_premium(uid, await bgm_days())
     except Exception:  # noqa: BLE001 — never charge without granting
-        await add_bgm(uid, cost)
+        await add_bgm(uid, cost, source="refund")
         raise

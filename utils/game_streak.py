@@ -34,5 +34,5 @@ async def on_game_played(uid: int) -> dict:
     streak = prev + 1 if before.get("game_streak_day") == yesterday else 1
     bonus = _BONUS[min(streak, len(_BONUS)) - 1]
     await db.safe_update("users", {"user_id": uid}, {"$set": {"game_streak": streak}})
-    await add_bgm(uid, bonus)
+    await add_bgm(uid, bonus, source="game")
     return {"streak": streak, "bonus": bonus}

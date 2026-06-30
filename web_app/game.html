@@ -209,7 +209,9 @@ function screenIntro(err){
   const rules = GAME==="quiz"
     ? `<span class="chip"><b>8</b> questions</span><span class="chip"><b>2</b> plays / day</span><span class="chip"><b>15:00</b> on the clock</span><span class="chip">skips are <b>free</b></span>`
     : GAME==="tf"
-    ? `<span class="chip"><b>20</b> questions</span><span class="chip"><b>2</b> plays / day</span><span class="chip"><b>15:00</b> on the clock</span><span class="chip">skips are <b>free</b></span>`
+    ? `<span class="chip"><b>15</b> questions</span><span class="chip"><b>2</b> plays / day</span><span class="chip"><b>15:00</b> on the clock</span><span class="chip">skips are <b>free</b></span>`
+    : GAME==="guess"
+    ? `<span class="chip"><b>15</b> questions</span><span class="chip"><b>3</b> plays / day</span><span class="chip"><b>15:00</b> on the clock</span><span class="chip">skips are <b>free</b></span>`
     : `<span class="chip"><b>6</b> questions</span><span class="chip"><b>3</b> plays / day</span><span class="chip"><b>15:00</b> on the clock</span><span class="chip">skips are <b>free</b></span>`;
   let body;
   if(GAME==="quiz"){
@@ -296,13 +298,30 @@ function renderPlay(animate=true){
        <button class="btn ghost" id="prev" ${idx===0?"disabled":""}>‹ Back</button>
        ${idx<total-1 ? `<button class="btn" id="next">Next ›</button>` : `<button class="btn" id="fin">🏁 Finish round</button>`}
      </div>
-     ${idx<total-1 ? `<button class="btn ghost block" id="fin2" style="margin-top:10px">🏁 Finish &amp; score round</button>`:""}`);
+     ${idx<total-1 ? `<button class="btn ghost block" id="fin2" style="margin-top:10px">🏁 Finish &amp; score round</button>`:""}
+     <button class="btn ghost block" id="quit" style="margin-top:10px;color:#ff8a8a">🚪 Quit round (forfeit)</button>`);
   app.querySelectorAll("[data-a]").forEach(b=> b.onclick=()=>pick(b.dataset.a));
   app.querySelectorAll("[data-j]").forEach(b=> b.onclick=()=>{ idx=+b.dataset.j; hap("light"); renderPlay(); });
   const prev=document.getElementById("prev"); if(prev) prev.onclick=()=>{ if(idx>0){idx--;hap("light");renderPlay();} };
   const next=document.getElementById("next"); if(next) next.onclick=()=>{ if(idx<total-1){idx++;hap("light");renderPlay();} };
   const fin=document.getElementById("fin"); if(fin) fin.onclick=confirmFinish;
   const fin2=document.getElementById("fin2"); if(fin2) fin2.onclick=confirmFinish;
+  const quit=document.getElementById("quit"); if(quit) quit.onclick=quitGame;
+}
+
+async function quitGame(){
+  const go=()=>{
+    clearInterval(timerInt); submitting=true;
+    try{ if(S&&S.session_id) api("/api/game/cancel",{ session_id:S.session_id }); }catch(e){}
+    hapN("warning");
+    H(`<div class="card center fade"><div style="font-size:1.9rem">🚪</div>
+        <div style="font-weight:800;margin-top:8px">Round forfeited</div>
+        <div class="mut" style="margin-top:8px;line-height:1.6">Today's play is used and no reward was earned — even if you were ahead.</div>
+        <br><button class="btn" onclick="tg?.close()">Close</button></div>`);
+  };
+  if(tg?.showConfirm){
+    tg.showConfirm("Quit this round? Your play for today will be used and you'll earn no reward — even if you're winning.",(ok)=>{ if(ok) go(); });
+  } else { go(); }
 }
 
 function pick(raw){

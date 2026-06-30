@@ -132,7 +132,8 @@ async def _start(message: Message, uid: int, state: FSMContext, *, edit: bool, l
                "Take your time — when you've got the order, tap <b>✅ Ready</b> and "
                "we'll hide them. Replay it perfectly to earn 💎 BGM, and the further "
                "you climb, the bigger the reward.</blockquote>",
-               reply_markup=kb([btn("✅ I'm Ready", "mm_ready", style="success")]))
+               reply_markup=kb([btn("✅ I'm Ready", "mm_ready", style="success")],
+                               [btn("🚪 Quit Game", "game_quit", style="danger")]))
 
 
 @router.message(Command("memory"))
@@ -164,7 +165,7 @@ async def cb_ready(call: CallbackQuery, state: FSMContext) -> None:
         f"<blockquote>Tap the palette below in the exact sequence you memorised, all "
         f"<code>{length}</code> in a row.\n\n"
         f"Progress: <code>0/{length}</code></blockquote>",
-        reply_markup=kb(*_palette_kb()))
+        reply_markup=kb(*_palette_kb(), [btn("🚪 Quit Game", "game_quit", style="danger")]))
 
 
 @router.callback_query(MemoryFSM.repeating, F.data.startswith("mm:"))
@@ -207,7 +208,7 @@ async def cb_tap(call: CallbackQuery, state: FSMContext) -> None:
             {"$set": {"mm_solved_token": rt}})
         rwd = _reward(length)
         if won is not None:
-            await add_bgm(call.from_user.id, rwd)
+            await add_bgm(call.from_user.id, rwd, source="game")
             await db.safe_update("users", {"user_id": call.from_user.id},
                                  {"$inc": {"games_played": 1, "game_bgm": rwd}})
             from utils.missions import mark
@@ -239,7 +240,7 @@ async def cb_tap(call: CallbackQuery, state: FSMContext) -> None:
         f"<blockquote>Tap the next tile in the sequence — all <code>{length}</code> "
         f"to claim the reward.\n\n"
         f"Progress: <code>{pos}/{length}</code></blockquote>",
-        reply_markup=kb(*_palette_kb()))
+        reply_markup=kb(*_palette_kb(), [btn("🚪 Quit Game", "game_quit", style="danger")]))
 
 
 @router.callback_query(F.data.startswith("mm_next:"))
