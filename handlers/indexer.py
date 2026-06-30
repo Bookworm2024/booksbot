@@ -47,6 +47,11 @@ async def _index_post(message: Message) -> None:
     live = await get_file_channel()
     if not live or message.chat.id != live:
         return
+    # Skip the prep pipeline's own re-uploads (prepared/staging copies of files that
+    # are already indexed) — they carry an invisible marker in the caption.
+    from utils.prepare import PREP_MARKER
+    if (message.caption or "").startswith(PREP_MARKER):
+        return
     item = extract_from_message(message)
     if not item:
         return  # not a file-bearing post (e.g. a plain text announcement)

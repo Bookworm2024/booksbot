@@ -123,6 +123,29 @@ Legend: ✅ done · 🔜 next · ⬜ planned
   recent in-copyright titles come via the operator (manual request fulfilment,
   forward-import, Telethon backfill), never an automated piracy pipeline.
 
+## Phase 9 — File preparation & branding (the "renamer" layer) ✅
+- ✅ Central `utils/prepare.py` — EVERY file the bot hands a user routes through it
+  (search/For You/Discover taps, Favorites, Finished, admin manual sends) + all
+  file-button labels.
+- ✅ Clean names: messy archive filenames ("OceanofPDF_Atomic_Habits_") → "Atomic
+  Habits" via a regex cleaner refined by the AI engine (batched, cached on the
+  files doc as `clean_name`, used for buttons AND captions). Search/list shows a
+  "🔄 Preparing your results…" card while first-seen titles are tidied.
+- ✅ Branded caption: "<b>Clean Title</b>  @handle" (admin-set kv `brand_handle`,
+  default @bookslibraryofficial).
+- ✅ Cover thumbnail: the admin branding image (set in 🎨 Branding) is processed
+  (Pillow → ≤320px/≤200KB JPEG) and baked onto each delivered document as its
+  thumbnail with a clean filename — done once (re-uploaded to the file channel,
+  coords cached `prepared_msg_id`/`prepared_file_id`), then delivered by copy.
+  A "📤 Preparing your file…" message covers the one-time latency.
+- ✅ Constraint-aware + flawless-degrading: cover applies to re-uploadable docs
+  (≤20MB Bot-API download cap; legacy/Telethon bytes fetched via a one-time
+  staging copy); larger/audio/un-fetchable files still get clean-name + branded
+  caption. Prep failure never fails delivery (falls back) and never burns quota.
+  Prepared/staging re-uploads carry an invisible marker the indexer skips (no dupes).
+- ✅ Harvester bakes the cover + clean_name at ingest (it re-uploads anyway).
+- ✅ Admin: 🧰 More Tools → 🎨 Branding (cover image, handle, on/off, cover on/off).
+
 ## Status: feature-complete + hardened
 All TBC features rebuilt + modernized; crypto via OxaPay.
 Credential-gated features (AI, crypto) activate once their keys are set in the

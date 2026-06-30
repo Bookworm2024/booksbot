@@ -43,7 +43,9 @@ async def cb_foryou(call: CallbackQuery) -> None:
         stat = (f"📊 <b>{count}</b> of your <b>{total}</b> reads &amp; requests "
                 f"so far are <b>{escape(genre)}</b>." if total else "")
         if picks:
-            rows = [[btn(f"{icon_for(f.get('ext', ''))} {f.get('name', 'Untitled')[:34]}",
+            from utils import prepare
+            cm = await prepare.clean_names_for(picks)
+            rows = [[btn(f"{icon_for(f.get('ext', ''))} {(cm.get(f['file_unique_id']) or f.get('name', 'Untitled'))[:34]}",
                          f"dl:{f['file_unique_id']}", style="success")] for f in picks]
             rows.append([btn("🔭 Explore Discover", "lib_discover", style="primary")])
             rows.append([btn("🔙 Back to Library", "menu_library", style="danger")])
@@ -90,7 +92,9 @@ async def cb_foryou(call: CallbackQuery) -> None:
                             [btn("🔙 Back to Library", "menu_library", style="danger")]))
         return
 
-    rows = [[btn(f"{icon_for(f.get('ext', ''))} {f.get('name', 'Untitled')[:34]}",
+    from utils import prepare
+    cm = await prepare.clean_names_for(picks)
+    rows = [[btn(f"{icon_for(f.get('ext', ''))} {(cm.get(f['file_unique_id']) or f.get('name', 'Untitled'))[:34]}",
                  f"dl:{f['file_unique_id']}", style="success")] for f in picks]
     rows.append([btn("🔙 Back to Library", "menu_library", style="danger")])
     await call.message.edit_text(

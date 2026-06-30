@@ -377,9 +377,14 @@ async def _ingest(cand: dict, bot) -> bool:
     src_name = _SRC_NAME.get(cand["src"], "a public-domain archive")
     caption = (f"📚 <b>{escape(cand['title'])}</b>{cap_author}\n"
                f"<i>Added from the public-domain archive ({src_name}).</i>")
+    # Bake the admin cover thumbnail on at ingest (the harvester re-uploads anyway),
+    # so harvested files arrive fully branded with no later prep pass.
+    from utils import prepare
+    thumb = await prepare._thumb_bytes(bot)
     try:
         sent = await bot.send_document(
             chan, BufferedInputFile(data, filename=fname),
+            thumbnail=(BufferedInputFile(thumb, filename="cover.jpg") if thumb else None),
             caption=caption, disable_notification=True)
     except Exception as exc:  # noqa: BLE001 — channel perms / size / rate
         logger.warning("harvest upload failed for %s: %s", cand["title"], exc)
@@ -404,7 +409,13 @@ async def _ingest(cand: dict, bot) -> bool:
     db = await MongoManager.get()
     enrich = {"src": cand["src"], "src_id": cand["src_id"],
               "name": cand["title"], "name_lc": cand["name_lc"],
-              "name_tg": trigrams(cand["name_lc"])}
+              "name_tg": trigrams(cand["name_lc"]),
+              # harvested titles are already clean, and this upload IS the branded
+              # copy (cover baked on above) — so mark it prepared to skip later prep.
+              "clean_name": cand["title"],
+              "prepared_msg_id": doc.get("msg_id"),
+              "prepared_file_id": doc.get("file_id"),
+              "brand_state": "prepared" if thumb else "caption"}
     if genre:
         enrich["genre"] = genre
     if cand.get("author"):

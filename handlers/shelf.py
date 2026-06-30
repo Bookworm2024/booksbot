@@ -107,19 +107,11 @@ async def cb_fin_get(call: CallbackQuery) -> None:
     if not f:
         await call.answer("⚠️ This title isn't on your Finished shelf anymore — mark it done again to keep it here.", show_alert=True)
         return
-    await call.answer("📤 On its way — re-delivering from your Finished shelf…")
-    caption = (f"{icon_for(f.get('ext',''))} <b>{escape(f.get('name','Your File') or 'Your File')}</b>"
-               "\n\n✅ <i>From your Finished shelf — re-fetched free.</i>")
-    src = f.get("chan_id") or await get_file_channel()
-    try:
-        if src and f.get("msg_id"):
-            await call.bot.copy_message(uid, src, f["msg_id"], caption=caption)
-        elif f.get("file_id"):
-            await call.bot.send_document(uid, f["file_id"], caption=caption)
-        else:
-            await call.message.answer("⚠️ <b>This title is no longer retrievable.</b>\n<i>The source file has moved on. Search for it again and we'll deliver a fresh copy.</i>")
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("finished re-delivery failed: %s", exc)
+    await call.answer()
+    from utils import prepare
+    ok = await prepare.deliver(call.bot, uid, f,
+                               note="✅ <i>From your Finished shelf — re-fetched free.</i>")
+    if not ok:
         await call.message.answer("⚠️ <b>We couldn't fetch this one right now.</b>\n<i>A momentary hiccup — please tap to re-fetch it again in a few seconds.</i>")
 
 

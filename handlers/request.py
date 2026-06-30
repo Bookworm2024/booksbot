@@ -311,6 +311,18 @@ async def _render_results(message: Message, state: FSMContext, query: str,
         await (message.edit_text if edit else message.answer)(text, reply_markup=markup)
         return
 
+    # Clean up messy archive titles for the button labels (cached; one batched AI
+    # call for any uncached titles on this page). Show a brief "Preparing…" card
+    # while we tidy the first-seen titles.
+    from utils import prepare
+    if edit and prepare.has_uncached(results):
+        try:
+            await message.edit_text("🔄 <b>Preparing your results…</b>\n"
+                                    "<i>Tidying up the titles for you.</i>")
+        except Exception:  # noqa: BLE001
+            pass
+    clean_map = await prepare.clean_names_for(results)
+
     rows = []
     # filter row (active filter highlighted)
     rows.append([btn(("● " if v == sf else "") + lbl, f"sf:{v}",
@@ -321,7 +333,8 @@ async def _render_results(message: Message, state: FSMContext, query: str,
                          style="success" if v == ss else "primary") for v, lbl in _SORTS])
     for f in results:
         fuid = f["file_unique_id"]
-        label = f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:38]}"
+        clean = clean_map.get(fuid) or f.get("name", "Untitled")
+        label = f"{icon_for(f.get('ext',''))} {clean[:38]}"
         rows.append([btn(label, f"dl:{fuid}", style="success")])
 
     nav = []
@@ -407,30 +420,13 @@ def _file_buttons(fuid: str, f: dict):
 
 
 async def _deliver_file(call: CallbackQuery, uid: int, f: dict, fuid: str, *, tag: str) -> bool:
-    """Copy/send the file from the archive and do all success bookkeeping. Returns
-    whether it was delivered. The CALLER owns refund-on-failure (quota or wallet)."""
-    caption = (f"{icon_for(f.get('ext',''))} <b>{escape(f.get('name','Your File') or 'Your File')}</b>\n"
-               "━━━━━━━━━━━━━━━━━━━━\n"
-               "<i>Delivered to your library — enjoy the read.</i>\n\n"
-               f"{CREDIT}")
-    fav_kb = _file_buttons(fuid, f)
-    delivered = False
-    # Deliver from the channel the file was INDEXED in (falls back to the live
-    # channel for legacy docs), so repointing the file channel never serves the
-    # wrong file or breaks old results.
-    src_channel = f.get("chan_id") or await get_file_channel()
-    try:
-        if src_channel and f.get("msg_id"):
-            await call.bot.copy_message(
-                chat_id=uid, from_chat_id=src_channel, message_id=f["msg_id"],
-                caption=caption, reply_markup=fav_kb)
-            delivered = True
-        elif f.get("file_id"):
-            await call.bot.send_document(uid, f["file_id"], caption=caption,
-                                         reply_markup=fav_kb)
-            delivered = True
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Delivery failed for %s: %s", fuid, exc)
+    """Brand + deliver the file (utils.prepare handles the cover/clean-name/"Preparing"
+    UX) and do all success bookkeeping. Returns whether it was delivered. The CALLER
+    owns refund-on-failure (quota or wallet)."""
+    from utils import prepare
+    delivered = await prepare.deliver(
+        call.bot, uid, f, reply_markup=_file_buttons(fuid, f),
+        note="<i>Delivered to your library — enjoy the read.</i>")
     if not delivered:
         return False
 

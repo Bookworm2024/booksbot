@@ -260,6 +260,37 @@ async def mood_titles(mood: str) -> list[str] | None:
     return _parse_titles(text, minimum=5)
 
 
+async def clean_titles(raw_names: list[str]) -> dict[str, str]:
+    """Turn messy archive FILENAMES into clean human book titles, in ONE call.
+    e.g. 'OceanofPDF_Atomic_Habits_' → 'Atomic Habits'. Returns {raw: clean} for
+    every name it could clean (missing keys → caller keeps its basic-cleaned name)."""
+    raw_names = [n for n in (raw_names or []) if (n or "").strip()]
+    if not raw_names or not await ai_enabled():
+        return {}
+    lines = "\n".join(f"{i + 1}. {n}" for i, n in enumerate(raw_names))
+    prompt = (
+        "Below are messy ebook FILENAMES, one per numbered line. For EACH line, output "
+        "the clean, human-readable book TITLE only — strip site names (OceanofPDF, "
+        "Z-Library, LibGen, PDFDrive, Anna's Archive), @handles, URLs, file extensions, "
+        "underscores, stray ids, and edition/format junk. Keep the real title (and a clear "
+        "subtitle if present). Do NOT invent or translate. Output EXACTLY one line per "
+        "input, same count and order, formatted 'N. Clean Title', and nothing else.\n\n"
+        + lines)
+    text = await ai_complete(prompt, max_tokens=min(2000, 60 * len(raw_names) + 120))
+    if not text:
+        return {}
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        m = re.match(r"\s*(\d+)[.)]\s*(.+)", line)
+        if not m:
+            continue
+        idx = int(m.group(1)) - 1
+        val = m.group(2).strip().strip('"').strip("•*").strip()
+        if 0 <= idx < len(raw_names) and len(val) >= 2 and val.upper() != "INVALID":
+            out[raw_names[idx]] = val[:120]
+    return out
+
+
 async def classify_genre(title: str) -> str | None:
     """Classify a book title into one of files.GENRES (or 'Other'). None if unavailable."""
     from utils.files import GENRES

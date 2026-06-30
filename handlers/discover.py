@@ -141,7 +141,9 @@ async def cb_genre_files(call: CallbackQuery) -> None:
             "Try another genre, or search a title and we'll fetch it for you.</blockquote>",
             reply_markup=kb([btn("🔙 Genres", "disc_genres", style="danger")]))
         return
-    rows = [[btn(f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:36]}",
+    from utils import prepare
+    cm = await prepare.clean_names_for(items)
+    rows = [[btn(f"{icon_for(f.get('ext',''))} {(cm.get(f['file_unique_id']) or f.get('name','Untitled'))[:36]}",
                  f"dl:{f['file_unique_id']}", style="success")] for f in items]
     rows.append([btn("🔙 Genres", "disc_genres", style="danger")])
     await call.message.edit_text(
@@ -166,7 +168,9 @@ async def cb_featured(call: CallbackQuery) -> None:
             "Check back soon, or explore 📚 Collections and 🔥 Popular in the meantime.</blockquote>",
             reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
         return
-    rows = [[btn(f"⭐ {icon_for(f.get('ext',''))} {f.get('name','Untitled')[:36]}",
+    from utils import prepare
+    cm = await prepare.clean_names_for(items)
+    rows = [[btn(f"⭐ {icon_for(f.get('ext',''))} {(cm.get(f['file_unique_id']) or f.get('name','Untitled'))[:36]}",
                  f"dl:{f['file_unique_id']}", style="success")] for f in items]
     rows.append([btn("🔙 Discover", "lib_discover", style="danger")])
     await call.message.edit_text(
@@ -232,7 +236,9 @@ async def cb_collection_files(call: CallbackQuery) -> None:
             "Try another collection, browse 🏷 Genres, or search a title directly.</blockquote>",
             reply_markup=kb([btn("🔙 Collections", "disc_collections", style="danger")]))
         return
-    rows = [[btn(f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:36]}",
+    from utils import prepare
+    cm = await prepare.clean_names_for(items)
+    rows = [[btn(f"{icon_for(f.get('ext',''))} {(cm.get(f['file_unique_id']) or f.get('name','Untitled'))[:36]}",
                  f"dl:{f['file_unique_id']}", style="success")] for f in items]
     rows.append([btn("🔙 Collections", "disc_collections", style="danger")])
     await call.message.edit_text(
@@ -306,7 +312,9 @@ async def cb_author_files(call: CallbackQuery) -> None:
             reply_markup=kb([btn("📚 Request a Book", "menu_request", style="success")],
                             [btn("🔙 Authors", "disc_authors", style="danger")]))
         return
-    rows = [[btn(f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:36]}",
+    from utils import prepare
+    cm = await prepare.clean_names_for(items)
+    rows = [[btn(f"{icon_for(f.get('ext',''))} {(cm.get(f['file_unique_id']) or f.get('name','Untitled'))[:36]}",
                  f"dl:{f['file_unique_id']}", style="success")] for f in items]
     rows.append([btn("🔙 Authors", "disc_authors", style="danger")])
     await call.message.edit_text(
@@ -391,11 +399,14 @@ async def cb_series_detail(call: CallbackQuery) -> None:
     base = parsed[0] if parsed else f.get("name", "Series")
     if not vols:
         vols = [f]
+    from utils import prepare
+    cm = await prepare.clean_names_for(vols)
     rows = []
     for v in vols:
-        vp = parse_series(v.get("name", ""))
+        vp = parse_series(v.get("name", ""))   # parse the RAW name for the volume number
         tag = f"#{vp[1]} " if vp else ""
-        rows.append([btn(f"📥 {tag}{v.get('name','Untitled')[:32]}",
+        nm = cm.get(v["file_unique_id"]) or v.get("name", "Untitled")
+        rows.append([btn(f"📥 {tag}{nm[:32]}",
                          f"dl:{v['file_unique_id']}", style="success")])
     rows.append([btn("🔙 Series", "disc_series", style="danger")])
     await call.message.edit_text(
@@ -407,10 +418,12 @@ async def cb_series_detail(call: CallbackQuery) -> None:
         reply_markup=kb(*rows))
 
 
-def _file_rows(items, page, total, base):
+def _file_rows(items, page, total, base, cm=None):
+    cm = cm or {}
     rows = []
     for f in items:
-        rows.append([btn(f"{icon_for(f.get('ext',''))} {f.get('name','Untitled')[:38]}",
+        name = cm.get(f["file_unique_id"]) or f.get("name", "Untitled")
+        rows.append([btn(f"{icon_for(f.get('ext',''))} {name[:38]}",
                          f"dl:{f['file_unique_id']}", style="success")])
     nav = []
     if page > 0:
@@ -441,13 +454,15 @@ async def cb_new(call: CallbackQuery) -> None:
             reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
         return
     chunk = items[page * _PER:(page + 1) * _PER]
+    from utils import prepare
+    cm = await prepare.clean_names_for(chunk)
     await call.message.edit_text(
         "🆕 <b>New Arrivals</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>Hot off the shelf — the freshest additions to the archive.</i>\n"
         f"<blockquote>📥 Delivered free with your daily quota.\n"
         f"📄 Page <code>{page+1}</code> — tap a cover to add it to your library.</blockquote>",
-        reply_markup=kb(*_file_rows(chunk, page, len(items), "disc_new")))
+        reply_markup=kb(*_file_rows(chunk, page, len(items), "disc_new", cm)))
 
 
 @router.callback_query(F.data.startswith("disc_pop:"))
@@ -464,18 +479,21 @@ async def cb_pop(call: CallbackQuery) -> None:
             reply_markup=kb([btn("🔙 Discover", "lib_discover", style="danger")]))
         return
     chunk = items[page * _PER:(page + 1) * _PER]
+    from utils import prepare
+    cm = await prepare.clean_names_for(chunk)
     await call.message.edit_text(
         "🔥 <b>Popular</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>The crowd favourites — most downloaded of all time.</i>\n"
         f"<blockquote>🏆 If everyone's reading it, there's a reason.\n"
         f"📥 Free with your daily quota · 📄 Page <code>{page+1}</code> — tap to add it to your library.</blockquote>",
-        reply_markup=kb(*_file_rows(chunk, page, len(items), "disc_pop")))
+        reply_markup=kb(*_file_rows(chunk, page, len(items), "disc_pop", cm)))
 
 
 @router.callback_query(F.data == "disc_botd")
 async def cb_botd(call: CallbackQuery) -> None:
     await call.answer()
+    from utils import prepare
     f = await book_of_the_day(_day_index())
     if not f:
         await call.message.edit_text(
@@ -489,7 +507,7 @@ async def cb_botd(call: CallbackQuery) -> None:
         "📅 <b>Book of the Day</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "<i>One handpicked read, refreshed every morning — just for today.</i>\n"
-        f"<blockquote>{icon_for(f.get('ext',''))} <b>{escape(f.get('name','Untitled'))}</b>\n\n"
+        f"<blockquote>{icon_for(f.get('ext',''))} <b>{escape((await prepare.clean_names_for([f])).get(f['file_unique_id']) or f.get('name','Untitled'))}</b>\n\n"
         "📥 Tap below and it's in your library — free with your daily quota.</blockquote>",
         reply_markup=kb([btn("📥 Claim Today's Pick", f"dl:{f['file_unique_id']}", style="success")],
                         [btn("🔙 Discover", "lib_discover", style="danger")]))

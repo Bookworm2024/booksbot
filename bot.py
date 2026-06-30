@@ -36,7 +36,7 @@ from handlers import (
     inline, invite, hangman, payments, qadmin, leaderboards, missions, notifs, profile,
     quests, rate, ratings, recommend, referral, report, request, requests_manual, revenue,
     settings_admin, shelf, speedread, spin, start, stats, support, tagger, track, vip,
-    pricing_admin, risk_admin, harvester_admin,
+    pricing_admin, risk_admin, harvester_admin, branding_admin,
 )
 from handlers.payments import oxapay_webhook
 from handlers.pay_api import api_pay_cancel, api_pay_ipaid, api_pay_status
@@ -152,6 +152,7 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(perms_admin.router)
     dp.include_router(dedupe_admin.router)
     dp.include_router(harvester_admin.router)
+    dp.include_router(branding_admin.router)
     dp.include_router(risk_admin.router)
     dp.include_router(admin.router)
     _register_error_handler(dp)

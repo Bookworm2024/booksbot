@@ -32,7 +32,8 @@ _AUDIO_EXT = {"mp3", "m4b", "m4a", "wav", "ogg", "flac", "aac"}
 _MAX_SCAN = 500  # cap matches materialised per search (memory bound)
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _SEARCH_PROJ = {"name": 1, "name_lc": 1, "ext": 1, "kind": 1, "msg_id": 1,
-                "file_id": 1, "file_unique_id": 1, "indexed_at": 1, "dl_count": 1}
+                "file_id": 1, "file_unique_id": 1, "indexed_at": 1, "dl_count": 1,
+                "clean_name": 1}
 _TAG_RE = re.compile(r"@\w+")
 _CLEAN_RE = re.compile(r"[_\-.]+")
 _NORM_RE = re.compile(r"[^a-z0-9 ]+")
@@ -346,7 +347,8 @@ async def archive_count() -> int:
     return await db.count_global("files")
 
 
-_DISC_PROJ = {"name": 1, "ext": 1, "kind": 1, "file_unique_id": 1, "dl_count": 1}
+_DISC_PROJ = {"name": 1, "ext": 1, "kind": 1, "file_unique_id": 1, "dl_count": 1,
+              "clean_name": 1}
 
 
 async def recent_files(limit: int = 48) -> list[dict]:

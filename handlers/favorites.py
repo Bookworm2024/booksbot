@@ -134,25 +134,17 @@ async def cb_fav_get(call: CallbackQuery) -> None:
     if not f:
         await call.answer("⚠️ This title isn't in your Favorites anymore — save it again to keep it on hand.", show_alert=True)
         return
-    await call.answer("📤 On its way — delivering from your Favorites…")
-    caption = (f"{icon_for(f.get('ext',''))} <b>{escape(f.get('name','Your File') or 'Your File')}</b>"
-               "\n\n⭐ <i>Re-delivered from your Favorites — always free.</i>")
+    await call.answer()
     ext = (f.get("ext") or "").lower()
     is_audio = f.get("kind") == "audio" or ext in _AUDIO_EXT
     rk = None
     if BOT_PUBLIC_URL:
         rk = kb([webapp_btn("🎧 Listen now" if is_audio else "📖 Read now",
                             "view.html", query=f"fuid={fuid}&ext={ext}", style="success")])
-    src_channel = f.get("chan_id") or await get_file_channel()
-    try:
-        if src_channel and f.get("msg_id"):
-            await call.bot.copy_message(uid, src_channel, f["msg_id"], caption=caption, reply_markup=rk)
-        elif f.get("file_id"):
-            await call.bot.send_document(uid, f["file_id"], caption=caption, reply_markup=rk)
-        else:
-            await call.message.answer("⚠️ <b>This title is no longer retrievable.</b>\n<i>The source file has moved on. Search for it again and we'll re-deliver a fresh copy.</i>")
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Favorite re-delivery failed: %s", exc)
+    from utils import prepare
+    ok = await prepare.deliver(call.bot, uid, f, reply_markup=rk,
+                               note="⭐ <i>Re-delivered from your Favorites — always free.</i>")
+    if not ok:
         await call.message.answer("⚠️ <b>We couldn't fetch this one right now.</b>\n<i>A momentary hiccup — please tap to open it again in a few seconds.</i>")
 
 

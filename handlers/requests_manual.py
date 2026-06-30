@@ -532,24 +532,18 @@ async def on_admin_file(message: Message, state: FSMContext) -> None:
                                    "chan_id": chan_id, "msg_id": chan_msg_id,
                                    "file_id": file_id}})
 
-    caption = ("🎁 <b>Your book has arrived</b>\n"
-               "━━━━━━━━━━━━━━━━━━━━\n"
-               "<i>Sourced and delivered, just as you asked — enjoy.</i>\n"
-               "<blockquote>"
-               f"📖 <b>{escape(str(req.get('title') or ''))}</b>\n✍️ {escape(str(req.get('author') or ''))}</blockquote>\n"
-               "<i>🔖 Tap below to save it to your library so it's always one tap away.</i>\n\n"
-               f"{CREDIT}")
     fav = kb([btn("⭐ Save to Favorites", f"fav_add:{fuid}", style="success")])
-    try:
-        await message.bot.send_document(target, file_id, caption=caption, reply_markup=fav) \
-            if message.document else \
-            await message.bot.copy_message(target, message.chat.id, message.message_id)
-    except Exception as exc:  # noqa: BLE001
+    # Brand + deliver through the prep pipeline (cover image, clean title @handle,
+    # "Preparing…" UX) — same treatment as every other file the bot hands a user.
+    from utils import prepare
+    delivered = await prepare.deliver(
+        message.bot, target, doc, reply_markup=fav,
+        note="🎁 <i>Sourced and delivered, just as you asked — enjoy.</i>")
+    if not delivered:
         await message.answer(
             "❌ <b>Delivery didn't go through</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            f"<blockquote>We couldn't hand this file to the reader.\n🛡 <b>Details:</b> "
-            f"{escape(str(exc))}</blockquote>\n"
+            "<blockquote>We couldn't hand this file to the reader.</blockquote>\n"
             "<i>💡 The ticket is still open — try sending the file again.</i>")
         return
 
