@@ -117,6 +117,18 @@ async def cmd_start(message: Message, command: CommandObject, state: FSMContext)
     if arg.startswith("dl_"):
         await _deeplink_download(message, uid, arg[3:])
         return
+    # Request Arena deep link: ?start=ar_<token> → run the group request's action
+    # (get/buy file, notify, or concierge) here in DM, behind the join gate.
+    if arg.startswith("ar_"):
+        from handlers.arena import handle_ticket
+        await handle_ticket(message, state, uid, arg[3:])
+        return
+    # ?start=go_premium → open the Premium screen (used by Arena upsell buttons)
+    if arg == "go_premium":
+        from handlers.vip import _view as _premium_view
+        text, markup = await _premium_view(uid)
+        await message.answer(text, reply_markup=markup)
+        return
     # referral attribution from the deep-link payload (?start=<referrer_id>)
     if arg:
         await remember_referrer(uid, arg)

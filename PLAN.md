@@ -146,6 +146,29 @@ Legend: ✅ done · 🔜 next · ⬜ planned
 - ✅ Harvester bakes the cover + clean_name at ingest (it re-uploads anyway).
 - ✅ Admin: 🧰 More Tools → 🎨 Branding (cover image, handle, on/off, cover on/off).
 
+## Phase 10 — Request Arena (group-topic requests, free-tier entry) ✅
+- ✅ Direct in-bot requesting (Request Bot + Concierge) is now PREMIUM-ONLY; free
+  members are redirected to the public Request Arena group. (request.py /
+  requests_manual.py gates → arena link + Go Premium.)
+- ✅ `handlers/arena.py` listens to ONE configured group + forum topic (kv
+  arena_chat/arena_topic, default @free_novellas / topic 33; admin panel 📣 Request
+  Arena). Every text there is treated as a request (per-user cooldown, ignores
+  bots/commands).
+- ✅ Match → topic reply "Found N" + a deep-link that, in DM, runs the join/force-sub
+  gate then delivers (premium unlimited; free daily quota → per-file overage/Premium
+  upsell shown in the topic when the limit's used up). Single match auto-delivers;
+  many → a pick list. "Buy this file" deep-link → wallet overage charge.
+- ✅ No match → 🔔 Notify me (watchlist auto-DM when added; if the user never started
+  the bot, a Start deep-link subscribes them + shows the dashboard + a confirm) and
+  👤 Request from admins (concierge prefilled with the title; ebook quota + audiobook-
+  premium rules still apply).
+- ✅ Reuse, not duplication: tickets (arena_tickets, TTL 7d) + deep-links route
+  through the EXISTING gate (start._not_joined), delivery/quota/overage
+  (request.fulfil_download / fulfil_paid), watchlist (request._add_watchlist) and
+  concierge (requests_manual.begin_concierge). Branding/prep applies to delivered files.
+- ⚙️ Operational: the bot must be a group ADMIN (or have BotFather privacy mode OFF)
+  to read the topic's messages.
+
 ## Status: feature-complete + hardened
 All TBC features rebuilt + modernized; crypto via OxaPay.
 Credential-gated features (AI, crypto) activate once their keys are set in the

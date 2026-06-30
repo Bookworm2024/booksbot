@@ -78,6 +78,7 @@ async def cb_more(call: CallbackQuery) -> None:
              btn("🧪 A/B Test", "admin_abtest", style="success")],
             [btn("📚 Harvester", "admin_harvest", style="success"),
              btn("🎨 Branding", "admin_brand", style="success")],
+            [btn("📣 Request Arena", "admin_arena", style="success")],
             [btn("🔙 Back", "admin_open", style="primary")]))
 
 

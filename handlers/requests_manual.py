@@ -125,20 +125,31 @@ async def _limit_card(call: CallbackQuery, key: str, kind: str, label: str) -> N
 @router.callback_query(F.data == "req_manual")
 async def cb_req_manual(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
-    await state.set_data({})
-    await call.message.edit_text(
+    # Direct in-bot concierge is Premium-only; free members reach it via the Arena.
+    if not await premium.is_premium(call.from_user.id):
+        from handlers.request import _request_blocked_card
+        text, markup = await _request_blocked_card()
+        await call.message.edit_text(text, reply_markup=markup)
+        return
+    await begin_concierge(call.message, state)
+
+
+async def begin_concierge(message: Message, state: FSMContext, *, prefill_title: str = "") -> None:
+    """Open the concierge flow from anywhere (e.g. the Arena 'Request admins' deep
+    link), optionally pre-seeding the title so we skip straight to format/author.
+    No premium gate here — this IS the free member's allowed path (the ebook quota
+    and audiobook-premium rule still apply at category pick)."""
+    await state.set_data({"prefill_title": prefill_title.strip()} if prefill_title.strip() else {})
+    head = f"<i>Requesting:</i> <b>{escape(prefill_title.strip())}</b>\n\n" if prefill_title.strip() else ""
+    await message.answer(
         "👤 <b>Concierge Request</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "<i>Can't find a title in the archive? Hand it to our team — we'll source it for you.</i>\n"
-        "<blockquote>Tell us what you're after and we'll track it down, then deliver it "
-        "straight to your chat. eBook or audiobook — your choice.\n"
-        "🎁 <b>Free of charge</b> — no tokens spent. Just a few requests a day, "
-        "so we can give every reader our full attention.</blockquote>\n"
-        "<i>👇 What shall we find for you?</i>",
-        reply_markup=kb(
-            [btn("📘 eBook", "mreq_ebook", style="primary"),
-             btn("🎧 Audiobook", "mreq_audio", style="success")],
-            [btn("🔙 Back to Requests", "menu_request", style="danger")]))
+        f"{head}"
+        "<i>Our team will source it and deliver it to your chat — free of charge.</i>\n"
+        "<blockquote>Pick a format to continue. eBook or audiobook — your choice.</blockquote>",
+        reply_markup=kb([btn("📘 eBook", "mreq_ebook", style="primary"),
+                         btn("🎧 Audiobook", "mreq_audio", style="success")],
+                        [btn("🔙 Back to Requests", "menu_request", style="danger")]))
 
 
 @router.callback_query(F.data.in_({"mreq_ebook", "mreq_audio"}))
@@ -157,6 +168,20 @@ async def cb_pick_category(call: CallbackQuery, state: FSMContext) -> None:
         return
 
     await state.update_data(category=category)
+    # Arena deep-link pre-seeded the title → skip step 1, jump to the author.
+    data = await state.get_data()
+    prefill = (data.get("prefill_title") or "").strip()
+    if prefill:
+        await state.update_data(title=prefill)
+        await state.set_state(ManualFSM.author)
+        await call.message.edit_text(
+            "✍️ <b>Request · Step 2 of 4</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>📖 <b>{escape(prefill)}</b>\n\n"
+            "Now the <b>author's name</b>. This helps us pick the right book when "
+            "several share a title.</blockquote>",
+            reply_markup=kb([btn("❌ Cancel", "mreq_cancel", style="danger")]))
+        return
     await state.set_state(ManualFSM.title)
     label = "📘 eBook" if category == "ebook" else "🎧 Audiobook"
     await call.message.edit_text(

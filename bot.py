@@ -29,7 +29,7 @@ from config import (
 )
 from database.connection import MongoManager
 from handlers import (
-    abtest, admin, admin_extra, admin_tools, ai_admin, anagram, broadcast, captcha,
+    abtest, admin, admin_extra, admin_tools, ai_admin, anagram, arena, broadcast, captcha,
     ads, battlepass, challenges, channel_admin, cosmetics, coverguess, crates, daily,
     dedupe_admin, discover, economy, fallback, favorites, featured_admin, feed, games, gift,
     goals, health_admin, indexer, locale, memory, moderation_admin, perms_admin,
@@ -155,6 +155,8 @@ def _build_dispatcher() -> Dispatcher:
     dp.include_router(branding_admin.router)
     dp.include_router(risk_admin.router)
     dp.include_router(admin.router)
+    # Request Arena: group-topic listener. Before fallback so it catches group text.
+    dp.include_router(arena.router)
     _register_error_handler(dp)
     # fallback last among message routers: catches stray non-command text only
     # when no FSM flow is active, so it can never shadow a real handler.

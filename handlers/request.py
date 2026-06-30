@@ -28,7 +28,7 @@ from utils.channel import get_file_channel
 from utils.files import (_MAX_SCAN, archive_count, fuzzy_search, get_file,
                          icon_for, search)
 from utils.format import fmt_amount
-from utils.keyboards import btn, kb, webapp_btn
+from utils.keyboards import btn, kb, url_btn, webapp_btn
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -50,6 +50,33 @@ def _norm(text: str) -> str:
 
 
 # ── Request Center ─────────────────────────────────────────────────────────────
+# Direct in-bot requesting (bot search + concierge) is a PREMIUM perk. Free members
+# request in the public Request Arena group, where the bot finds + delivers the file.
+async def _request_blocked_card():
+    from handlers import arena
+    url = await arena.topic_url()
+    rows = []
+    if url:
+        rows.append([url_btn("📣 Open the Request Arena", url)])
+    rows.append([btn("👑 Go Premium", "go_premium", style="success")])
+    rows.append([btn("🔙 Back", "menu_home", style="danger")])
+    return (
+        "📣 <b>Request in the Arena</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<i>Requesting directly in the bot is a Premium perk.</i>\n"
+        "<blockquote>📚 <b>Free members</b> — just post the book or audiobook name in our "
+        "public <b>Request Arena</b> and the bot finds it and delivers it to you right here. "
+        "It's quick and open to everyone.\n\n"
+        "👑 <b>Premium</b> unlocks instant in-bot requests — Request Bot <i>and</i> "
+        "concierge — plus unlimited downloads and the full library.</blockquote>",
+        kb(*rows))
+
+
+async def _is_premium(uid: int) -> bool:
+    from utils import premium
+    return await premium.is_premium(uid)
+
+
 def _request_center():
     text = (
         "📚 <b>Request Center</b>\n"
@@ -74,7 +101,10 @@ def _request_center():
 @router.message(Command("request"))
 async def cmd_request(message: Message, state: FSMContext) -> None:
     await state.clear()
-    text, markup = _request_center()
+    if not await _is_premium(message.chat.id):
+        text, markup = await _request_blocked_card()
+    else:
+        text, markup = _request_center()
     await message.answer(text, reply_markup=markup)
 
 
@@ -82,13 +112,20 @@ async def cmd_request(message: Message, state: FSMContext) -> None:
 async def cb_request_center(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await call.answer()
-    text, markup = _request_center()
+    if not await _is_premium(call.from_user.id):
+        text, markup = await _request_blocked_card()
+    else:
+        text, markup = _request_center()
     await call.message.edit_text(text, reply_markup=markup)
 
 
 @router.callback_query(F.data == "req_auto")
 async def cb_req_auto(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
+    if not await _is_premium(call.from_user.id):
+        text, markup = await _request_blocked_card()
+        await call.message.edit_text(text, reply_markup=markup)
+        return
     from utils.flags import is_on
     if not await is_on("search"):
         await call.message.edit_text(
@@ -419,13 +456,14 @@ def _file_buttons(fuid: str, f: dict):
     return kb(*rows)
 
 
-async def _deliver_file(call: CallbackQuery, uid: int, f: dict, fuid: str, *, tag: str) -> bool:
+async def _deliver_file(bot, msg: Message, uid: int, f: dict, fuid: str, *, tag: str) -> bool:
     """Brand + deliver the file (utils.prepare handles the cover/clean-name/"Preparing"
     UX) and do all success bookkeeping. Returns whether it was delivered. The CALLER
-    owns refund-on-failure (quota or wallet)."""
+    owns refund-on-failure (quota or wallet). `msg` = the DM to post follow-ups to,
+    so it works from a button OR a deep link."""
     from utils import prepare
     delivered = await prepare.deliver(
-        call.bot, uid, f, reply_markup=_file_buttons(fuid, f),
+        bot, uid, f, reply_markup=_file_buttons(fuid, f),
         note="<i>Delivered to your library — enjoy the read.</i>")
     if not delivered:
         return False
@@ -460,7 +498,7 @@ async def _deliver_file(call: CallbackQuery, uid: int, f: dict, fuid: str, *, ta
         from utils.series import next_volume
         nxt = await next_volume(f)
         if nxt:
-            await call.message.answer(
+            await msg.answer(
                 "📚 <b>Next in the series</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "<i>Keep the story going — the next volume is ready for you.</i>\n\n"
@@ -470,12 +508,12 @@ async def _deliver_file(call: CallbackQuery, uid: int, f: dict, fuid: str, *, ta
     except Exception:  # noqa: BLE001 — a nudge must never break delivery
         pass
     # found-a-book → admin (full detail) + public (privacy-safe) activity log
-    await log_book_found(call.bot, uid, f.get("name") or "", f.get("ext") or "", tag)
+    await log_book_found(bot, uid, f.get("name") or "", f.get("ext") or "", tag)
     return True
 
 
-async def _delivery_failed(call: CallbackQuery, note: str = "") -> None:
-    await call.message.answer(
+async def _delivery_failed(msg: Message, note: str = "") -> None:
+    await msg.answer(
         "⚠️ <b>That delivery didn't go through</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         + (f"<i>{note}</i>\n\n" if note else "")
@@ -503,6 +541,27 @@ async def _overage_options(uid: int) -> list:
     return opts
 
 
+async def fulfil_download(bot, msg: Message, uid: int, f: dict) -> None:
+    """Quota-gated delivery used by BOTH the dl: button and the group Request Arena
+    deep link: PREMIUM = unlimited; FREE = daily quota, then a per-file overage offer."""
+    fuid = f["file_unique_id"]
+    from utils import premium, quota
+    consumed = False
+    if await premium.is_premium(uid):
+        await quota.consume(uid, "dl")   # unlimited; recorded for stats only
+        tag = "PREMIUM"
+    elif await quota.consume(uid, "dl"):
+        consumed = True
+        tag = "FREE"
+    else:
+        await _offer_overage(msg, uid, f)   # free quota exhausted → overage/premium
+        return
+    if not await _deliver_file(bot, msg, uid, f, fuid, tag=tag):
+        if consumed:
+            await quota.refund_one(uid, "dl")   # a failed delivery never burns a free download
+        await _delivery_failed(msg, "Your free download wasn't used." if consumed else "")
+
+
 @router.callback_query(F.data.startswith("dl:"))
 async def cb_download(call: CallbackQuery) -> None:
     uid = call.from_user.id
@@ -511,35 +570,16 @@ async def cb_download(call: CallbackQuery) -> None:
     if not f:
         await call.answer("This title is no longer in the archive. Try a fresh search and we'll find another copy.", show_alert=True)
         return
-
-    from utils import premium, quota
-    consumed = False
-    if await premium.is_premium(uid):
-        await quota.consume(uid, "dl")  # unlimited; recorded for stats only
-        tag = "PREMIUM"
-    elif await quota.consume(uid, "dl"):
-        consumed = True
-        tag = "FREE"
-    else:
-        # free quota exhausted → offer the paid per-file overage instead of stopping
-        await call.answer()
-        await _offer_overage(call, fuid, f)
-        return
-
-    await call.answer("📤 Delivering your title — one moment…")
-    if not await _deliver_file(call, uid, f, fuid, tag=tag):
-        if consumed:
-            await quota.refund_one(uid, "dl")  # a failed delivery never burns a free download
-        await _delivery_failed(call, "Your free download wasn't used." if consumed else "")
+    await call.answer()
+    await fulfil_download(call.bot, call.message, uid, f)
 
 
-async def _offer_overage(call: CallbackQuery, fuid: str, f: dict) -> None:
-    uid = call.from_user.id
+async def _offer_overage(msg: Message, uid: int, f: dict) -> None:
     from utils import quota
     _, lim = await quota.status(uid, "dl")
     bucket, price, sym = (await _overage_options(uid))[0]
     name = escape((f.get("name") or "this title")[:48])
-    await call.message.answer(
+    await msg.answer(
         "📥 <b>Daily free downloads used up</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"<i>You've delivered your {quota.fmt_limit(lim)} free files today — nice reading.</i>\n\n"
@@ -548,9 +588,37 @@ async def _offer_overage(call: CallbackQuery, fuid: str, f: dict) -> None:
         f"Grab this one now for <b>{sym}{fmt_amount(price)}</b> from your wallet, or go "
         "👑 <b>Premium</b> for unlimited downloads and the whole library.</blockquote>",
         reply_markup=kb(
-            [btn(f"📥 Get it for {sym}{fmt_amount(price)}", f"dlpay:{fuid}", style="success")],
+            [btn(f"📥 Get it for {sym}{fmt_amount(price)}", f"dlpay:{f['file_unique_id']}", style="success")],
             [btn("👑 Go Premium (unlimited)", "go_premium", style="primary")],
             [btn("🔙 Back", "menu_home", style="danger")]))
+
+
+async def fulfil_paid(bot, msg: Message, uid: int, f: dict) -> None:
+    """Charge the per-file overage from the wallet, then deliver. Used by BOTH the
+    dlpay: button and the Arena 'buy this file' deep link."""
+    fuid = f["file_unique_id"]
+    from utils.wallet import spend_money, add_money
+    # Charge exactly the option shown (the user's preferred currency).
+    bucket, price, sym = (await _overage_options(uid))[0]
+    if not await spend_money(uid, bucket, price):
+        await msg.answer(
+            "💳 <b>Top up to grab this file</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"<i>A single extra download is {sym}{fmt_amount(price)} — your wallet's a little short.</i>\n\n"
+            "<blockquote>Top up your wallet and tap the file again, or go 👑 <b>Premium</b> for "
+            "unlimited downloads and skip per-file charges entirely.</blockquote>",
+            reply_markup=kb([btn("💳 Top Up Wallet", "acc_buy", style="success")],
+                            [btn("👑 Go Premium", "go_premium", style="primary")],
+                            [btn("🔙 Back", "menu_home", style="danger")]))
+        return
+    if not await _deliver_file(bot, msg, uid, f, fuid, tag=f"PAID {sym}{fmt_amount(price)}"):
+        await add_money(uid, bucket, price)   # refund the overage on failure
+        await _delivery_failed(msg, f"Your {sym}{fmt_amount(price)} was refunded.")
+        return
+    await msg.answer(
+        f"✅ <b>{sym}{fmt_amount(price)} charged</b> from your wallet for this file — enjoy!\n"
+        "<i>💡 👑 Premium makes downloads unlimited, no per-file charge.</i>",
+        reply_markup=kb([btn("👑 Go Premium", "go_premium", style="primary")]))
 
 
 @router.callback_query(F.data.startswith("dlpay:"))
@@ -561,31 +629,8 @@ async def cb_download_paid(call: CallbackQuery) -> None:
     if not f:
         await call.answer("This title is no longer in the archive. Try a fresh search.", show_alert=True)
         return
-    from utils.wallet import spend_money, add_money
-    # Charge exactly the option we showed the user (their preferred currency), so
-    # the amount debited always matches the price on the button.
-    bucket, price, sym = (await _overage_options(uid))[0]
-    if not await spend_money(uid, bucket, price):
-        await call.answer()
-        await call.message.answer(
-            "💳 <b>Top up to grab this file</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"<i>A single extra download is {sym}{fmt_amount(price)} — your wallet's a little short.</i>\n\n"
-            "<blockquote>Top up your wallet and tap the file again, or go 👑 <b>Premium</b> for "
-            "unlimited downloads and skip per-file charges entirely.</blockquote>",
-            reply_markup=kb([btn("💳 Top Up Wallet", "acc_buy", style="success")],
-                            [btn("👑 Go Premium", "go_premium", style="primary")],
-                            [btn("🔙 Back", "menu_home", style="danger")]))
-        return
-    await call.answer("📤 Delivering your title — one moment…")
-    if not await _deliver_file(call, uid, f, fuid, tag=f"PAID {sym}{fmt_amount(price)}"):
-        await add_money(uid, bucket, price)  # refund the overage on failure
-        await _delivery_failed(call, f"Your {sym}{fmt_amount(price)} was refunded.")
-        return
-    await call.message.answer(
-        f"✅ <b>{sym}{fmt_amount(price)} charged</b> from your wallet for this file — enjoy!\n"
-        "<i>💡 👑 Premium makes downloads unlimited, no per-file charge.</i>",
-        reply_markup=kb([btn("👑 Go Premium", "go_premium", style="primary")]))
+    await call.answer()
+    await fulfil_paid(call.bot, call.message, uid, f)
 
 
 # NOTE: req_manual and req_history are handled by requests_manual.py and track.py.

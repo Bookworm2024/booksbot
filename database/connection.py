@@ -126,6 +126,9 @@ class MongoManager:
                 await db.coupon_uses.create_index([("code", ASCENDING), ("user_id", ASCENDING)], unique=True)
                 # captured errors auto-expire after 30 days (TTL on `at`)
                 await db.errors.create_index([("at", ASCENDING)], expireAfterSeconds=2592000)
+                # Request Arena tickets: unique token + auto-expire after 7 days
+                await db.arena_tickets.create_index([("token", ASCENDING)], unique=True)
+                await db.arena_tickets.create_index([("created_at", ASCENDING)], expireAfterSeconds=604800)
                 # one reaction per (file, user)
                 await db.reactions.create_index(
                     [("file_unique_id", ASCENDING), ("user_id", ASCENDING)], unique=True)
